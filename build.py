@@ -93,6 +93,9 @@ open(D + 'manifest.webmanifest', 'w', encoding='utf-8').write(json.dumps(manifes
 os.makedirs(D + 'icons', exist_ok=True)
 for f in os.listdir(A + 'icons'): shutil.copy(A + 'icons/' + f, D + 'icons/' + f)
 open(D + 'sw.js', 'w', encoding='utf-8').write(open(A + 'sw.js', encoding='utf-8').read().replace('__VERSION__', ver))
+# a simple download page for sharing: <site>/download/
+os.makedirs(D + 'download', exist_ok=True)
+shutil.copy(A + 'download.html', D + 'download/index.html')
 print('web app version', ver)
 if len(sys.argv) > 1:
     open(sys.argv[1], 'w', encoding='utf-8').write(out)
