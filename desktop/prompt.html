@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>HelixBoard</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 18px 20px; background: #1C1220; color: #F6ECF4; font: 14px "Segoe UI", system-ui, sans-serif; }
+  label { display: block; margin-bottom: 10px; line-height: 1.4; white-space: pre-wrap; }
+  input { box-sizing: border-box; width: 100%; height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #3A2840; background: #271A2C; color: inherit; font: inherit; }
+  input:focus { outline: none; border-color: #FF5FA2; }
+  .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  button { min-width: 84px; height: 34px; border-radius: 8px; border: 1px solid #3A2840; background: #271A2C; color: inherit; font: 600 13px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+  button.primary { background: #FF5FA2; border-color: #FF5FA2; color: #24020F; }
+</style>
+</head>
+<body>
+<label id="m" for="v"></label>
+<input id="v">
+<div class="row"><button id="no">Cancel</button><button id="ok" class="primary">OK</button></div>
+<script>
+  const q = new URLSearchParams(location.search), v = document.getElementById('v');
+  document.getElementById('m').textContent = q.get('m') || '';
+  v.value = q.get('v') || '';
+  v.focus(); v.select();
+  const ok = () => promptBridge.done(v.value), no = () => promptBridge.done(null);
+  document.getElementById('ok').onclick = ok;
+  document.getElementById('no').onclick = no;
+  addEventListener('keydown', e => { if (e.key === 'Enter') ok(); else if (e.key === 'Escape') no(); });
+</script>
+</body>
+</html>

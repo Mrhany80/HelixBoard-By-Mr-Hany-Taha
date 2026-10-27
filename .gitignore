@@ -1,0 +1,6 @@
+desktop/node_modules/
+desktop/release/
+desktop/app/
+dist/
+*.log
+.DS_Store

@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>HelixBoard — annotate screen</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; user-select: none; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; touch-action: none; cursor: crosshair; }
+  body.through canvas { cursor: default; }
+  #bar { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 16px; background: rgba(28,18,32,.94); border: 1px solid #3A2840; box-shadow: 0 12px 36px rgba(0,0,0,.45); font: 600 13px "Segoe UI", system-ui, sans-serif; color: #F6ECF4; }
+  #bar button { min-width: 40px; height: 40px; border-radius: 11px; border: 1px solid #3A2840; background: #271A2C; color: inherit; font: inherit; cursor: pointer; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; }
+  #bar button.on { background: #FF5FA2; border-color: #FF5FA2; color: #24020F; }
+  #bar .sw { width: 30px; min-width: 30px; height: 30px; border-radius: 50%; padding: 0; border: 3px solid transparent; }
+  #bar .sw.on { border-color: #fff; box-shadow: 0 0 0 2px #FF5FA2; }
+  #bar .sep { width: 1px; height: 28px; background: #3A2840; }
+  #bar b { color: #FF5FA2; margin: 0 4px; }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="bar">
+  <b>HelixBoard</b>
+  <button class="sw on" data-c="#FF3B6B" title="Red" style="background:#FF3B6B"></button>
+  <button class="sw" data-c="#1C7ED6" title="Blue" style="background:#1C7ED6"></button>
+  <button class="sw" data-c="#2F9E44" title="Green" style="background:#2F9E44"></button>
+  <button class="sw" data-c="#FFD43B" title="Yellow" style="background:#FFD43B"></button>
+  <button class="sw" data-c="#111111" title="Black" style="background:#111"></button>
+  <span class="sep"></span>
+  <button id="pen" class="on" title="Pen">✎ Pen</button>
+  <button id="hi" title="Highlighter">▬ Highlight</button>
+  <button id="undo" title="Undo (Ctrl+Z)">↶</button>
+  <button id="clear" title="Clear all ink">Clear</button>
+  <span class="sep"></span>
+  <button id="through" title="Use the apps underneath; your ink stays">🖱 Use apps</button>
+  <button id="snap" title="Put a picture of the screen with your ink on the board">📷 To board</button>
+  <button id="done" title="Close (Esc)">✕ Done</button>
+</div>
+<div id="flash"></div>
+<script>
+  const cv = document.getElementById('c'), g = cv.getContext('2d', { desynchronized: true }), bar = document.getElementById('bar');
+  let DPR = 1, color = '#FF3B6B', mode = 'pen', strokes = [], cur = null, through = false;
+  const size = () => { DPR = devicePixelRatio || 1; cv.width = innerWidth * DPR; cv.height = innerHeight * DPR; redraw(); };
+  function drawStroke(s) { if (s.p.length < 2) { g.beginPath(); g.arc(s.p[0][0], s.p[0][1], s.w / 2, 0, 7); g.fillStyle = s.c; g.globalAlpha = s.a; g.fill(); return; }
+    g.globalAlpha = s.a; g.strokeStyle = s.c; g.lineWidth = s.w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(s.p[0][0], s.p[0][1]);
+    for (let i = 1; i < s.p.length - 1; i++) { const mx = (s.p[i][0] + s.p[i + 1][0]) / 2, my = (s.p[i][1] + s.p[i + 1][1]) / 2; g.quadraticCurveTo(s.p[i][0], s.p[i][1], mx, my); }
+    const L = s.p[s.p.length - 1]; g.lineTo(L[0], L[1]); g.stroke(); }
+  function redraw() { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, innerWidth, innerHeight); strokes.forEach(drawStroke); if (cur) drawStroke(cur); g.globalAlpha = 1; }
+  cv.addEventListener('pointerdown', e => { if (through) return; cv.setPointerCapture(e.pointerId); cur = { c: color, w: mode === 'hi' ? 26 : 5, a: mode === 'hi' ? 0.38 : 1, p: [[e.clientX, e.clientY]] }; redraw(); });
+  cv.addEventListener('pointermove', e => { if (!cur) return; (e.getCoalescedEvents ? e.getCoalescedEvents() : [e]).forEach(ev => cur.p.push([ev.clientX, ev.clientY])); redraw(); });
+  const up = () => { if (!cur) return; strokes.push(cur); cur = null; redraw(); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  document.querySelectorAll('.sw').forEach(b => b.onclick = () => { color = b.dataset.c; document.querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); if (through) setThrough(false); });
+  const setMode = m => { mode = m; document.getElementById('pen').classList.toggle('on', m === 'pen'); document.getElementById('hi').classList.toggle('on', m === 'hi'); if (through) setThrough(false); };
+  document.getElementById('pen').onclick = () => setMode('pen'); document.getElementById('hi').onclick = () => setMode('hi');
+  document.getElementById('undo').onclick = () => { strokes.pop(); redraw(); };
+  document.getElementById('clear').onclick = () => { strokes = []; redraw(); };
+  /* "Use apps": clicks go through to the programs underneath, except over this toolbar */
+  function setThrough(on) { through = on; document.body.classList.toggle('through', on); document.getElementById('through').classList.toggle('on', on); overlay.through(on); }
+  document.getElementById('through').onclick = () => setThrough(!through);
+  bar.addEventListener('mouseenter', () => { if (through) overlay.through(false); });
+  bar.addEventListener('mouseleave', () => { if (through) overlay.through(true); });
+  document.getElementById('snap').onclick = async () => { bar.style.visibility = 'hidden'; await new Promise(r => setTimeout(r, 120)); const ok = await overlay.snap(); bar.style.visibility = ''; const f = document.getElementById('flash'); f.style.opacity = 0.7; setTimeout(() => f.style.opacity = 0, 160); if (!ok) alert('The screen could not be captured.'); };
+  document.getElementById('done').onclick = () => overlay.close();
+  addEventListener('keydown', e => { if (e.key === 'Escape') overlay.close(); else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { strokes.pop(); redraw(); } });
+  addEventListener('resize', size); size();
+</script>
+</body>
+</html>

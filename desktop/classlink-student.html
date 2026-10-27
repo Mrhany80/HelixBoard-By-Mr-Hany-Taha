@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="__LANG__" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120A14">
+<title>__TITLE__ · HelixBoard</title>
+<style>
+  :root { --bg:#120A14; --panel:#1C1220; --panel2:#271A2C; --line:#3A2840; --ink:#F6ECF4; --muted:#B9A5B6; --accent:#FF5FA2; --ok:#4ADE80; --bad:#FF6B6B; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Tahoma, Roboto, sans-serif; display: flex; flex-direction: column; min-height: 100dvh; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  nav { display: flex; gap: 6px; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  nav button { flex: 1; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: inherit; font: 600 14px inherit; font-family: inherit; position: relative; }
+  nav button.on { background: var(--accent); border-color: var(--accent); color: #24020F; }
+  nav button .dot { position: absolute; top: 5px; inset-inline-end: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+  main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 12px; max-width: 900px; width: 100%; margin: 0 auto; }
+  .center { margin: auto 0; text-align: center; }
+  h1 { font-size: 26px; margin: 0 0 6px; } h2 { font-size: 20px; margin: 0; line-height: 1.35; }
+  .muted { color: var(--muted); }
+  input { width: 100%; height: 52px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel2); color: inherit; font: 600 19px inherit; font-family: inherit; padding: 0 14px; margin: 6px 0; text-align: center; }
+  input:focus { outline: none; border-color: var(--accent); }
+  .go { width: 100%; height: 54px; border: 0; border-radius: 14px; background: var(--accent); color: #24020F; font: 800 19px inherit; font-family: inherit; margin-top: 8px; }
+  .go:disabled { opacity: .5; }
+  .btn { height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); color: inherit; font: 600 15px inherit; font-family: inherit; padding: 0 14px; }
+  .btn.on { background: var(--accent); border-color: var(--accent); color: #24020F; }
+  .err { color: var(--bad); min-height: 22px; margin-top: 6px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .boardwrap { position: relative; background: #fff; border-radius: 12px; overflow: hidden; touch-action: pan-x pan-y pinch-zoom; }
+  .boardwrap img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+  .boardwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .boardwrap.view canvas { pointer-events: none; }
+  .sw { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; padding: 0; }
+  .sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+  .file { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+  .file .ic { width: 44px; height: 44px; border-radius: 12px; background: var(--panel2); display: grid; place-items: center; font-size: 22px; flex: none; }
+  .opts { display: grid; gap: 10px; }
+  .opt { border: 2px solid var(--line); border-radius: 14px; background: var(--panel2); color: inherit; font: 600 17px inherit; font-family: inherit; padding: 14px; text-align: start; display: flex; gap: 12px; align-items: center; }
+  .opt .lt { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 900; color: #1E1419; flex: none; }
+  .opt.on { border-color: var(--accent); background: #3A1530; }
+  .opt.right { border-color: var(--ok); } .opt.wrong { border-color: var(--bad); }
+  .bar { height: 8px; border-radius: 4px; background: var(--panel2); overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); }
+  .big { font: 900 56px system-ui, sans-serif; }
+  footer { text-align: center; font-size: 12px; color: var(--muted); padding: 8px; }
+  #off { position: fixed; left: 12px; right: 12px; bottom: 12px; padding: 10px 14px; border-radius: 12px; background: #5A1E28; color: #fff; text-align: center; font-weight: 600; display: none; }
+  [dir=rtl] .opt { text-align: right; }
+</style>
+</head>
+<body>
+<header><b id="hd">__TITLE__</b><span id="me"></span></header>
+<nav id="nav" hidden></nav>
+<main id="m"></main>
+<div id="off"></div>
+<footer>HelixBoard By Mr. Hany Taha</footer>
+<script>
+(() => {
+  const LANG = document.documentElement.lang === 'ar' ? 'ar' : 'en';
+  const AR = { 'Join the class': 'انضم إلى الصف', 'Type your real name so your teacher knows who you are.': 'اكتب اسمك الحقيقي ليعرفك معلمك.', 'Your name': 'اسمك', 'PIN': 'الرمز', 'Join': 'انضمام', 'Board': 'السبورة', 'Files': 'الملفات', 'Homework': 'الواجبات', 'Waiting for the teacher to share the board…': 'بانتظار أن يشارك المعلم السبورة…', 'View': 'عرض', 'Write': 'كتابة', 'Undo': 'تراجع', 'Your ink appears on the teacher’s board.': 'يظهر حبرك على سبورة المعلم.', 'Nothing shared yet.': 'لم تتم مشاركة شيء بعد.', 'Lesson video': 'فيديو الدرس', 'File': 'ملف', 'No homework shared right now.': 'لا توجد واجبات مشتركة الآن.', 'Due': 'التسليم', 'questions': 'أسئلة', 'Done ✓': 'تم ✓', 'Start': 'ابدأ', 'Question': 'السؤال', 'of': 'من', 'Back': 'السابق', 'Next': 'التالي', 'Submit': 'تسليم', 'Answer every question first.': 'أجب عن جميع الأسئلة أولاً.', 'Submitted!': 'تم التسليم!', 'Your score': 'درجتك', 'Correct answer': 'الإجابة الصحيحة', 'Back to homework': 'العودة إلى الواجبات', 'The class link has closed': 'تم إغلاق رابط الصف', 'Thanks for joining!': 'شكراً لانضمامك!', 'Reconnecting…': 'جارٍ إعادة الاتصال…', 'Cannot reach the board — check your connection.': 'تعذّر الوصول إلى السبورة — تحقق من اتصالك.', 'Please join again.': 'يرجى الانضمام مرة أخرى.', 'Writing is off.': 'الكتابة متوقفة.' };
+  const t = s => LANG === 'ar' && AR[s] ? AR[s] : s;
+  if (LANG === 'ar') document.documentElement.dir = 'rtl';
+  const C = ['#FF5FA2', '#22D3EE', '#FFC928', '#4ADE80', '#B197FC', '#FF9F5A'], L = 'ABCDEF';
+  const m = document.getElementById('m'), nav = document.getElementById('nav'), off = document.getElementById('off'), q = new URLSearchParams(location.search);
+  const pin = q.get('pin') || '', key = 'hbcl:' + pin;
+  let pid = null, me = null, st = null, tab = 'board', ver = 0, loopId = 0, hwRun = null;
+  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); if (s) { pid = s.pid; me = s; } } catch (e) {}
+  const el = (tag, attrs, ...kids) => { const e = document.createElement(tag); Object.entries(attrs || {}).forEach(([k, v]) => k === 'class' ? e.className = v : k.startsWith('on') ? e[k] = v : e.setAttribute(k, v)); kids.flat().forEach(k => e.append(k && k.nodeType ? k : document.createTextNode(k == null ? '' : String(k)))); return e; };
+  const set = (...kids) => m.replaceChildren(...kids);
+  const post = (p, d) => fetch(p + '?pid=' + encodeURIComponent(pid || ''), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).then(r => r.json().then(j => ({ ok: r.ok, j })));
+
+  function joinScreen(msg) {
+    nav.hidden = true;
+    const name = el('input', { maxlength: '24', placeholder: t('Your name'), autocomplete: 'off', autocapitalize: 'words' });
+    const pinIn = el('input', { inputmode: 'numeric', maxlength: '6', placeholder: t('PIN') }); pinIn.value = pin;
+    const err = el('div', { class: 'err' }, msg || ''), go = el('button', { class: 'go' }, t('Join'));
+    const submit = async () => { go.disabled = true; err.textContent = ''; try { const r = await fetch('/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pinIn.value.trim(), name: name.value }) }).then(r => r.json().then(j => ({ ok: r.ok, j }))); if (!r.ok) { err.textContent = r.j.error || 'Could not join.'; go.disabled = false; return; } pid = r.j.pid; me = r.j; try { localStorage.setItem(key, JSON.stringify(me)); } catch (e) {} connect(); } catch (e) { err.textContent = t('Cannot reach the board — check your connection.'); go.disabled = false; } };
+    go.onclick = submit; name.onkeydown = e => { if (e.key === 'Enter') submit(); };
+    set(el('div', { class: 'center' }, el('h1', {}, t('Join the class')), el('p', { class: 'muted' }, t('Type your real name so your teacher knows who you are.')), pin ? '' : pinIn, name, go, err));
+    setTimeout(() => name.focus(), 50);
+  }
+
+  function connect() {
+    const id = ++loopId; ver = 0;
+    document.getElementById('me').replaceChildren(el('i', { style: 'background:' + me.color }), ' ', me.name);
+    (async () => { let fails = 0;
+      while (id === loopId && pid) {
+        try {
+          const r = await fetch('/poll?pid=' + encodeURIComponent(pid) + '&v=' + ver, { cache: 'no-store' });
+          if (r.status === 403) { try { localStorage.removeItem(key); } catch (e) {} pid = null; joinScreen(t('Please join again.')); return; }
+          const s = await r.json(); fails = 0; off.style.display = 'none';
+          if (s.v === 'closed') { closed(); return; }
+          if (s.ver !== ver) { ver = s.ver; const prev = st; st = s; render(prev); }
+        } catch (e) { fails++; if (fails > 2) { off.textContent = t('Reconnecting…'); off.style.display = 'block'; } if (fails > 40) { closed(); return; } await new Promise(r => setTimeout(r, Math.min(5000, 800 * fails))); }
+      } })();
+  }
+  function closed() { pid = null; try { localStorage.removeItem(key); } catch (e) {} nav.hidden = true; off.style.display = 'none'; set(el('div', { class: 'center' }, el('h1', {}, t('The class link has closed')), el('p', { class: 'muted' }, t('Thanks for joining!')))); }
+
+  function render(prev) {
+    nav.hidden = false;
+    const tabs = [['board', t('Board'), !!st.board], ['files', t('Files'), st.files.length > 0], ['hw', t('Homework'), st.homework.some(h => !h.done)]];
+    nav.replaceChildren(...tabs.map(([k, l, dot]) => el('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; hwRun = null; render(st); } }, l, dot && k !== tab ? el('span', { class: 'dot' }) : '')));
+    if (hwRun && tab === 'hw') return;
+    if (tab === 'board') return boardView(prev);
+    if (tab === 'files') return filesView();
+    return hwList();
+  }
+
+  /* ---------- live board, with a pen when the teacher allows writing ---------- */
+  let bw = null, img = null, cv = null, mode = 'view', color = null, mine = [];
+  function boardView(prev) {
+    if (!st.board) { bw = null; return set(el('div', { class: 'center muted' }, t('Waiting for the teacher to share the board…'))); }
+    if (!bw || !bw.isConnected) {
+      color = color || me.color; img = el('img', { alt: '' }); cv = el('canvas'); bw = el('div', { class: 'boardwrap view' }, img, cv);
+      const tools = el('div', { class: 'row', id: 'tools' });
+      set(bw, tools); bindPen();
+    }
+    if (!prev || !prev.board || prev.board.ver !== st.board.ver || !img.src) img.src = '/board.jpg?pid=' + encodeURIComponent(pid) + '&v=' + st.board.ver;
+    const tools = document.getElementById('tools'); if (!st.draw && mode === 'write') mode = 'view';
+    bw.className = 'boardwrap ' + mode;
+    tools.replaceChildren(...(st.draw ? [el('button', { class: 'btn' + (mode === 'view' ? ' on' : ''), onclick: () => { mode = 'view'; boardView(st); } }, '👁 ' + t('View')), el('button', { class: 'btn' + (mode === 'write' ? ' on' : ''), onclick: () => { mode = 'write'; boardView(st); } }, '✎ ' + t('Write')),
+      ...[me.color, '#111111', '#1971C2', '#2F9E44', '#E8590C'].map(c => el('button', { class: 'sw' + (c === color ? ' on' : ''), style: 'background:' + c, onclick: () => { color = c; mode = 'write'; boardView(st); } })),
+      el('span', { class: 'muted', style: 'font-size:13px;flex-basis:100%' }, t('Your ink appears on the teacher’s board.'))] : []));
+  }
+  function bindPen() {
+    const g = cv.getContext('2d'); let cur = null;
+    const size = () => { const r = cv.getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio; draw(); };
+    const draw = () => { g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); const r = cv.getBoundingClientRect(); g.clearRect(0, 0, r.width, r.height); [...mine, cur].filter(Boolean).forEach(s => { g.strokeStyle = s.c; g.lineWidth = 3; g.lineCap = g.lineJoin = 'round'; g.beginPath(); s.pts.forEach((p, i) => i ? g.lineTo(p[0] * r.width, p[1] * r.height) : g.moveTo(p[0] * r.width, p[1] * r.height)); if (s.pts.length === 1) g.lineTo(s.pts[0][0] * r.width + 0.1, s.pts[0][1] * r.height); g.stroke(); }); };
+    const pos = e => { const r = cv.getBoundingClientRect(); return [+((e.clientX - r.left) / r.width).toFixed(4), +((e.clientY - r.top) / r.height).toFixed(4)]; };
+    cv.onpointerdown = e => { if (mode !== 'write') return; cv.setPointerCapture(e.pointerId); cur = { c: color, pts: [pos(e)] }; draw(); };
+    cv.onpointermove = e => { if (!cur) return; (e.getCoalescedEvents ? e.getCoalescedEvents() : [e]).forEach(ev => cur.pts.push(pos(ev))); draw(); };
+    cv.onpointerup = cv.onpointercancel = () => { if (!cur) return; const s = cur; cur = null; mine.push(s); draw(); post('/stroke', { pts: s.pts.slice(0, 800), c: s.c, w: 4 }).then(r => { if (!r.ok) { mine = mine.filter(x => x !== s); draw(); } }).catch(() => {}); };
+    img.onload = () => { mine = []; size(); };
+    addEventListener('resize', size);
+  }
+
+  /* ---------- files: lesson videos and other shared files ---------- */
+  function filesView() {
+    if (!st.files.length) return set(el('div', { class: 'center muted' }, t('Nothing shared yet.')));
+    const mb = n => n ? (n / 1048576).toFixed(n > 10485760 ? 0 : 1) + ' MB' : '';
+    set(...st.files.map(f => el('a', { class: 'card file', href: '/file?pid=' + encodeURIComponent(pid) + '&id=' + f.id, download: f.name }, el('span', { class: 'ic' }, f.kind === 'video' ? '🎬' : f.kind === 'homework' ? '📝' : '📄'), el('span', {}, el('b', {}, f.name), el('div', { class: 'muted', style: 'font-size:13px' }, (f.kind === 'video' ? t('Lesson video') : t('File')) + (f.size ? ' · ' + mb(f.size) : ''))))));
+  }
+
+  /* ---------- homework on the phone ---------- */
+  function hwList() {
+    if (!st.homework.length) return set(el('div', { class: 'center muted' }, t('No homework shared right now.')));
+    set(...st.homework.map(h => el('div', { class: 'card' }, el('h2', {}, h.title), el('div', { class: 'muted', style: 'margin:4px 0 10px' }, h.n + ' ' + t('questions') + (h.due ? ' · ' + t('Due') + ' ' + h.due : '')), h.done ? el('b', { style: 'color:var(--ok)' }, t('Done ✓')) : el('button', { class: 'go', style: 'margin:0', onclick: () => startHw(h.id) }, t('Start')))));
+  }
+  async function startHw(id) {
+    const hw = await fetch('/hw?pid=' + encodeURIComponent(pid) + '&id=' + encodeURIComponent(id)).then(r => r.json());
+    if (!hw || !hw.questions) return;
+    const saveKey = 'hbhw:' + id; let s; try { s = JSON.parse(localStorage.getItem(saveKey) || 'null'); } catch (e) {}
+    hwRun = s && s.ans && s.ans.length === hw.questions.length ? s : { i: 0, ans: hw.questions.map(() => null), t0: Date.now() };
+    const save = () => { try { localStorage.setItem(saveKey, JSON.stringify(hwRun)); } catch (e) {} };
+    const show = () => { const qq = hw.questions[hwRun.i];
+      set(el('div', { class: 'muted' }, hw.title + ' · ' + t('Question') + ' ' + (hwRun.i + 1) + ' ' + t('of') + ' ' + hw.questions.length), el('div', { class: 'bar' }, el('i', { style: 'width:' + ((hwRun.i + 1) / hw.questions.length * 100) + '%' })), el('h2', {}, qq.q),
+        el('div', { class: 'opts' }, qq.o.map((o, k) => el('button', { class: 'opt' + (hwRun.ans[hwRun.i] === k ? ' on' : ''), onclick: () => { hwRun.ans[hwRun.i] = k; save(); if (hwRun.i < hw.questions.length - 1) { hwRun.i++; } show(); } }, el('span', { class: 'lt', style: 'background:' + C[k] }, L[k]), o))),
+        el('div', { class: 'row', style: 'justify-content:space-between' }, el('button', { class: 'btn', onclick: () => { if (hwRun.i > 0) { hwRun.i--; save(); show(); } } }, t('Back')), hwRun.i < hw.questions.length - 1 ? el('button', { class: 'btn', onclick: () => { hwRun.i++; save(); show(); } }, t('Next')) : el('button', { class: 'btn on', onclick: submit }, t('Submit'))), el('div', { class: 'err', id: 'hwErr' })); };
+    const submit = async () => { if (hwRun.ans.some(a => a == null)) { document.getElementById('hwErr').textContent = t('Answer every question first.'); hwRun.i = hwRun.ans.findIndex(a => a == null); return setTimeout(show, 900); }
+      const r = await post('/hwsubmit', { id, ans: hwRun.ans, ms: Date.now() - hwRun.t0 }); if (!r.ok) { document.getElementById('hwErr').textContent = r.j.error || 'Error'; return; }
+      try { localStorage.removeItem(saveKey); } catch (e) {} const ans = hwRun.ans; hwRun = { done: true };
+      set(el('div', { class: 'center' }, el('div', { class: 'big' }, '🎉'), el('h1', {}, t('Submitted!')), r.j.total ? el('p', {}, t('Your score') + ': ' + r.j.score + ' / ' + r.j.total) : ''),
+        ...(r.j.key ? hw.questions.map((qq, i) => el('div', { class: 'card' }, el('b', {}, (i + 1) + '. ' + qq.q), el('div', { style: 'margin-top:6px;color:' + (ans[i] === r.j.key[i] ? 'var(--ok)' : 'var(--bad)') }, (ans[i] === r.j.key[i] ? '✓ ' : '✗ ') + (qq.o[ans[i]] || '')), r.j.key[i] >= 0 && ans[i] !== r.j.key[i] ? el('div', { class: 'muted' }, t('Correct answer') + ': ' + qq.o[r.j.key[i]]) : '')) : []),
+        el('button', { class: 'go', onclick: () => { hwRun = null; render(st); } }, t('Back to homework'))); };
+    show();
+  }
+  if (pid && me) connect(); else joinScreen();
+})();
+</script>
+</body>
+</html>

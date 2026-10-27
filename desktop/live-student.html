@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120A14">
+<title>__TITLE__ · HelixBoard quiz</title>
+<style>
+  :root { --bg:#120A14; --panel:#1C1220; --panel2:#271A2C; --line:#3A2840; --ink:#F6ECF4; --muted:#B9A5B6; --accent:#FF5FA2; --ok:#4ADE80; --bad:#FF6B6B; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: radial-gradient(900px 500px at 50% -10%, #3A1530, var(--bg)); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; min-height: 100dvh; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(28,18,32,.8); }
+  header b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .sc { font: 800 18px ui-monospace, Consolas, monospace; color: var(--accent); }
+  main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 14px; max-width: 720px; width: 100%; margin: 0 auto; }
+  .center { margin: auto 0; text-align: center; }
+  h1 { font-size: 28px; margin: 0 0 6px; } h2 { font-size: 22px; margin: 0; line-height: 1.3; }
+  .muted { color: var(--muted); }
+  input { width: 100%; height: 54px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel2); color: inherit; font: 600 20px system-ui, sans-serif; padding: 0 14px; margin: 6px 0; text-align: center; }
+  input:focus { outline: none; border-color: var(--accent); }
+  button.go { width: 100%; height: 56px; border: 0; border-radius: 14px; background: var(--accent); color: #24020F; font: 800 20px system-ui, sans-serif; margin-top: 8px; }
+  button.go:disabled { opacity: .5; }
+  .err { color: var(--bad); min-height: 22px; margin-top: 6px; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; }
+  .opts.many { grid-template-columns: 1fr; }
+  .opt { border: 0; border-radius: 18px; color: #1E1419; font: 700 18px system-ui, sans-serif; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 110px; text-align: center; transition: transform .1s, opacity .2s; }
+  .opt:active { transform: scale(.97); }
+  .opt .lt { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.55); display: grid; place-items: center; font-size: 22px; font-weight: 900; }
+  .opt.dim { opacity: .3; } .opt.right { outline: 5px solid var(--ok); outline-offset: 2px; } .opt.mine { outline: 5px solid #fff; outline-offset: 2px; }
+  .bar { height: 8px; border-radius: 4px; background: var(--panel2); overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); transition: width .25s linear; }
+  .big { font: 900 64px system-ui, sans-serif; } .res { border-radius: 20px; padding: 24px 16px; text-align: center; } .res.ok { background: #1F5133; } .res.no { background: #5A1E28; } .res.poll { background: var(--panel2); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .dots { display: inline-flex; gap: 6px; } .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: b 1.2s infinite; } .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes b { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+  footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px; }
+</style>
+</head>
+<body>
+<header><b id="hd">__TITLE__</b><span class="sc" id="sc"></span></header>
+<main id="m"></main>
+<footer>HelixBoard By Mr. Hany Taha</footer>
+<script>
+(() => {
+  const C = ['#FF5FA2', '#22D3EE', '#FFC928', '#4ADE80', '#B197FC', '#FF9F5A'], L = 'ABCDEF';
+  const m = document.getElementById('m'), q = new URLSearchParams(location.search);
+  const pin = q.get('pin') || '';
+  const key = 'hbq:' + pin;
+  let pid = null, timer = 0, view = null;
+  try { pid = localStorage.getItem(key); } catch (e) {}
+  const el = (tag, attrs, ...kids) => { const e = document.createElement(tag); Object.entries(attrs || {}).forEach(([k, v]) => k === 'class' ? e.className = v : k.startsWith('on') ? e[k] = v : e.setAttribute(k, v)); kids.flat().forEach(k => e.append(k && k.nodeType ? k : document.createTextNode(k == null ? '' : String(k)))); return e; };
+  const set = (...kids) => { m.replaceChildren(...kids); };
+  const post = (p, d) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).then(r => r.json().then(j => ({ ok: r.ok, j })));
+
+  function joinScreen(msg) {
+    const name = el('input', { maxlength: '24', placeholder: 'Your name', autocomplete: 'off', autocapitalize: 'words' });
+    const pinIn = el('input', { inputmode: 'numeric', maxlength: '6', placeholder: 'Game PIN' }); pinIn.value = pin;
+    const err = el('div', { class: 'err' }, msg || '');
+    const go = el('button', { class: 'go' }, 'Join');
+    const submit = async () => { go.disabled = true; err.textContent = ''; try { const r = await post('/join', { pin: pinIn.value.trim(), name: name.value }); if (!r.ok) { err.textContent = r.j.error || 'Could not join.'; go.disabled = false; return; } pid = r.j.pid; try { localStorage.setItem('hbq:' + pinIn.value.trim(), pid); } catch (e) {} connect(); } catch (e) { err.textContent = 'Cannot reach the board — are you on the school Wi-Fi?'; go.disabled = false; } };
+    go.onclick = submit; name.onkeydown = e => { if (e.key === 'Enter') submit(); };
+    set(el('div', { class: 'center' }, el('h1', {}, 'Join the quiz'), el('p', { class: 'muted' }, 'Type your real name so your teacher knows who you are.'), pin ? '' : pinIn, name, go, err));
+    setTimeout(() => name.focus(), 50);
+  }
+
+  /* long-polling: one request waits on the board until something changes; works on Wi-Fi, mobile data and through the internet link */
+  let ver = 0, loopId = 0;
+  function connect() {
+    const me = ++loopId; ver = 0;
+    (async () => { let fails = 0;
+      while (me === loopId && pid) {
+        try {
+          const r = await fetch('/poll?pid=' + encodeURIComponent(pid) + '&v=' + ver, { cache: 'no-store' });
+          if (r.status === 403) { try { localStorage.removeItem(key); } catch (e) {} pid = null; joinScreen('Please join again.'); return; }
+          const j = await r.json(); fails = 0; hideOffline();
+          if (j.data && j.ver > ver) { ver = j.ver; render(j.data); if (j.data.v === 'closed') { pid = null; return; } }
+        } catch (e) { fails++; /* the board stopped the game after the final results */ if (view && view.v === 'end' && fails > 2) { hideOffline(); render({ v: 'closed' }); return; } if (fails > 2) showOffline(); await new Promise(r => setTimeout(r, Math.min(5000, 800 * fails))); }
+      } })();
+  }
+  const off = el('div', { style: 'position:fixed;left:12px;right:12px;bottom:12px;padding:10px 14px;border-radius:12px;background:#5A1E28;color:#fff;text-align:center;font-weight:600;display:none' }, 'Reconnecting…'); document.body.append(off);
+  const showOffline = () => off.style.display = 'block', hideOffline = () => off.style.display = 'none';
+
+  function render(d) {
+    clearInterval(timer); view = d;
+    if (d.v === 'closed') { try { localStorage.removeItem(key); } catch (e) {} set(el('div', { class: 'center' }, el('h1', {}, 'The quiz has finished'), el('p', { class: 'muted' }, 'Thanks for playing!'))); return; }
+    document.getElementById('sc').textContent = d.score != null ? d.score + ' pts' : '';
+    if (d.v === 'lobby') return set(el('div', { class: 'center' }, el('h1', {}, 'You’re in, ' + d.name + '!'), el('p', { class: 'muted' }, 'Look at the board — the quiz starts soon.'), el('div', { class: 'dots' }, el('i'), el('i'), el('i'))));
+    if (d.v === 'question') {
+      const bar = el('i', { style: 'width:100%' });
+      const head = el('div', {}, el('div', { class: 'muted' }, 'Question ' + (d.qi + 1) + ' of ' + d.total), el('h2', {}, d.q));
+      const opts = el('div', { class: 'opts' + (d.o.length > 4 || d.o.some(o => o.length > 40) ? ' many' : '') }, d.o.map((o, k) => el('button', { class: 'opt' + (d.answered != null ? (k === d.answered ? ' mine' : ' dim') : ''), style: 'background:' + C[k], onclick: () => pick(k) }, el('span', { class: 'lt' }, L[k]), o)));
+      set(head, d.limit ? el('div', { class: 'bar' }, bar) : '', opts, d.answered != null ? el('p', { class: 'muted center', style: 'margin:0' }, 'Answer locked in — wait for the reveal.') : '');
+      if (d.limit) { const end = Date.now() + d.left * 1000; const tick = () => { const left = Math.max(0, end - Date.now()); bar.style.width = (left / (d.limit * 1000) * 100) + '%'; if (!left) { clearInterval(timer); /* student-paced: time is up, move on */ if (d.self && view === d && d.answered == null) pick(-1); } }; tick(); timer = setInterval(tick, 200); }
+      return;
+    }
+    if (d.v === 'reveal') {
+      const r = d.last || {}; const poll = d.a < 0;
+      const box = poll ? el('div', { class: 'res poll' }, el('h2', {}, d.mine == null ? 'No answer' : 'Thanks for voting!')) : d.mine == null ? el('div', { class: 'res no' }, el('div', { class: 'big' }, '⏱'), el('h2', {}, 'No answer this time')) : r.ok ? el('div', { class: 'res ok' }, el('div', { class: 'big' }, '✓'), el('h2', {}, 'Correct! +' + r.pts), r.streak > 1 ? el('div', {}, '🔥 ' + r.streak + ' in a row') : '') : el('div', { class: 'res no' }, el('div', { class: 'big' }, '✗'), el('h2', {}, 'Not this time'));
+      const right = poll ? '' : el('div', { class: 'card' }, el('div', { class: 'muted' }, 'The answer'), el('b', {}, L[d.a] + ') ' + d.o[d.a]), d.ex ? el('div', { class: 'muted', style: 'margin-top:6px' }, d.ex) : '');
+      return set(box, right, d.rank ? el('p', { class: 'center muted', style: 'margin:0' }, 'You are ' + ordinal(d.rank) + ' of ' + d.players) : '');
+    }
+    if (d.v === 'selfres') {
+      const r = d.last || {}, poll = d.a < 0;
+      const box = poll ? el('div', { class: 'res poll' }, el('h2', {}, 'Thanks!')) : d.mine == null || d.mine < 0 ? el('div', { class: 'res no' }, el('div', { class: 'big' }, '⏱'), el('h2', {}, 'Time’s up')) : r.ok ? el('div', { class: 'res ok' }, el('div', { class: 'big' }, '✓'), el('h2', {}, 'Correct! +' + r.pts), r.streak > 1 ? el('div', {}, '🔥 ' + r.streak + ' in a row') : '') : el('div', { class: 'res no' }, el('div', { class: 'big' }, '✗'), el('h2', {}, 'Not this time'));
+      const right = poll ? '' : el('div', { class: 'card' }, el('div', { class: 'muted' }, 'The answer'), el('b', {}, L[d.a] + ') ' + d.o[d.a]), d.ex ? el('div', { class: 'muted', style: 'margin-top:6px' }, d.ex) : '');
+      const nx = el('button', { class: 'go', onclick: () => { nx.disabled = true; post('/next', { pid }); } }, d.isLast ? 'See my result' : 'Next question');
+      return set(el('div', { class: 'muted' }, 'Question ' + (d.qi + 1) + ' of ' + d.total), box, right, nx, d.rank ? el('p', { class: 'center muted', style: 'margin:0' }, 'You are ' + ordinal(d.rank) + ' of ' + d.players) : '');
+    }
+    if (d.v === 'selfdone') return set(el('div', { class: 'center' }, el('div', { class: 'big' }, '🏁'), el('h1', {}, 'All done!'), el('p', {}, d.correct + ' of ' + d.total + ' correct · ' + d.score + ' points'), d.rank ? el('p', { class: 'muted' }, 'You are ' + ordinal(d.rank) + ' of ' + d.players + ' so far — wait for the final results on the board.') : ''));
+    if (d.v === 'end') return set(el('div', { class: 'center' }, el('div', { class: 'big' }, d.rank === 1 ? '🏆' : d.rank <= 3 ? '🎉' : '⭐'), el('h1', {}, ordinal(d.rank) + ' place'), el('p', {}, d.score + ' points'), el('p', { class: 'muted' }, 'Well done, ' + d.name + '!')));
+  }
+  async function pick(k) {
+    if (!view || view.v !== 'question' || view.answered != null) return;
+    view.answered = k; if (k >= 0) render(view);
+    try { const r = await post('/answer', { pid, qi: view.qi, c: k }); if (!r.ok && r.j.error) { const p = el('p', { class: 'err center' }, r.j.error); m.append(p); } } catch (e) {}
+  }
+  const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+  if (pid) connect(); else joinScreen();
+})();
+</script>
+</body>
+</html>

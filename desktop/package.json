@@ -1,0 +1,98 @@
+{
+  "name": "helixboard",
+  "productName": "HelixBoard By Mr. Hany Taha",
+  "version": "2.2.0",
+  "description": "HelixBoard By Mr. Hany Taha \u2014 the Science Slate. Interactive whiteboard for science teaching and study.",
+  "author": "Mr. Hany Taha \u2014 Green Hills International School",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "scripts": {
+    "prepare-app": "python3 ../build.py && node -e \"require('fs').mkdirSync('app',{recursive:true});require('fs').copyFileSync('../dist/index.html','app/index.html')\"",
+    "start": "npm run prepare-app && electron .",
+    "dist": "npm run prepare-app && electron-builder --win nsis portable --x64"
+  },
+  "build": {
+    "appId": "com.ghis.helixboard",
+    "productName": "HelixBoard By Mr. Hany Taha",
+    "copyright": "\u00a9 Mr. Hany Taha",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "prompt-preload.js",
+      "prompt.html",
+      "app/index.html",
+      "build/icon.ico",
+      "build/icon.png",
+      "live.js",
+      "live-student.html",
+      "overlay.html",
+      "overlay-preload.js",
+      "tunnel.js",
+      "classlink.js",
+      "classlink-student.html"
+    ],
+    "afterPack": "./build/after-pack.js",
+    "fileAssociations": [
+      {
+        "ext": "helix",
+        "name": "HelixBoard board",
+        "description": "HelixBoard board",
+        "icon": "build/icon.ico",
+        "role": "Editor"
+      },
+      {
+        "ext": "hbset",
+        "name": "HelixBoard quiz / flashcard set",
+        "description": "HelixBoard quiz or flashcard set",
+        "icon": "build/icon.ico",
+        "role": "Editor"
+      },
+      {
+        "ext": "hbhw",
+        "name": "HelixBoard homework",
+        "description": "HelixBoard homework",
+        "icon": "build/icon.ico",
+        "role": "Editor"
+      },
+      {
+        "ext": "hbres",
+        "name": "HelixBoard homework results",
+        "description": "HelixBoard homework results",
+        "icon": "build/icon.ico",
+        "role": "Editor"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "HelixBoard By Mr. Hany Taha",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "HelixBoard-By-Mr-Hany-Taha-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "HelixBoard-By-Mr-Hany-Taha-Portable-${version}.${ext}"
+    },
+    "publish": null
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "resedit": "^3.1.0"
+  }
+}
