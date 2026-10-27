@@ -5,6 +5,7 @@ const fs = require('fs');
 const { LiveQuiz, lanAddresses } = require('./live');
 const { ClassLink } = require('./classlink');
 const { Tunnel } = require('./tunnel');
+const { createUpdater } = require('./updater');
 
 app.setAppUserModelId('com.ghis.helixboard');
 
@@ -220,6 +221,8 @@ app.on('before-quit', () => { if (tunnel) tunnel.close(); if (clTunnel) clTunnel
 
 app.whenReady().then(() => {
   createWindow();
+  const updater = createUpdater(() => win, url => net.fetch(url));
+  ipcMain.on('update:check', e => { if (fromMain(e)) updater.check(true); });
   process.argv.slice(1).filter(a => OPENABLE.test(a)).forEach(openPath);
 });
 app.on('open-file', (e, p) => { e.preventDefault(); openPath(p); });

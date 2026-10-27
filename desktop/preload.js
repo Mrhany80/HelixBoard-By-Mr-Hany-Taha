@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('helixDesktop', {
   },
   saveRecording: (name, bytes) => ipcRenderer.invoke('rec:save', name, bytes),
   showFile: file => ipcRenderer.send('show-file', file),
+  checkUpdates: () => ipcRenderer.send('update:check'),
   live: {
     start: quiz => ipcRenderer.invoke('live:start', quiz),
     cmd: (cmd, arg) => ipcRenderer.invoke('live:cmd', cmd, arg),

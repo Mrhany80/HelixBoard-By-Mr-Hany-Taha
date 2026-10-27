@@ -17,5 +17,11 @@ async function install() {
     : '<p><b>Android tablet (Chrome):</b></p><ol><li>Tap the <b>⋮</b> menu at the top right of Chrome.</li><li>Choose <b>Install app</b> (or <b>Add to Home screen</b>).</li><li>Open HelixBoard from its new icon — it runs full screen and works offline.</li></ol><p><b>Windows / Mac (Chrome or Edge):</b> click the install icon at the right end of the address bar.</p>') +
     '<p class="small muted">Updates arrive by themselves: when a new version is ready, HelixBoard offers “Update now”.</p><div class="foot"><button class="btn primary" data-close>OK</button></div>');
 }
-window.HBInstall = { install, get installed() { return !!standalone(); } };
+/* Windows app: asks GitHub for a newer release. Web app: asks the website for a newer version (the "Update now" bar appears if there is one). */
+async function checkUpdates() {
+  if (window.helixDesktop && helixDesktop.checkUpdates) { helixDesktop.checkUpdates(); toast('Checking for updates…'); return; }
+  try { const r = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (!r) { toast('Updates arrive by themselves when HelixBoard is opened from its website.'); return; }
+    await r.update(); setTimeout(() => { if (!r.waiting && !r.installing) toast('HelixBoard is up to date.'); }, 2500); }
+  catch (e) { toast('Could not check for updates — are you online?'); } }
+window.HBInstall = { install, checkUpdates, get installed() { return !!standalone(); } };
 })();

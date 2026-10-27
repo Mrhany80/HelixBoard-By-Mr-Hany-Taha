@@ -149,9 +149,9 @@ Activity is queued on the device when offline and sent later.
 ## Tablet web app (Android and iPad)
 
 `python3 build.py` also writes `dist/manifest.webmanifest`, `dist/sw.js` (versioned offline cache) and `dist/icons/`.
-Upload the whole `dist/` folder to any HTTPS static host (Netlify, GitHub Pages, Cloudflare Pages, Vercel).
+It is published automatically to **https://mrhany80.github.io/HelixBoard-By-Mr-Hany-Taha/** by GitHub Pages on every push to `main`.
 Students open the address once and install it (Page tab → **Install as app** shows the steps for their device).
-To publish an update, rebuild and upload `dist/` again — installed copies offer **Update now** within 30 minutes or on next launch.
+To publish an update, push to `main` — installed copies offer **Update now** within 30 minutes or on next launch.
 
 ## Windows desktop app
 
@@ -174,6 +174,18 @@ The `.exe` icon and version details are written by `build/after-pack.js` (no Win
 Change the version in `desktop/package.json`. The installers are not code-signed, so Windows
 SmartScreen shows “Windows protected your PC” the first time — click **More info → Run anyway**.
 
+### Publishing a Windows update
+
+The installed app checks `https://github.com/Mrhany80/HelixBoard-By-Mr-Hany-Taha/releases/latest/download/latest.json`
+a few seconds after start and every 6 hours (also Page tab → **Check for updates**). When the version there is newer it
+offers **Update now**, downloads the Setup `.exe`, checks its SHA-256 and runs it.
+
+1. Raise `version` in `desktop/package.json` (e.g. 2.2.1).
+2. `cd desktop && npm run dist` — also writes `release/latest.json`.
+3. On GitHub: **Releases → Draft a new release**, tag `v2.2.1`, attach the Setup `.exe`, the Portable `.exe` and `latest.json`, **Publish**.
+
+The tablet web app updates itself whenever `main` changes (`.github/workflows/pages.yml` rebuilds and publishes it).
+
 ## Fixing errors
 
 1. Run `python3 build.py` then open `dist/index.html`.
@@ -186,6 +198,6 @@ SmartScreen shows “Windows protected your PC” the first time — click **Mor
 
 - Arabic handwriting recognition is not offered (the interface itself is fully Arabic: the ع button).
 - The iPad version is a web app (no App Store build — that needs a Mac and an Apple developer account).
-- The Windows app updates by installing the new Setup `.exe`; the tablet web app updates itself.
+- The Windows installer is not code-signed, so SmartScreen warns on first install.
 - PowerPoint animations and videos aren't captured; the slide shows its final look.
 - Floating panels, the wheel screen and the on-screen keyboard are not captured in recordings.

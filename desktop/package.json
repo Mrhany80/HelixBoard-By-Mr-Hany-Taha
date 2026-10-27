@@ -2,19 +2,19 @@
   "name": "helixboard",
   "productName": "HelixBoard By Mr. Hany Taha",
   "version": "2.2.0",
-  "description": "HelixBoard By Mr. Hany Taha \u2014 the Science Slate. Interactive whiteboard for science teaching and study.",
-  "author": "Mr. Hany Taha \u2014 Green Hills International School",
+  "description": "HelixBoard By Mr. Hany Taha — the Science Slate. Interactive whiteboard for science teaching and study.",
+  "author": "Mr. Hany Taha — Green Hills International School",
   "license": "UNLICENSED",
   "main": "main.js",
   "scripts": {
     "prepare-app": "python3 ../build.py && node -e \"require('fs').mkdirSync('app',{recursive:true});require('fs').copyFileSync('../dist/index.html','app/index.html')\"",
     "start": "npm run prepare-app && electron .",
-    "dist": "npm run prepare-app && electron-builder --win nsis portable --x64"
+    "dist": "npm run prepare-app && electron-builder --win nsis portable --x64 && node build/latest-json.js"
   },
   "build": {
     "appId": "com.ghis.helixboard",
     "productName": "HelixBoard By Mr. Hany Taha",
-    "copyright": "\u00a9 Mr. Hany Taha",
+    "copyright": "© Mr. Hany Taha",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -33,7 +33,8 @@
       "overlay-preload.js",
       "tunnel.js",
       "classlink.js",
-      "classlink-student.html"
+      "classlink-student.html",
+      "updater.js"
     ],
     "afterPack": "./build/after-pack.js",
     "fileAssociations": [

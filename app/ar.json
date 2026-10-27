@@ -2066,5 +2066,10 @@
 "menu at the top right of Chrome.": "في أعلى يمين Chrome.",
 ", then": "، ثم",
 "(or": "(أو",
-"Full name": "الاسم الكامل"
+"Full name": "الاسم الكامل",
+"Check for updates": "البحث عن تحديثات",
+"Checking for updates…": "جارٍ البحث عن تحديثات…",
+"HelixBoard is up to date.": "HelixBoard محدّث.",
+"Updates arrive by themselves when HelixBoard is opened from its website.": "تصل التحديثات تلقائيًا عند فتح HelixBoard من موقعه.",
+"Could not check for updates — are you online?": "تعذّر البحث عن تحديثات — هل أنت متصل بالإنترنت؟"
 }
