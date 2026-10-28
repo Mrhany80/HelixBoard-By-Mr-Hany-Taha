@@ -3,123 +3,109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HelixBoard Download</title>
-<meta name="description" content="Download HelixBoard By Mr. Hany Taha for Windows, iPad and Android.">
-<meta name="theme-color" content="#120A14">
+<title>HelixBoard for Windows</title>
+<meta name="description" content="Download HelixBoard By Mr. Hany Taha — the interactive science whiteboard for Windows PCs and smartboards.">
+<meta name="theme-color" content="#0E0912">
 <link rel="icon" href="../icons/icon-192.png">
-<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <style>
-:root{--bg:#120A14;--panel:#1C1220;--panel2:#271A2C;--ink:#F6ECF4;--muted:#B9A5B6;--line:#3A2840;--accent:#FF5FA2;--accent-ink:#24020F;--cyan:#22D3EE}
+:root{--bg:#0E0912;--panel:#18111D;--panel2:#221828;--line:#33263B;--ink:#F7EEF5;--muted:#AE9BAC;--accent:#FF5FA2;--cyan:#22D3EE;--gold:#FFC928;--grad:linear-gradient(135deg,#FF5FA2 0%,#C266FF 52%,#22D3EE 100%)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#F6F2EC;--panel:#FFFFFF;--panel2:#F4EEE8;--line:#E6DCD2;--ink:#1D1420;--muted:#6E5C6B;--grad:linear-gradient(135deg,#D6246E 0%,#8B3FD9 52%,#0B8FA8 100%)}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;min-height:100vh}
-.wrap{max-width:980px;margin:0 auto;padding:40px 16px 56px}
-header{display:flex;align-items:center;gap:16px;margin-bottom:8px}
-header img{width:64px;height:64px;border-radius:16px}
-h1{margin:0;font-size:clamp(24px,5vw,36px);line-height:1.1;letter-spacing:-.01em}
-h1 span{color:var(--accent)}
-.sub{color:var(--muted);margin:0 0 32px}
-.lang{margin-inline-start:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px}
-.card.mine{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.card h2{margin:0;font-size:20px;display:flex;align-items:center;gap:10px}
-.card svg{width:26px;height:26px;flex:none}
-.tag{font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--accent);border-radius:999px;padding:2px 9px;margin-inline-start:auto}
-.card p,.card ol{margin:0;color:var(--muted);font-size:15px}
-.card ol{padding-inline-start:20px}
-.card li{margin:4px 0}
-.card b{color:var(--ink)}
-.btn{display:block;text-align:center;text-decoration:none;font-weight:700;border-radius:12px;padding:13px 16px;background:var(--accent);color:var(--accent-ink)}
-.btn.alt{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
-.small{font-size:13px;color:var(--muted)}
-.small a{color:var(--cyan)}
-.note{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;color:var(--muted);font-size:14px}
-footer{margin-top:28px;color:var(--muted);font-size:13px;text-align:center}
-[dir=rtl] body,[dir=rtl]{font-family:"Segoe UI",Tahoma,"Noto Kufi Arabic",sans-serif}
+body{margin:0;background:radial-gradient(1100px 520px at 50% -10%,color-mix(in srgb,#C266FF 16%,var(--bg)),var(--bg));color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;min-height:100vh}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 16px 56px}
+nav{display:flex;align-items:center;gap:12px}
+nav img{width:44px;height:44px;border-radius:12px}
+nav b{font-size:19px;letter-spacing:-.01em}
+nav small{display:block;color:var(--muted);font-size:12.5px}
+.lang{margin-inline-start:auto;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.hero{text-align:center;padding:56px 0 34px}
+.hero h1{margin:0 auto;max-width:760px;font-size:clamp(32px,6vw,58px);line-height:1.05;letter-spacing:-.025em}
+.hero h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:620px;margin:16px auto 0;color:var(--muted);font-size:clamp(16px,2.2vw,19px)}
+.cta{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:30px}
+.dl{display:inline-flex;align-items:center;gap:14px;text-decoration:none;color:#fff;background:var(--grad);border-radius:18px;padding:18px 30px 18px 24px;font-weight:800;font-size:clamp(18px,2.6vw,22px);box-shadow:0 18px 40px -14px rgba(255,95,162,.7);transition:transform .12s,filter .2s}
+.dl:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.dl svg{width:30px;height:30px;flex:none}
+.dl small{display:block;font-weight:600;font-size:13px;opacity:.9}
+.meta{color:var(--muted);font-size:14px}
+.alt{color:var(--ink);font-size:14.5px;text-decoration:none;border-bottom:1px dashed var(--muted)}
+.alt:hover{color:var(--accent);border-color:var(--accent)}
+h2{font-size:22px;margin:46px 0 14px;letter-spacing:-.01em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.card .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:20px;background:var(--panel2);margin-bottom:8px}
+.card b{display:block;margin-bottom:2px}
+.card span{color:var(--muted);font-size:14.5px}
+ol.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:10px}
+ol.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 16px 13px 56px;position:relative;color:var(--muted)}
+ol.steps li::before{content:counter(s);position:absolute;left:16px;top:12px;width:28px;height:28px;border-radius:50%;background:var(--grad);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px}
+[dir=rtl] ol.steps li{padding:13px 56px 13px 16px}[dir=rtl] ol.steps li::before{left:auto;right:16px}
+ol.steps b{color:var(--ink)}
+.note{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;padding:12px 16px;color:var(--muted);font-size:14.5px}
+[dir=rtl] .note{border-left:1px solid var(--line);border-right:4px solid var(--gold)}
+footer{margin-top:44px;text-align:center;color:var(--muted);font-size:13px}
+[dir=rtl] body{font-family:"Segoe UI",Tahoma,"Noto Kufi Arabic",sans-serif}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <img src="../icons/icon-192.png" alt="">
-    <div><h1>HelixBoard <span data-t="by">By Mr. Hany Taha</span></h1></div>
-    <button class="lang" id="lang">العربية</button>
-  </header>
-  <p class="sub" data-t="sub">The interactive science whiteboard — for teaching on the smartboard and studying on any device. Free.</p>
+  <nav><img src="../icons/icon-192.png" alt=""><div><b>HelixBoard</b><small data-t="by">By Mr. Hany Taha</small></div><button class="lang" id="lang">العربية</button></nav>
 
+  <section class="hero">
+    <h1 data-t="h1">The science whiteboard for <span>Windows</span></h1>
+    <p data-t="sub">For PCs, laptops and classroom smartboards. Live class activities on students’ phones, PowerPoint with animations, video lessons and hundreds of science tools. Free.</p>
+    <div class="cta">
+      <a class="dl" id="dlSetup" href="https://github.com/Mrhany80/HelixBoard-By-Mr-Hany-Taha/releases/latest">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zm8.5-1.2L21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zm8.5 0H21V21l-9.5-1.3z"/></svg>
+        <span><span data-t="dl">Download for Windows</span><small id="ver" data-t="verx">Installer · updates itself</small></span>
+      </a>
+      <div class="meta" data-t="req">Windows 10 or 11 · 64-bit</div>
+      <a class="alt" id="dlPortable" href="https://github.com/Mrhany80/HelixBoard-By-Mr-Hany-Taha/releases/latest" data-t="port">or the portable version (runs without installing, e.g. from a USB stick)</a>
+    </div>
+  </section>
+
+  <h2 data-t="newh">New in this version</h2>
   <div class="grid">
-    <section class="card" id="c-win">
-      <h2><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zm8.5-1.2L21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zm8.5 0H21V21l-9.5-1.3z"/></svg><span data-t="win">Windows</span><em class="tag" data-t="rec" hidden>For this device</em></h2>
-      <p data-t="winp">For PCs, laptops and smartboards. Installs with Start-menu and desktop shortcuts, and updates itself.</p>
-      <a class="btn" id="dlSetup" href="https://github.com/Mrhany80/HelixBoard-By-Mr-Hany-Taha/releases/latest"><span data-t="dl">Download for Windows</span></a>
-      <a class="btn alt" id="dlPortable" href="https://github.com/Mrhany80/HelixBoard-By-Mr-Hany-Taha/releases/latest"><span data-t="port">Portable version (no install)</span></a>
-      <p class="small" id="ver"></p>
-      <p class="small" data-t="smart">If Windows shows “Windows protected your PC”, click <b>More info → Run anyway</b>.</p>
-    </section>
-
-    <section class="card" id="c-ipad">
-      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M11 18h2"/></svg><span data-t="ipad">iPad / iPhone</span><em class="tag" data-t="rec" hidden>For this device</em></h2>
-      <ol>
-        <li data-t="i1">Open this page in <b>Safari</b>.</li>
-        <li data-t="i2">Tap <b>Open HelixBoard</b> below.</li>
-        <li data-t="i3">Tap <b>Share ↑</b>, then <b>Add to Home Screen</b>.</li>
-      </ol>
-      <a class="btn" href="../"><span data-t="open">Open HelixBoard</span></a>
-    </section>
-
-    <section class="card" id="c-android">
-      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M11 17h2"/></svg><span data-t="android">Android tablet</span><em class="tag" data-t="rec" hidden>For this device</em></h2>
-      <ol>
-        <li data-t="a1">Open this page in <b>Chrome</b>.</li>
-        <li data-t="a2">Tap <b>Open HelixBoard</b> below.</li>
-        <li data-t="a3">Tap <b>⋮</b> (top right), then <b>Install app</b>.</li>
-      </ol>
-      <a class="btn" href="../"><span data-t="open">Open HelixBoard</span></a>
-    </section>
+    <div class="card"><div class="ic">📱</div><b data-t="f1">Live class</b><span data-t="f1d">Draw it, polls, word clouds, short answers, photos and sticky notes on students’ phones — every answer live, by name.</span></div>
+    <div class="card"><div class="ic">🎬</div><b data-t="f2">Video lessons</b><span data-t="f2d">A video split into parts by your questions: it pauses, asks the phones, then plays on.</span></div>
+    <div class="card"><div class="ic">✨</div><b data-t="f3">PowerPoint animations</b><span data-t="f3d">Bullets and shapes appear click by click in the slideshow.</span></div>
+    <div class="card"><div class="ic">✍️</div><b data-t="f4">Sharper pen</b><span data-t="f4d">Ink follows the pen more tightly, with a sensitivity slider.</span></div>
   </div>
 
-  <div class="note" data-t="note">The tablet version works offline after the first visit and updates itself — when a new version is ready, HelixBoard shows “Update now”.</div>
+  <h2 data-t="insth">How to install</h2>
+  <ol class="steps">
+    <li data-t="s1">Click <b>Download for Windows</b> and open the file when it finishes.</li>
+    <li data-t="s2">If Windows shows “Windows protected your PC”, click <b>More info → Run anyway</b>. (The app is not code-signed yet.)</li>
+    <li data-t="s3">Open <b>HelixBoard</b> from the Start menu or the desktop shortcut.</li>
+  </ol>
+  <div class="note" data-t="upd">Already installed? You don’t need to download again — HelixBoard offers <b>Update now</b> by itself when a new version is ready (or Page tab → <b>Check for updates</b>).</div>
+
   <footer data-t="foot">Designed by Mr. Hany Taha</footer>
 </div>
 <script>
 (() => {
   const AR = {
-    by: 'بواسطة أ. هاني طه', sub: 'السبورة التفاعلية للعلوم — للتدريس على السبورة الذكية وللمذاكرة على أي جهاز. مجانًا.',
-    win: 'ويندوز', rec: 'لهذا الجهاز', winp: 'لأجهزة الكمبيوتر واللابتوب والسبورات الذكية. يُثبَّت مع اختصارات في قائمة ابدأ وسطح المكتب، ويحدّث نفسه تلقائيًا.',
-    dl: 'تنزيل لويندوز', port: 'النسخة المحمولة (بدون تثبيت)',
-    smart: 'إذا ظهرت رسالة «Windows protected your PC» اضغط <b>More info ← Run anyway</b>.',
-    ipad: 'آيباد / آيفون', i1: 'افتح هذه الصفحة في <b>Safari</b>.', i2: 'اضغط <b>افتح HelixBoard</b> بالأسفل.', i3: 'اضغط <b>مشاركة ↑</b> ثم <b>إضافة إلى الشاشة الرئيسية</b>.',
-    open: 'افتح HelixBoard', android: 'جهاز أندرويد لوحي', a1: 'افتح هذه الصفحة في <b>Chrome</b>.', a2: 'اضغط <b>افتح HelixBoard</b> بالأسفل.', a3: 'اضغط <b>⋮</b> (أعلى اليمين) ثم <b>تثبيت التطبيق</b>.',
-    note: 'نسخة الأجهزة اللوحية تعمل بدون إنترنت بعد أول زيارة وتحدّث نفسها — عند توفر إصدار جديد يظهر زر «حدّث الآن».', foot: 'تصميم أ. هاني طه'
+    by: 'تصميم أ. هاني طه', h1: 'السبورة العلمية التفاعلية لـ<span>ويندوز</span>',
+    sub: 'لأجهزة الكمبيوتر واللابتوب والسبورات الذكية في الصف. أنشطة الصف المباشر على هواتف الطلاب، وPowerPoint مع الحركات، ودروس الفيديو، ومئات أدوات العلوم. مجاناً.',
+    dl: 'تنزيل لويندوز', verx: 'برنامج تثبيت · يحدّث نفسه', req: 'ويندوز 10 أو 11 · 64 بت', port: 'أو النسخة المحمولة (تعمل بدون تثبيت، مثلاً من فلاشة USB)',
+    newh: 'الجديد في هذا الإصدار', f1: 'الصف المباشر', f1d: 'ارسمها، والاستطلاعات، وسحب الكلمات، والإجابات القصيرة، والصور، والملاحظات اللاصقة على هواتف الطلاب — كل إجابة مباشرة وبالاسم.',
+    f2: 'دروس الفيديو', f2d: 'فيديو مقسّم إلى أجزاء بأسئلتك: يتوقف ويسأل الهواتف ثم يكمل.', f3: 'حركات PowerPoint', f3d: 'تظهر النقاط والأشكال نقرة بعد نقرة في العرض التقديمي.', f4: 'قلم أدق', f4d: 'يتبع الحبر القلم بدقة أكبر، مع شريط للحساسية.',
+    insth: 'طريقة التثبيت', s1: 'اضغط <b>تنزيل لويندوز</b> وافتح الملف بعد انتهاء التنزيل.', s2: 'إذا ظهرت رسالة «Windows protected your PC» اضغط <b>More info ← Run anyway</b>. (التطبيق غير موقّع رقمياً بعد.)', s3: 'افتح <b>HelixBoard</b> من قائمة ابدأ أو من اختصار سطح المكتب.',
+    upd: 'مثبّت لديك بالفعل؟ لا حاجة للتنزيل مجدداً — يعرض HelixBoard زر <b>حدّث الآن</b> تلقائياً عند توفر إصدار جديد (أو تبويب الصفحة ← <b>البحث عن تحديثات</b>).', foot: 'تصميم أ. هاني طه'
   };
   const EN = {}; document.querySelectorAll('[data-t]').forEach(e => { EN[e.dataset.t] = e.innerHTML; });
   let ar = false; try { ar = localStorage.getItem('dlLang') === 'ar'; } catch (e) {}
-  const btn = document.getElementById('lang');
-  function apply() {
-    document.documentElement.lang = ar ? 'ar' : 'en'; document.documentElement.dir = ar ? 'rtl' : 'ltr';
-    document.querySelectorAll('[data-t]').forEach(e => { e.innerHTML = (ar ? AR : EN)[e.dataset.t] || EN[e.dataset.t]; });
-    btn.textContent = ar ? 'English' : 'العربية'; showVer();
-  }
+  const btn = document.getElementById('lang'); let rel = null;
+  function apply() { document.documentElement.lang = ar ? 'ar' : 'en'; document.documentElement.dir = ar ? 'rtl' : 'ltr';
+    document.querySelectorAll('[data-t]').forEach(e => { e.innerHTML = (ar ? AR : EN)[e.dataset.t] || EN[e.dataset.t]; }); btn.textContent = ar ? 'English' : 'العربية'; showVer(); }
+  function showVer() { if (!rel || !rel.setup) return; const v = document.getElementById('ver'); v.textContent = (ar ? 'الإصدار ' : 'Version ') + rel.tag.replace(/^v/, '') + ' · ' + Math.round(rel.setup.size / 1048576) + ' MB' + (ar ? ' · يحدّث نفسه' : ' · updates itself'); }
   btn.onclick = () => { ar = !ar; try { localStorage.setItem('dlLang', ar ? 'ar' : 'en'); } catch (e) {} apply(); };
-
-  /* highlight the card for the visitor's device */
-  const ua = navigator.userAgent, ipad = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  const mine = ipad ? 'c-ipad' : /Android/.test(ua) ? 'c-android' : /Windows/.test(ua) ? 'c-win' : null;
-  if (mine) { const c = document.getElementById(mine); c.classList.add('mine'); c.querySelector('.tag').hidden = false; if (mine !== 'c-win') c.parentNode.prepend(c); }
-
-  /* point the buttons straight at the newest installer files, so the download starts at once */
-  let rel = null;
-  function showVer() { const v = document.getElementById('ver'); if (!rel) { v.textContent = ''; return; }
-    const mb = rel.setup ? Math.round(rel.setup.size / 1048576) + ' MB' : '';
-    v.textContent = (ar ? 'الإصدار ' : 'Version ') + rel.tag.replace(/^v/, '') + (mb ? ' · ' + mb : ''); }
+  /* the buttons point straight at the newest installer files, so the download starts at once */
   fetch('https://api.github.com/repos/Mrhany80/HelixBoard-By-Mr-Hany-Taha/releases/latest').then(r => r.ok ? r.json() : null).then(j => {
-    if (!j || !j.assets) return;
-    const find = re => j.assets.find(a => re.test(a.name));
+    if (!j || !j.assets) return; const find = re => j.assets.find(a => re.test(a.name));
     rel = { tag: j.tag_name || '', setup: find(/Setup-[\d.]+\.exe$/i), portable: find(/Portable-[\d.]+\.exe$/i) };
     if (rel.setup) document.getElementById('dlSetup').href = rel.setup.browser_download_url;
-    if (rel.portable) document.getElementById('dlPortable').href = rel.portable.browser_download_url;
-    showVer();
-  }).catch(() => {});
+    if (rel.portable) document.getElementById('dlPortable').href = rel.portable.browser_download_url; showVer(); }).catch(() => {});
   apply();
 })();
 </script>
