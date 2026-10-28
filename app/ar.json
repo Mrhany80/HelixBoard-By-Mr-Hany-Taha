@@ -2197,5 +2197,18 @@
 "Add an answer": "إضافة إجابة",
 "Send questions to phones (Live class)": "إرسال الأسئلة إلى الهواتف (الصف المباشر)",
 "Hide this bar (a small tab stays to bring it back)": "إخفاء هذا الشريط (يبقى تبويب صغير لإعادته)",
-"Play animations": "تشغيل الحركات"
+"Play animations": "تشغيل الحركات",
+"📶 Same Wi-Fi": "📶 نفس شبكة Wi-Fi",
+"Mobile data, home Wi-Fi or any school network": "بيانات الجوال أو Wi-Fi المنزل أو أي شبكة مدرسية",
+"Phones on the same Wi-Fi as this computer": "الهواتف على نفس شبكة Wi-Fi لهذا الكمبيوتر",
+"Use either code — whichever works on your phone · tap the background or press Esc to close": "استخدم أي رمز — أيهما يعمل على هاتفك · اضغط الخلفية أو Esc للإغلاق",
+"Opening the internet link…": "جارٍ فتح رابط الإنترنت…",
+"Waiting for the internet address to go live…": "بانتظار تفعيل عنوان الإنترنت…",
+"Checking the internet link…": "جارٍ فحص رابط الإنترنت…",
+"The code appears here once it works — use the Wi-Fi code meanwhile.": "يظهر الرمز هنا عندما يعمل — استخدم رمز Wi-Fi في الأثناء.",
+"Phones can’t connect on Wi-Fi?": "الهواتف لا تتصل عبر Wi-Fi؟",
+"Allow HelixBoard on all networks": "السماح لـ HelixBoard على جميع الشبكات",
+"Waiting for Windows…": "بانتظار ويندوز…",
+"This computer could not test the link. If phones show an error, use the Wi-Fi code.": "تعذّر على هذا الكمبيوتر فحص الرابط. إذا ظهر خطأ على الهواتف فاستخدم رمز Wi-Fi.",
+"The internet link dropped — reopening it (scan the new QR code)…": "انقطع رابط الإنترنت — جارٍ إعادة فتحه (امسح رمز QR الجديد)…"
 }

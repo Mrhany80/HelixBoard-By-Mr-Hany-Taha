@@ -10,6 +10,10 @@ const ASSET = 'cloudflared-windows-amd64.exe';
 const RELEASE = 'https://api.github.com/repos/cloudflare/cloudflared/releases/latest';
 const DOWNLOAD = 'https://github.com/cloudflare/cloudflared/releases/latest/download/' + ASSET;
 const URL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
+/* cloudflared prints the address before the link is connected; phones that scan too early get an error (and may remember it for minutes),
+   so the address is only shown once Cloudflare reports a registered connection AND the new name answers on the public internet */
+const READY_RE = /Registered tunnel connection|Connection [0-9a-f-]+ registered/i;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* Windows checks the Authenticode signature; anything not validly signed by Cloudflare is deleted and never run */
 function verifySignature(file) {
@@ -47,31 +51,66 @@ async function ensureCloudflared(dir, netFetch, onStatus) {
 }
 const sha256 = b => require('crypto').createHash('sha256').update(b).digest('hex');
 
-function startTunnel(bin, port) {
+function startTunnel(bin, port, home) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:' + port], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    let done = false, log = '';
-    const finish = (err, url) => { if (done) return; done = true; clearTimeout(to); if (err) { try { proc.kill(); } catch (e) {} reject(err); } else resolve({ url, proc }); };
-    const read = buf => { const t = String(buf); log = (log + t).slice(-4000); const m = t.match(URL_RE) || log.match(URL_RE); if (m) finish(null, m[0]); };
+    /* http2 runs over the normal HTTPS port (443) that school firewalls allow; the default (QUIC over UDP) is often blocked.
+       A private home folder means a cloudflared config file left on this PC by other software can never break the quick tunnel. */
+    const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--edge-ip-version', 'auto', '--url', 'http://127.0.0.1:' + port],
+      { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: Object.assign({}, process.env, { USERPROFILE: home, HOME: home }) });
+    let done = false, log = '', url = null;
+    const finish = (err, u) => { if (done) return; done = true; clearTimeout(to); if (err) { try { proc.kill(); } catch (e) {} reject(err); } else resolve({ url: u, proc }); };
+    const read = buf => { log = (log + String(buf)).slice(-8000); if (!url) { const m = log.match(URL_RE); if (m) url = m[0]; } if (url && READY_RE.test(log)) finish(null, url); };
     proc.stdout.on('data', read); proc.stderr.on('data', read);
     proc.on('error', e => finish(new Error('The tunnel tool could not start: ' + e.message)));
-    proc.on('exit', code => finish(new Error('The internet link closed (' + code + '). ' + (/(429|Too Many Requests)/.test(log) ? 'Cloudflare is busy — try again in a minute.' : 'The school network may be blocking it.'))));
-    const to = setTimeout(() => finish(new Error('The internet link did not open in time — the network may be blocking Cloudflare.')), 45000);
+    proc.on('exit', code => finish(new Error(/(429|Too Many Requests)/.test(log) ? 'Cloudflare is busy right now.' : 'The internet link closed (' + code + ') — the network may be blocking Cloudflare.')));
+    const to = setTimeout(() => finish(new Error(url ? 'Cloudflare gave an address but the link did not connect — this network may block it.' : 'The internet link did not open in time — the network may be blocking Cloudflare.')), 60000);
   });
+}
+/* waits until the new address exists in public DNS (asked over HTTPS, so this PC's own DNS cache never stores a "not found"),
+   then checks the whole path: Cloudflare → tunnel → this app. Returns true when a phone would see the class page. */
+async function reachable(url, netFetch, onStatus) {
+  const host = new URL(url).hostname, t0 = Date.now();
+  if (!process.env.HB_CLOUDFLARED) {
+    onStatus('Waiting for the internet address to go live…');
+    while (Date.now() - t0 < 45000) {
+      try { const r = await netFetch('https://cloudflare-dns.com/dns-query?name=' + encodeURIComponent(host) + '&type=A', { headers: { accept: 'application/dns-json' } }); const j = await r.json(); if (j && j.Status === 0 && (j.Answer || []).length) break; } catch (e) {}
+      await sleep(1500);
+    }
+    await sleep(1500);
+  }
+  onStatus('Checking the internet link…');
+  for (let i = 0; i < 5; i++) {
+    try { const r = await netFetch((process.env.HB_TUNNEL_PING_ORIGIN || url) + '/hb-ping?t=' + Date.now()); if (r.ok) { const j = await r.json(); if (j && j.app === 'helixboard') return true; } } catch (e) {}
+    await sleep(2000);
+  }
+  return false;
 }
 
 class Tunnel {
-  constructor(dir, netFetch) { this.dir = dir; this.netFetch = netFetch; this.proc = null; }
+  constructor(dir, netFetch) { this.dir = dir; this.netFetch = netFetch; this.proc = null; this.gen = 0; }
+  /* resolves { url, checked }: checked is false when this PC could not reach the link (phones on other networks may still) */
   async open(port, onStatus) {
-    this.close();
+    this.close(); const gen = ++this.gen;
     const bin = await ensureCloudflared(this.dir, this.netFetch, onStatus);
-    onStatus('Opening the internet link…');
-    const { url, proc } = await startTunnel(bin, port);
-    this.proc = proc;
-    proc.on('exit', () => { if (this.proc === proc) { this.proc = null; this.onDrop && this.onDrop(); } });
-    return url;
+    const home = path.join(this.dir, 'cf-home'); try { fs.mkdirSync(home, { recursive: true }); } catch (e) {}
+    let last = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (gen !== this.gen) throw new Error('cancelled');
+      onStatus(attempt === 1 ? 'Opening the internet link…' : 'Trying again (' + attempt + ' of 3)…');
+      try {
+        const { url, proc } = await startTunnel(bin, port, home);
+        if (gen !== this.gen) { try { proc.kill(); } catch (e) {} throw new Error('cancelled'); }
+        this.proc = proc; proc.on('exit', () => { if (this.proc === proc) { this.proc = null; this.onDrop && this.onDrop(); } });
+        const ok = await reachable(url, this.netFetch, onStatus);
+        if (gen !== this.gen) throw new Error('cancelled');
+        if (ok || attempt === 3) return { url, checked: ok };
+        last = new Error('The internet link opened but did not answer.'); this.close(); this.gen = gen;
+      } catch (e) { if (e.message === 'cancelled') throw e; last = e; }
+      await sleep(attempt * 4000);
+    }
+    throw last || new Error('The internet link could not open.');
   }
-  close() { const p = this.proc; this.proc = null; if (p) { try { p.kill(); } catch (e) {} } }
+  close() { this.gen++; const p = this.proc; this.proc = null; if (p) { try { p.kill(); } catch (e) {} } }
 }
 
 module.exports = { Tunnel, verifySignature };

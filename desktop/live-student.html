@@ -74,11 +74,11 @@
           if (r.status === 403) { try { localStorage.removeItem(key); } catch (e) {} pid = null; joinScreen('Please join again.'); return; }
           const j = await r.json(); fails = 0; hideOffline();
           if (j.data && j.ver > ver) { ver = j.ver; render(j.data); if (j.data.v === 'closed') { pid = null; return; } }
-        } catch (e) { fails++; /* the board stopped the game after the final results */ if (view && view.v === 'end' && fails > 2) { hideOffline(); render({ v: 'closed' }); return; } if (fails > 2) showOffline(); await new Promise(r => setTimeout(r, Math.min(5000, 800 * fails))); }
+        } catch (e) { fails++; /* the board stopped the game after the final results */ if (view && view.v === 'end' && fails > 2) { hideOffline(); render({ v: 'closed' }); return; } if (fails > 2) showOffline(fails > 10); await new Promise(r => setTimeout(r, Math.min(5000, 800 * fails))); }
       } })();
   }
   const off = el('div', { style: 'position:fixed;left:12px;right:12px;bottom:12px;padding:10px 14px;border-radius:12px;background:#5A1E28;color:#fff;text-align:center;font-weight:600;display:none' }, 'Reconnecting…'); document.body.append(off);
-  const showOffline = () => off.style.display = 'block', hideOffline = () => off.style.display = 'none';
+  const showOffline = long => { off.textContent = long ? 'Connection lost — still trying. If this lasts, scan the QR code on the board again.' : 'Reconnecting…'; off.style.display = 'block'; }, hideOffline = () => off.style.display = 'none';
 
   function render(d) {
     clearInterval(timer); view = d;

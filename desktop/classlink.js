@@ -90,6 +90,8 @@ class ClassLink {
   async handle(req, res) {
     const url = new URL(req.url, 'http://x');
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
+    /* health check for the internet link (the app checks the whole path before showing the QR code) */
+    if (req.method === 'GET' && url.pathname === '/hb-ping') { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); return res.end(JSON.stringify({ app: 'helixboard', pin: this.pin.length })); }
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self'" });
       return res.end(this.html.split('__TITLE__').join(escapeHtml(this.title)).split('__LANG__').join(this.lang));

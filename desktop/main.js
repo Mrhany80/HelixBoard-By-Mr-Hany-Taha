@@ -153,17 +153,25 @@ ipcMain.handle('overlay:snap', async e => {
 
 /* ---------- phone quiz server (classroom Wi-Fi) ---------- */
 const live = new LiveQuiz(snap => { if (win && !win.isDestroyed()) win.webContents.send('live:update', snap); });
-/* the internet link: students on any network join through a public https address that forwards here */
-let tunnel = null;
-async function openLink() {
-  if (!live.server) return;
-  tunnel = tunnel || new Tunnel(app.getPath('userData'), url => net.fetch(url));
-  tunnel.onDrop = () => { if (live.server) { live.tunnel = { state: 'failed', error: 'The internet link dropped.' }; live.update(); } };
-  const status = msg => { live.tunnel = { state: 'connecting', msg }; live.update(); };
-  status('Opening the internet link…');
-  try { const url = await tunnel.open(live.port, status); if (live.server) { live.tunnel = { state: 'ready', url: url + '/?pin=' + live.pin }; live.update(); } else tunnel.close(); }
-  catch (er) { live.tunnel = { state: 'failed', error: er.message }; live.update(); }
+/* the internet link: students on any network join through a public https address that forwards here.
+   Shared by the phone quiz and the class link: the address is shown only once it really works, and a dropped link reopens by itself
+   (up to 4 times in 10 minutes) with a new QR code; the same-Wi-Fi addresses always work alongside it. */
+function linkKeeper(srv, getTunnel) {
+  let drops = [];
+  const open = async () => {
+    if (!srv.server) return; const t = getTunnel();
+    t.onDrop = () => { if (!srv.server) return; drops = drops.filter(x => Date.now() - x < 600000); drops.push(Date.now());
+      if (drops.length <= 4) { srv.tunnel = { state: 'connecting', msg: 'The internet link dropped — reopening it (scan the new QR code)…' }; srv.update(); setTimeout(open, 1500); }
+      else { srv.tunnel = { state: 'failed', error: 'The internet link keeps dropping on this network. Phones on the same Wi-Fi can still join.' }; srv.update(); } };
+    const status = msg => { if (srv.server) { srv.tunnel = { state: 'connecting', msg }; srv.update(); } };
+    status('Opening the internet link…');
+    try { const r = await t.open(srv.port, status); if (srv.server) { srv.tunnel = { state: 'ready', url: r.url + '/?pin=' + srv.pin, checked: r.checked }; srv.update(); } else t.close(); }
+    catch (er) { if (er.message === 'cancelled') return; if (srv.server) { srv.tunnel = { state: 'failed', error: er.message + ' Phones on the same Wi-Fi can still join.' }; srv.update(); } }
+  };
+  return open;
 }
+let tunnel = null;
+const openLink = linkKeeper(live, () => (tunnel = tunnel || new Tunnel(app.getPath('userData'), (url, o) => net.fetch(url, o))));
 ipcMain.handle('live:start', async (e, quiz) => {
   try { const info = await live.start(quiz); if (quiz.internet !== false) openLink(); return info; }
   catch (er) { return { error: er.code === 'EADDRINUSE' ? 'The quiz port is busy — close other quiz windows and try again.' : er.message }; }
@@ -181,15 +189,7 @@ ipcMain.handle('live:cmd', (e, cmd, arg) => {
 /* ---------- Class link: live board, student pens, shared files and homework for phones ---------- */
 const cl = new ClassLink((type, data, snap) => { if (win && !win.isDestroyed()) win.webContents.send('cl:event', type, data, snap); });
 let clTunnel = null;
-async function openClLink() {
-  if (!cl.server) return;
-  clTunnel = clTunnel || new Tunnel(app.getPath('userData'), url => net.fetch(url));
-  clTunnel.onDrop = () => { if (cl.server) { cl.tunnel = { state: 'failed', error: 'The internet link dropped.' }; cl.update(); } };
-  const status = msg => { cl.tunnel = { state: 'connecting', msg }; cl.update(); };
-  status('Opening the internet link…');
-  try { const url = await clTunnel.open(cl.port, status); if (cl.server) { cl.tunnel = { state: 'ready', url: url + '/?pin=' + cl.pin }; cl.update(); } else clTunnel.close(); }
-  catch (er) { cl.tunnel = { state: 'failed', error: er.message }; cl.update(); }
-}
+const openClLink = linkKeeper(cl, () => (clTunnel = clTunnel || new Tunnel(app.getPath('userData'), (url, o) => net.fetch(url, o))));
 const fromMain = e => win && e.sender === win.webContents;
 ipcMain.handle('cl:start', async (e, opts) => {
   if (!fromMain(e)) return null;
@@ -217,6 +217,21 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   else if (cmd === 'link') openClLink();
   else if (cmd === 'stop') { await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
   return cl.snapshot();
+});
+/* school Wi-Fi is often a "Public" network, and the first-run firewall question only allows "Private" ones, so phones on the Wi-Fi are
+   silently blocked. This adds one inbound rule for HelixBoard itself (all network types), after the usual Windows administrator prompt. */
+ipcMain.handle('fw:allow', async e => {
+  if (!fromMain(e) || process.platform !== 'win32') return { ok: false, error: 'Only needed on Windows.' };
+  /* the elevated command is passed base64-encoded, so no path or quote can break it; one rule for this program, one for the class ports
+     (the portable copy runs from a temporary folder, so the port rule is what keeps it working) */
+  const exe = process.execPath.replace(/[`$"]/g, '`$&');
+  const inner = 'netsh advfirewall firewall delete rule name="HelixBoard phones" | Out-Null\r\n' +
+    'netsh advfirewall firewall add rule name="HelixBoard phones" dir=in action=allow program="' + exe + '" enable=yes profile=any | Out-Null\r\n' +
+    'netsh advfirewall firewall add rule name="HelixBoard phones" dir=in action=allow protocol=TCP localport=8320-8333 enable=yes profile=any | Out-Null';
+  const b64 = Buffer.from(inner, 'utf16le').toString('base64');
+  const cmd = "Start-Process -FilePath powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','" + b64 + "'";
+  return new Promise(resolve => require('child_process').execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { windowsHide: true, timeout: 120000 },
+    err => resolve(err ? { ok: false, error: /cancel|1223/i.test(String(err.message)) ? 'Windows did not get permission (the prompt was cancelled).' : 'Windows could not add the rule: ' + err.message } : { ok: true })));
 });
 /* lesson recordings are written to Documents\HelixBoard\Recordings, so they can be shared without copying them through memory again */
 ipcMain.handle('rec:save', async (e, name, bytes) => {

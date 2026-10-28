@@ -20,7 +20,8 @@ function lanAddresses() {
   }));
   /* private Wi-Fi/Ethernet addresses first; virtual adapters (VirtualBox, Hyper-V, VPN) last */
   const virt = n => /virtual|vbox|vmware|hyper-v|vethernet|docker|wsl|tailscale|zerotier|loopback/i.test(n);
-  return out.sort((a, b) => (virt(a.name) - virt(b.name)) || (b.priv - a.priv)).map(a => a.address);
+  const wifi = n => /wi-?fi|wlan|wireless/i.test(n) ? 1 : 0;
+  return out.sort((a, b) => (virt(a.name) - virt(b.name)) || (b.priv - a.priv) || (wifi(b.name) - wifi(a.name))).map(a => a.address);
 }
 
 class LiveQuiz {
@@ -65,6 +66,8 @@ class LiveQuiz {
     const url = new URL(req.url, 'http://x');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    /* health check for the internet link (the app checks the whole path before showing the QR code) */
+    if (req.method === 'GET' && url.pathname === '/hb-ping') { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); return res.end(JSON.stringify({ app: 'helixboard', pin: this.pin.length })); }
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:" });
       return res.end(this.html.split('__TITLE__').join(escapeHtml(this.title)));

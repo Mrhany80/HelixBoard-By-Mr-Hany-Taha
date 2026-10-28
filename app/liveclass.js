@@ -170,8 +170,9 @@ function paintTile(cv, strokes) { const r = cv.getBoundingClientRect(); const W 
 
 /* ---------- rendering ---------- */
 function render() { if (!L.el) return; renderJoin(); renderTop(); renderSide(); renderMain(); }
-function renderJoin() { const j = L.el && L.el.querySelector('#lcJoin'); const ln = HBCL.links && HBCL.links(); if (!j || !ln) return; const key = ln.url + ln.pin; if (j.dataset.k === key) return; j.dataset.k = key;
-  j.innerHTML = '<div class="qr">' + qrSvg(ln.url) + '</div><div><div class="pin">' + esc(ln.pin) + '</div><small>' + (ln.isNet ? '🌐 Any network · ' : '📶 Same Wi-Fi · ') + esc(ln.url.replace(/\/\?pin=\d+$/, '').replace(/^https?:\/\//, '')) + '</small></div>'; }
+function renderJoin() { const j = L.el && L.el.querySelector('#lcJoin'); const ln = HBCL.links && HBCL.links(); if (!j || !ln) return; const key = ln.url + ln.pin + ((ln.tn || {}).state || ''); if (j.dataset.k === key) return; j.dataset.k = key;
+  const tn = ln.tn || {}, st = tn.state === 'ready' ? '🌐 Any network + 📶 Wi-Fi' : tn.state === 'connecting' ? '📶 Wi-Fi ready · 🌐 opening…' : tn.state === 'failed' ? '📶 Same Wi-Fi only' : '📶 Same Wi-Fi';
+  j.innerHTML = '<div class="qr">' + qrSvg(ln.url) + '</div><div><div class="pin">' + esc(ln.pin) + '</div><small>' + st + ' · tap for both QR codes</small></div>'; }
 function renderTop() { const b = L.el.querySelector('#lcTopBtns'); const lock = L.snap && L.snap.lock;
   b.innerHTML = (L.act ? '<button class="btn sm" id="lcNew">' + icon('plus') + 'New activity</button>' : '') + '<button class="btn sm' + (lock ? ' primary' : '') + '" id="lcLock" title="Pause every phone so students look at the board">' + icon(lock ? 'lock-open' : 'lock') + (lock ? 'Unlock phones' : 'Eyes on board') + '</button><button class="btn sm" id="lcLb">' + icon('trophy') + 'Stars</button>';
   const n = b.querySelector('#lcNew'); if (n) n.onclick = () => endActivity(true);
