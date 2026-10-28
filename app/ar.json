@@ -2210,5 +2210,22 @@
 "Allow HelixBoard on all networks": "السماح لـ HelixBoard على جميع الشبكات",
 "Waiting for Windows…": "بانتظار ويندوز…",
 "This computer could not test the link. If phones show an error, use the Wi-Fi code.": "تعذّر على هذا الكمبيوتر فحص الرابط. إذا ظهر خطأ على الهواتف فاستخدم رمز Wi-Fi.",
-"The internet link dropped — reopening it (scan the new QR code)…": "انقطع رابط الإنترنت — جارٍ إعادة فتحه (امسح رمز QR الجديد)…"
+"The internet link dropped — reopening it (scan the new QR code)…": "انقطع رابط الإنترنت — جارٍ إعادة فتحه (امسح رمز QR الجديد)…",
+"Answers": "الإجابات",
+"Submit once": "إرسال مرة واحدة",
+"Live": "مباشر",
+"Students press Submit; the answer then locks. Best for checking understanding.": "يضغط الطلاب تسليم ثم تُقفل الإجابة. الأفضل للتحقق من الفهم.",
+"Answers appear as students work and can change until time is up. Best for brainstorming.": "تظهر الإجابات أثناء عمل الطلاب ويمكن تغييرها حتى ينتهي الوقت. الأفضل للعصف الذهني.",
+"Time limit": "المهلة",
+"Hand in unsent work when time is up": "تسليم العمل غير المرسل عند انتهاء الوقت",
+"submitted": "سلّموا",
+"Reopen for 1 min": "إعادة الفتح لدقيقة",
+"Remove · let them redo": "حذف · السماح بالإعادة",
+"One more minute — the phones show the new time.": "دقيقة إضافية — تعرض الهواتف الوقت الجديد.",
+"1½ minutes": "دقيقة ونصف",
+"15 minutes": "15 دقيقة",
+"20 minutes": "20 دقيقة",
+"30 minutes": "30 دقيقة",
+"🔒 Submit once": "🔒 إرسال مرة واحدة",
+"📡 Live": "📡 مباشر"
 }

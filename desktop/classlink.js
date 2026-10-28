@@ -60,14 +60,20 @@ class ClassLink {
     const options = type === 'poll' ? (Array.isArray(a.options) ? a.options : []).slice(0, 6).map(o => String(o || '').slice(0, 80)) : [];
     if (type === 'poll' && options.length < 2) return null;
     const secs = Math.max(0, Math.min(3600, +a.secs || 0));
+    /* once: each student submits one final answer, which then locks (Nearpod/ClassPoint style); otherwise answers are live and can change.
+       auto: when time is up (or the teacher closes answers), phones hand in unsent work by themselves during a short grace period */
     this.act = { id: crypto.randomBytes(5).toString('hex'), type, prompt: String(a.prompt || '').slice(0, 300), options, bg: a.bg ? Buffer.from(a.bg) : null, ar: Math.max(0.3, Math.min(4, +a.ar || 4 / 3)),
-      open: true, endsAt: secs ? Date.now() + secs * 1000 : 0, anon: !!a.anon, responses: new Map(), started: Date.now() };
-    this.shared = null; clearTimeout(this.actTimer);
-    if (secs) this.actTimer = setTimeout(() => { if (this.act && this.act.open) { this.act.open = false; this.emit('act'); this.changed(); } }, secs * 1000 + 300);
+      open: true, endsAt: secs ? Date.now() + secs * 1000 : 0, anon: !!a.anon, once: a.once !== false, auto: a.auto !== false, closedAt: 0, responses: new Map(), started: Date.now() };
+    this.shared = null; this.players.forEach(pl => { pl.working = 0; }); this.armTimer();
     this.changed(); return this.act.id;
   }
+  armTimer() { clearTimeout(this.actTimer); const a = this.act; if (!a || !a.open || !a.endsAt) return;
+    this.actTimer = setTimeout(() => { if (this.act === a && a.open) this.closeAnswers(); }, Math.max(0, a.endsAt - Date.now()) + 250); }
+  closeAnswers() { const a = this.act; if (!a) return; a.open = false; a.closedAt = Date.now(); clearTimeout(this.actTimer); this.emit('act'); this.changed(); }
   actOptions(o) { const a = this.act; if (!a) return;
-    if ('open' in o) { a.open = !!o.open; if (a.open) a.endsAt = 0; clearTimeout(this.actTimer); }
+    if ('open' in o) { if (o.open) { a.open = true; a.closedAt = 0; a.endsAt = 0; clearTimeout(this.actTimer); } else if (a.open) { this.closeAnswers(); return; } }
+    /* the teacher gives more time: from now if time had run out, otherwise on top of what is left */
+    if ('extend' in o) { const s = Math.max(10, Math.min(1800, +o.extend || 60)) * 1000; a.endsAt = (a.open && a.endsAt ? Math.max(a.endsAt, Date.now()) : Date.now()) + s; a.open = true; a.closedAt = 0; this.armTimer(); }
     if ('anon' in o) a.anon = !!o.anon;
     if ('reveal' in o) a.reveal = Number.isInteger(o.reveal) ? o.reveal : null;
     this.changed(); }
@@ -83,8 +89,8 @@ class ClassLink {
   lowerHand(pid) { if (pid) { const pl = this.players.get(pid); if (pl) pl.hand = 0; } else this.players.forEach(pl => { pl.hand = 0; }); this.changed(); }
   clearQuestions() { this.questions = []; this.emit('status'); }
   responses() { const a = this.act; if (!a) return null;
-    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, endsAt: a.endsAt, anon: a.anon, reveal: a.reveal == null ? null : a.reveal, ar: a.ar, hasBg: !!a.bg,
-      list: [...a.responses.entries()].map(([pid, r]) => { const pl = this.players.get(pid); return { pid, name: pl ? pl.name : '?', color: pl ? pl.color : '#888', value: r.value, at: r.at, n: r.n }; }) }; }
+    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, endsAt: a.endsAt, anon: a.anon, once: a.once, auto: a.auto, reveal: a.reveal == null ? null : a.reveal, ar: a.ar, hasBg: !!a.bg,
+      list: [...a.responses.entries()].map(([pid, r]) => { const pl = this.players.get(pid); return { pid, name: pl ? pl.name : '?', color: pl ? pl.color : '#888', value: r.value, at: r.at, n: r.n, late: !!r.late }; }) }; }
 
   /* ---------- HTTP ---------- */
   async handle(req, res) {
@@ -107,6 +113,7 @@ class ClassLink {
     if (req.method === 'POST' && url.pathname === '/stroke') return this.body(req, res, d => this.stroke(pl, d, res), 64 * 1024);
     if (req.method === 'GET' && url.pathname === '/actbg.jpg') { const a = this.act; if (!a || !a.bg) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': a.bg.length }); return res.end(a.bg); }
     if (req.method === 'POST' && url.pathname === '/answer') return this.body(req, res, d => this.answer(pl, d, res), 3 * 1024 * 1024);
+    if (req.method === 'POST' && url.pathname === '/working') return this.working(pl, res);
     if (req.method === 'POST' && url.pathname === '/hand') return this.body(req, res, d => this.hand(pl, d, res), 4096);
     if (req.method === 'POST' && url.pathname === '/hwsubmit') return this.body(req, res, d => this.hwSubmit(pl, d, res), 64 * 1024);
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
@@ -141,19 +148,29 @@ class ClassLink {
       act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, hand: !!pl.hand, lock: this.lock };
   }
   actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
-    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar,
+    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar, once: a.once, auto: a.auto, grace: !a.open && a.auto && a.closedAt ? Math.max(0, 6000 - (Date.now() - a.closedAt)) : 0,
       reveal: a.type === 'poll' && a.reveal != null ? a.reveal : null, mine: r ? r.value : null }; }
   /* a student's answer to the live activity — checked by type, then passed to the teacher's screen */
   answer(pl, d, res) {
     const a = this.act; if (!a || String(d.id || '') !== a.id) return json(res, 409, { error: 'That activity has finished.' });
-    if (!a.open) return json(res, 403, { error: 'Answers are closed.' });
-    const now = Date.now(); pl.posts = pl.posts.filter(t => now - t < 10000); if (pl.posts.length >= 40) return json(res, 429, { error: 'Slow down a little.' }); pl.posts.push(now);
-    const v = cleanAnswer(a, d.value, a.responses.get(pl.id)); if (v === undefined) return json(res, 400, { error: 'That answer could not be read.' });
-    if (v === null) a.responses.delete(pl.id); else { const old = a.responses.get(pl.id); a.responses.set(pl.id, { value: v, at: now, n: old ? old.n + 1 : 1 }); }
+    const now = Date.now(), old = a.responses.get(pl.id);
+    /* after the deadline only the automatic hand-in of unsent work is accepted, for a few seconds */
+    const grace = !a.open && a.auto && d.auto && a.closedAt && now - a.closedAt < 6000 && !old;
+    if (!a.open && !grace) return json(res, 403, { error: 'Time is up — answers are closed.' });
+    if (a.once && old && a.type !== 'notes') return json(res, 409, { error: 'You have already submitted.', mine: old.value });
+    pl.posts = pl.posts.filter(t => now - t < 10000); if (pl.posts.length >= 40) return json(res, 429, { error: 'Slow down a little.' }); pl.posts.push(now);
+    const v = cleanAnswer(a, d.value, old); if (v === undefined) return json(res, 400, { error: 'That answer could not be read.' });
+    /* collaborate board in submit-once mode: notes can be added, never edited or taken back */
+    if (a.once && a.type === 'notes' && old && (v === null || old.value.some((n, i) => !v[i] || v[i].t !== n.t))) return json(res, 409, { error: 'Posted notes cannot be changed.', mine: old.value });
+    if (a.once && v === null) return json(res, 400, { error: 'Your answer is empty.' });
+    if (v === null) a.responses.delete(pl.id); else a.responses.set(pl.id, { value: v, at: now, n: old ? old.n + 1 : 1, late: !!(grace || d.auto) });
+    pl.working = 0;
     if (this.shared && this.shared.actId === a.id && this.shared.name === pl.name && v) { this.shared.value = v; this.changed(); }
-    this.emit('response', { actId: a.id, pid: pl.id, name: pl.name, color: pl.color, type: a.type, value: v, at: now });
+    this.emit('response', { actId: a.id, pid: pl.id, name: pl.name, color: pl.color, type: a.type, value: v, at: now, auto: !!(grace || d.auto) });
     json(res, 200, { ok: true, mine: v });
   }
+  /* "working on it": a phone says so while a student draws or types, so the teacher sees who is busy and who has not started */
+  working(pl, res) { const a = this.act; if (a && a.open && !a.responses.has(pl.id)) { const was = pl.working && Date.now() - pl.working < 15000; pl.working = Date.now(); if (!was) this.emit('working', { pid: pl.id }); } json(res, 200, { ok: true }); }
   hand(pl, d, res) {
     const q = String(d.q || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
     if (q) { if (this.questions.filter(x => x.pid === pl.id && Date.now() - x.at < 60000).length >= 3) return json(res, 429, { error: 'Wait a minute before asking again.' }); this.questions.push({ pid: pl.id, name: pl.name, q, at: Date.now() }); if (this.questions.length > 200) this.questions.shift(); }
@@ -199,8 +216,8 @@ class ClassLink {
     json(res, 200, { ok: true, score: ans.filter((a, i) => key[i] >= 0 && a === key[i]).length, total: key.filter(a => a >= 0).length, key: hw.showAnswers ? key : null });
   }
 
-  snapshot() { return { pin: this.pin, port: this.port, tunnel: this.tunnel, boardOn: this.boardOn, drawOn: this.drawOn, files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })), homework: [...this.homework.keys()], players: [...this.players.values()].map(p => ({ pid: p.id, name: p.name, color: p.color, stars: p.stars || 0, hand: p.hand || 0, online: p.waiters.length > 0 || Date.now() - p.seen < 30000 })),
-    act: this.act ? { id: this.act.id, type: this.act.type, open: this.act.open, count: this.act.responses.size, endsAt: this.act.endsAt } : null, lock: this.lock, questions: this.questions.slice(-50) }; }
+  snapshot() { return { pin: this.pin, port: this.port, tunnel: this.tunnel, boardOn: this.boardOn, drawOn: this.drawOn, files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })), homework: [...this.homework.keys()], players: [...this.players.values()].map(p => ({ pid: p.id, name: p.name, color: p.color, stars: p.stars || 0, hand: p.hand || 0, working: !!(p.working && Date.now() - p.working < 15000), online: p.waiters.length > 0 || Date.now() - p.seen < 30000 })),
+    act: this.act ? { id: this.act.id, type: this.act.type, open: this.act.open, count: this.act.responses.size, endsAt: this.act.endsAt, once: this.act.once } : null, lock: this.lock, questions: this.questions.slice(-50) }; }
   emit(type, data) { this.onEvent && this.onEvent(type, data, this.snapshot()); }
   update() { this.emit('status'); }
 }
