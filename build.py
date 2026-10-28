@@ -15,7 +15,7 @@ D = R + 'dist/'
 # module doesn't stop the whole app
 ORDER = ['core','engine','input','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
          'recog','classtools','notes','smart','deck','wheel','timer','water','io','ui',
-         'fullscreen','toolsize','roots','studio','notekit','classlink','account','install','lang','intro','main']
+         'fullscreen','toolsize','roots','studio','notekit','classlink','liveclass','account','install','lang','intro','main']
 
 parts = []
 for m in ORDER:

@@ -9,16 +9,17 @@ const S = { on: false, info: null, snap: null, url: '', picked: false, dirty: tr
 
 function needApp(what) { modal.open('<h2>' + what + '</h2><p>Students scan one QR code and see your board live on their phones or tablets, write on it for group work, download lesson videos and do homework — from the same Wi-Fi or from any network.</p><p>This needs the <b>HelixBoard Windows app</b>, which runs the class link on this computer (no accounts or website needed).</p><div class="foot"><button class="btn primary" data-close>OK</button></div>'); }
 
-async function start() { if (!D()) return needApp('Class link'); if (S.on) return panel();
+async function start(opts) { opts = opts || {}; if (!D()) return needApp('Class link'); if (S.on) return opts.quiet ? null : panel();
   toast('Starting the class link…');
   const r = await D().start({ title: (E.page().name || 'Our class'), lang: set.get('lang', 'en'), internet: set.get('phoneNet', true) });
   if (!r || r.error) { toast('The class link could not start: ' + esc((r && r.error) || 'unknown error'), 6000); return; }
   S.on = true; S.info = r; S.picked = false; D().onEvent(onEvent); window.HBA && HBA.log('class_link', {});
   await D().cmd('options', { boardOn: set.get('clBoard', true), drawOn: false });
-  S.snap = await D().cmd('snapshot'); panel(); stream(); }
-async function stop() { if (!S.on) return; S.on = false; clearInterval(S.t); await D().cmd('stop'); const f = window.HB.floats.classlink; if (f) f.destroy(); toast('Class link closed.'); }
+  S.snap = await D().cmd('snapshot'); if (!opts.quiet) panel(); stream(); }
+async function stop() { if (!S.on) return; S.on = false; clearInterval(S.t); await D().cmd('stop'); window.HBLC && HBLC.closed(); const f = window.HB.floats.classlink; if (f) f.destroy(); toast('Class link closed.'); }
 
-function onEvent(type, data, snap) { S.snap = snap;
+function onEvent(type, data, snap) { S.snap = snap; if (window.HBLC) HBLC.event(type, data, snap);
+  if (type === 'response' || type === 'hand' || type === 'question') return;
   if (type === 'stroke') return addInk(data);
   if (type === 'homework') { window.HBL && HBL.hwResult && HBL.hwResult(data.id, data.result); toast('📝 ' + esc(data.result.name) + ' handed in homework.'); return draw(); }
   draw(); }
@@ -34,6 +35,9 @@ function clearInk() { const objs = E.page().objs.filter(o => o.stu); if (!objs.l
 ['view', 'changed', 'page', 'stroke-added', 'selection', 'img-loaded'].forEach(ev => bus.on(ev, () => { S.dirty = true; }));
 document.addEventListener('pointermove', e => { if (e.buttons && e.target.closest && e.target.closest('#stage')) S.dirty = true; }, true);
 function stream() { clearInterval(S.t); S.t = setInterval(() => { if (!S.on || S.busy || !(S.snap && S.snap.boardOn)) return; if (!S.dirty && Date.now() - S.last < 5000) return; send(); }, 700); }
+/* the board as a picture (white behind it), for phones and for Draw-it backgrounds */
+function boardCanvas(maxW) { const cs = [document.getElementById('cvBg'), E.cvMain, E.cvLive], W = E.cvMain.width, H = E.cvMain.height; if (!W || !H) return null; const k = Math.min(1, (maxW || 1600) / W);
+  const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); cs.forEach(x => x && g.drawImage(x, 0, 0, c.width, c.height)); return c; }
 function send() { const cs = [document.getElementById('cvBg'), E.cvMain, E.cvLive], W = E.cvMain.width, H = E.cvMain.height; if (!W || !H) return; const k = Math.min(1, 1600 / W);
   const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); cs.forEach(x => x && g.drawImage(x, 0, 0, c.width, c.height));
   S.busy = true; S.dirty = false; S.last = Date.now();
@@ -69,5 +73,5 @@ function pickFile() { const inp = document.createElement('input'); inp.type = 'f
 async function shareFile(f) { if (!D()) return needApp('Share with the class'); if (!S.on) await start(); if (!S.on) return; await D().cmd('addFile', f); S.snap = await D().cmd('snapshot'); draw(); snd('pop'); toast('Shared with the class: ' + esc(f.name) + ' — students find it under Files.', 4200); }
 async function shareHomework(hw) { if (!D()) return needApp('Homework on phones'); if (!S.on) await start(); if (!S.on) return; await D().cmd('addHomework', hw); S.snap = await D().cmd('snapshot'); draw(); toast('Homework shared — students open it under Homework on the class link.', 4200); }
 
-window.HBCL = { start, stop, shareFile, shareHomework, clearInk, get on() { return S.on; }, get available() { return !!D(); } };
+window.HBCL = { start, stop, shareFile, shareHomework, clearInk, bigQr, boardCanvas, links: () => { if (!S.on) return null; const l = links(); return Object.assign({ pin: S.info.pin, url: S.url }, l); }, get snap() { return S.snap; }, get on() { return S.on; }, get available() { return !!D(); } };
 })();

@@ -2,6 +2,8 @@
    - the teacher's board live (a picture refreshed as it changes) and, when the teacher allows it, a pen to write on it (group work),
    - shared files: lesson recordings and homework,
    - homework they can do on the phone, with results going straight to the teacher.
+   - live activities like Nearpod and ClassPoint: Draw It (every student's drawing side by side, by name), polls, word clouds,
+     short answers, photos and a collaborate board — plus stars, raised hands and questions.
    Phones use long-polling, which works on the same Wi-Fi and through the internet link (tunnel.js). */
 const http = require('http');
 const fs = require('fs');
@@ -22,7 +24,7 @@ class ClassLink {
     this.pin = String(crypto.randomInt(100000, 1000000));
     this.players = new Map(); this.badPins = new Map();
     this.board = null; this.boardVer = 0; this.boardOn = false; this.drawOn = false;
-    this.files = []; this.homework = new Map(); this.ver = 0; this.tunnel = { state: 'off' }; this.closing = false;
+    this.files = []; this.homework = new Map(); this.ver = 0; this.act = null; this.shared = null; this.lock = false; this.questions = []; this.tunnel = { state: 'off' }; this.closing = false;
     this.html = fs.readFileSync(PAGE, 'utf8');
     this.server = http.createServer((req, res) => this.handle(req, res).catch(e => { try { json(res, 500, { error: 'Server error' }); } catch (er) {} }));
     this.server.on('clientError', (e, sock) => { try { sock.end('HTTP/1.1 400 Bad Request\r\n\r\n'); } catch (er) {} });
@@ -36,7 +38,7 @@ class ClassLink {
   }
   async stop() {
     if (!this.server) return;
-    clearInterval(this.ping);
+    clearInterval(this.ping); clearTimeout(this.actTimer);
     this.changed('closed');
     if (this.players.size) await new Promise(r => setTimeout(r, 1500));
     this.players.forEach(pl => this.flush(pl));
@@ -51,6 +53,38 @@ class ClassLink {
   removeFile(id) { this.files = this.files.filter(f => f.id !== id); this.changed(); }
   addHomework(hw) { this.homework.set(hw.id, hw); this.changed(); }
   removeHomework(id) { this.homework.delete(id); this.changed(); }
+
+  /* ---------- live activities ---------- */
+  setActivity(a) {
+    const type = ACT_TYPES.includes(a && a.type) ? a.type : null; if (!type) return null;
+    const options = type === 'poll' ? (Array.isArray(a.options) ? a.options : []).slice(0, 6).map(o => String(o || '').slice(0, 80)) : [];
+    if (type === 'poll' && options.length < 2) return null;
+    const secs = Math.max(0, Math.min(3600, +a.secs || 0));
+    this.act = { id: crypto.randomBytes(5).toString('hex'), type, prompt: String(a.prompt || '').slice(0, 300), options, bg: a.bg ? Buffer.from(a.bg) : null, ar: Math.max(0.3, Math.min(4, +a.ar || 4 / 3)),
+      open: true, endsAt: secs ? Date.now() + secs * 1000 : 0, anon: !!a.anon, responses: new Map(), started: Date.now() };
+    this.shared = null; clearTimeout(this.actTimer);
+    if (secs) this.actTimer = setTimeout(() => { if (this.act && this.act.open) { this.act.open = false; this.emit('act'); this.changed(); } }, secs * 1000 + 300);
+    this.changed(); return this.act.id;
+  }
+  actOptions(o) { const a = this.act; if (!a) return;
+    if ('open' in o) { a.open = !!o.open; if (a.open) a.endsAt = 0; clearTimeout(this.actTimer); }
+    if ('anon' in o) a.anon = !!o.anon;
+    if ('reveal' in o) a.reveal = Number.isInteger(o.reveal) ? o.reveal : null;
+    this.changed(); }
+  endActivity() { clearTimeout(this.actTimer); this.act = null; this.shared = null; this.changed(); }
+  /* the teacher shows one student's answer on every phone (or stops showing it) */
+  share(pid) { const a = this.act, r = a && pid ? a.responses.get(pid) : null; const pl = pid && this.players.get(pid);
+    this.shared = r && pl ? { type: a.type, name: a.anon ? 'A classmate' : pl.name, value: r.value, ar: a.ar, bg: !!a.bg, actId: a.id } : null; this.changed(); }
+  removeResponse(pid, idx) { const a = this.act, r = a && a.responses.get(pid); if (!r) return;
+    if (a.type === 'notes' && Number.isInteger(idx)) { r.value.splice(idx, 1); if (!r.value.length) a.responses.delete(pid); } else a.responses.delete(pid);
+    if (this.shared && this.shared.actId === a.id) this.shared = null; const pl = this.players.get(pid); if (pl) this.flush(pl); this.changed(); }
+  award(pid, n) { const pl = this.players.get(pid); if (!pl) return; pl.stars = Math.max(0, (pl.stars || 0) + (Number.isInteger(n) ? n : 1)); this.changed(); }
+  setLock(v) { this.lock = !!v; this.changed(); }
+  lowerHand(pid) { if (pid) { const pl = this.players.get(pid); if (pl) pl.hand = 0; } else this.players.forEach(pl => { pl.hand = 0; }); this.changed(); }
+  clearQuestions() { this.questions = []; this.emit('status'); }
+  responses() { const a = this.act; if (!a) return null;
+    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, endsAt: a.endsAt, anon: a.anon, reveal: a.reveal == null ? null : a.reveal, ar: a.ar, hasBg: !!a.bg,
+      list: [...a.responses.entries()].map(([pid, r]) => { const pl = this.players.get(pid); return { pid, name: pl ? pl.name : '?', color: pl ? pl.color : '#888', value: r.value, at: r.at, n: r.n }; }) }; }
 
   /* ---------- HTTP ---------- */
   async handle(req, res) {
@@ -69,6 +103,9 @@ class ClassLink {
     if (req.method === 'GET' && url.pathname === '/file') return this.sendFile(url.searchParams.get('id'), res);
     if (req.method === 'GET' && url.pathname === '/hw') { const hw = this.homework.get(url.searchParams.get('id')); if (!hw) return json(res, 404, { error: 'Not found' }); return json(res, 200, studentCopy(hw)); }
     if (req.method === 'POST' && url.pathname === '/stroke') return this.body(req, res, d => this.stroke(pl, d, res), 64 * 1024);
+    if (req.method === 'GET' && url.pathname === '/actbg.jpg') { const a = this.act; if (!a || !a.bg) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': a.bg.length }); return res.end(a.bg); }
+    if (req.method === 'POST' && url.pathname === '/answer') return this.body(req, res, d => this.answer(pl, d, res), 3 * 1024 * 1024);
+    if (req.method === 'POST' && url.pathname === '/hand') return this.body(req, res, d => this.hand(pl, d, res), 4096);
     if (req.method === 'POST' && url.pathname === '/hwsubmit') return this.body(req, res, d => this.hwSubmit(pl, d, res), 64 * 1024);
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
   }
@@ -90,7 +127,7 @@ class ClassLink {
     if (taken.has(name.toLowerCase())) { let i = 2; while (taken.has((name + ' ' + i).toLowerCase())) i++; name = name + ' ' + i; }
     const COLORS = ['#E03131', '#1971C2', '#2F9E44', '#E8590C', '#9C36B5', '#0C8599', '#C2255C', '#5F3DC4', '#66A80F', '#D9480F'];
     const id = crypto.randomBytes(9).toString('base64url');
-    this.players.set(id, { id, name, color: COLORS[this.players.size % COLORS.length], waiters: [], waitSince: 0, seen: Date.now(), ver: 0, strokes: [] });
+    this.players.set(id, { id, name, color: COLORS[this.players.size % COLORS.length], waiters: [], waitSince: 0, seen: Date.now(), ver: 0, strokes: [], stars: 0, hand: 0, posts: [] });
     this.emit('players');
     json(res, 200, { pid: id, name, color: this.players.get(id).color });
   }
@@ -98,7 +135,29 @@ class ClassLink {
     return { v: this.server && !this.closing ? 'live' : 'closed', ver: this.ver, title: this.title, name: pl.name, color: pl.color,
       board: this.boardOn && this.board ? { ver: this.boardVer, ar: this.boardView ? this.boardView.ar : 1.6 } : null, draw: this.boardOn && this.drawOn,
       files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })),
-      homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })) };
+      homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })),
+      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, hand: !!pl.hand, lock: this.lock };
+  }
+  actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
+    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar,
+      reveal: a.type === 'poll' && a.reveal != null ? a.reveal : null, mine: r ? r.value : null }; }
+  /* a student's answer to the live activity — checked by type, then passed to the teacher's screen */
+  answer(pl, d, res) {
+    const a = this.act; if (!a || String(d.id || '') !== a.id) return json(res, 409, { error: 'That activity has finished.' });
+    if (!a.open) return json(res, 403, { error: 'Answers are closed.' });
+    const now = Date.now(); pl.posts = pl.posts.filter(t => now - t < 10000); if (pl.posts.length >= 40) return json(res, 429, { error: 'Slow down a little.' }); pl.posts.push(now);
+    const v = cleanAnswer(a, d.value, a.responses.get(pl.id)); if (v === undefined) return json(res, 400, { error: 'That answer could not be read.' });
+    if (v === null) a.responses.delete(pl.id); else { const old = a.responses.get(pl.id); a.responses.set(pl.id, { value: v, at: now, n: old ? old.n + 1 : 1 }); }
+    if (this.shared && this.shared.actId === a.id && this.shared.name === pl.name && v) { this.shared.value = v; this.changed(); }
+    this.emit('response', { actId: a.id, pid: pl.id, name: pl.name, color: pl.color, type: a.type, value: v, at: now });
+    json(res, 200, { ok: true, mine: v });
+  }
+  hand(pl, d, res) {
+    const q = String(d.q || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
+    if (q) { if (this.questions.filter(x => x.pid === pl.id && Date.now() - x.at < 60000).length >= 3) return json(res, 429, { error: 'Wait a minute before asking again.' }); this.questions.push({ pid: pl.id, name: pl.name, q, at: Date.now() }); if (this.questions.length > 200) this.questions.shift(); }
+    else pl.hand = d.up ? Date.now() : 0;
+    this.emit(q ? 'question' : 'hand', { name: pl.name, q }); this.changed();
+    json(res, 200, { ok: true });
   }
   poll(pl, url, res) {
     const v = +url.searchParams.get('v') || 0;
@@ -138,9 +197,31 @@ class ClassLink {
     json(res, 200, { ok: true, score: ans.filter((a, i) => key[i] >= 0 && a === key[i]).length, total: key.filter(a => a >= 0).length, key: hw.showAnswers ? key : null });
   }
 
-  snapshot() { return { pin: this.pin, port: this.port, tunnel: this.tunnel, boardOn: this.boardOn, drawOn: this.drawOn, files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })), homework: [...this.homework.keys()], players: [...this.players.values()].map(p => ({ name: p.name, color: p.color, online: p.waiters.length > 0 || Date.now() - p.seen < 30000 })) }; }
+  snapshot() { return { pin: this.pin, port: this.port, tunnel: this.tunnel, boardOn: this.boardOn, drawOn: this.drawOn, files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })), homework: [...this.homework.keys()], players: [...this.players.values()].map(p => ({ pid: p.id, name: p.name, color: p.color, stars: p.stars || 0, hand: p.hand || 0, online: p.waiters.length > 0 || Date.now() - p.seen < 30000 })),
+    act: this.act ? { id: this.act.id, type: this.act.type, open: this.act.open, count: this.act.responses.size, endsAt: this.act.endsAt } : null, lock: this.lock, questions: this.questions.slice(-50) }; }
   emit(type, data) { this.onEvent && this.onEvent(type, data, this.snapshot()); }
   update() { this.emit('status'); }
+}
+
+/* ---------- answers are checked strictly: right shape, right size, nothing that could break the teacher's screen ---------- */
+const ACT_TYPES = ['draw', 'poll', 'word', 'text', 'image', 'notes'];
+const HEX = /^#[0-9a-f]{6}$/i;
+const cleanText = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
+function cleanAnswer(a, v, old) {
+  if (v === null) return null;
+  switch (a.type) {
+    case 'poll': return Number.isInteger(v) && v >= 0 && v < a.options.length ? v : undefined;
+    case 'text': { const t = cleanText(v, 500); return t || null; }
+    case 'word': { const list = (Array.isArray(v) ? v : [v]).slice(0, 3).map(w => cleanText(w, 30).replace(/\s+/g, ' ')).filter(Boolean); return list.length ? list : null; }
+    case 'image': return typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length < 2.8e6 ? v : undefined;
+    case 'notes': { if (!Array.isArray(v)) return undefined; const list = v.slice(0, 6).map(n => ({ t: cleanText(n && n.t, 200), c: Math.max(0, Math.min(5, (n && n.c) | 0)) })).filter(n => n.t); return list.length ? list : null; }
+    case 'draw': { if (!Array.isArray(v)) return undefined; let total = 0; const out = [];
+      for (const s of v.slice(0, 400)) { if (!s || !Array.isArray(s.p)) continue; const pts = [];
+        for (let i = 0; i + 1 < s.p.length && pts.length < 2400; i += 2) { const x = +s.p[i], y = +s.p[i + 1]; if (Number.isFinite(x) && Number.isFinite(y)) pts.push(Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))); }
+        total += pts.length; if (total > 60000) break; if (pts.length) out.push({ c: HEX.test(s.c || '') ? s.c : '#111111', w: Math.max(0.5, Math.min(40, +s.w || 3)), e: s.e ? 1 : 0, p: pts.map(n => Math.round(n * 10000) / 10000) }); }
+      return out.length ? out : null; }
+  }
+  return undefined;
 }
 
 /* phones never receive the answer key unless the teacher chose to show answers after submitting */

@@ -204,6 +204,16 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   else if (cmd === 'removeFile') cl.removeFile(a);
   else if (cmd === 'addHomework') cl.addHomework(a);
   else if (cmd === 'removeHomework') cl.removeHomework(a);
+  else if (cmd === 'activity') { const id = cl.setActivity(a && a.bg ? Object.assign({}, a, { bg: Buffer.from(a.bg) }) : a); return id ? cl.responses() : { error: 'That activity could not start.' }; }
+  else if (cmd === 'actOptions') { cl.actOptions(a || {}); return cl.responses(); }
+  else if (cmd === 'endActivity') cl.endActivity();
+  else if (cmd === 'responses') return cl.responses();
+  else if (cmd === 'share') cl.share(a || null);
+  else if (cmd === 'removeResponse') cl.removeResponse(a && a.pid, a && a.idx);
+  else if (cmd === 'award') cl.award(a && a.pid, a && a.n);
+  else if (cmd === 'lock') cl.setLock(a);
+  else if (cmd === 'lowerHand') cl.lowerHand(a || null);
+  else if (cmd === 'clearQuestions') cl.clearQuestions();
   else if (cmd === 'link') openClLink();
   else if (cmd === 'stop') { await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
   return cl.snapshot();

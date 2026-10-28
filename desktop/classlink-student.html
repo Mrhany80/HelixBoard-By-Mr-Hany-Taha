@@ -48,26 +48,55 @@
   footer { text-align: center; font-size: 12px; color: var(--muted); padding: 8px; }
   #off { position: fixed; left: 12px; right: 12px; bottom: 12px; padding: 10px 14px; border-radius: 12px; background: #5A1E28; color: #fff; text-align: center; font-weight: 600; display: none; }
   [dir=rtl] .opt { text-align: right; }
+  .hbtn { height: 34px; min-width: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: inherit; font: 600 14px inherit; font-family: inherit; padding: 0 9px; }
+  .hbtn.on { background: #FFC928; color: #241a00; border-color: #FFC928; }
+  .stars { font-weight: 800; color: #FFC928; white-space: nowrap; }
+  .prompt { font: 700 20px/1.35 system-ui, sans-serif; }
+  .clock { font: 800 15px ui-monospace, monospace; color: #FFC928; }
+  .pad { position: relative; background: #fff; border-radius: 14px; overflow: hidden; touch-action: none; box-shadow: 0 0 0 1px var(--line); }
+  .pad img, .pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pad img { object-fit: contain; pointer-events: none; }
+  .pad.off { opacity: .75; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sz { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); display: grid; place-items: center; padding: 0; }
+  .sz i { display: block; border-radius: 50%; background: var(--ink); }
+  .sz.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  textarea { width: 100%; min-height: 110px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel2); color: inherit; font: 500 17px/1.4 inherit; font-family: inherit; padding: 12px; resize: vertical; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-weight: 600; }
+  .note { border-radius: 12px; padding: 12px 14px; color: #1E1419; font-weight: 600; position: relative; word-break: break-word; }
+  .note button { position: absolute; top: 4px; inset-inline-end: 4px; border: 0; background: rgba(0,0,0,.12); border-radius: 8px; width: 28px; height: 28px; }
+  .ok { color: var(--ok); font-weight: 700; }
+  .shared { border-color: #FFC928; }
+  .shared .who { color: #FFC928; font-weight: 800; font-size: 14px; }
+  #lockv { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
+  #lockv .big { font-size: 80px; }
+  #sheetq { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--panel); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 16px; display: none; }
+  .opt .pc { margin-inline-start: auto; font-weight: 800; }
 </style>
 </head>
 <body>
-<header><b id="hd">__TITLE__</b><span id="me"></span></header>
+<header><b id="hd">__TITLE__</b><span id="stars" class="stars"></span><span id="me"></span><button class="hbtn" id="handB" hidden title="Raise hand">✋</button><button class="hbtn" id="askB" hidden title="Ask a question">?</button></header>
 <nav id="nav" hidden></nav>
 <main id="m"></main>
 <div id="off"></div>
+<div id="lockv"><div class="big">👀</div><h1 id="lockt">Eyes on the board</h1><p class="muted" id="lockp">Your teacher has paused the phones for a moment.</p></div>
+<div id="sheetq"><b id="askT">Ask your teacher a question</b><textarea id="askQ" maxlength="200" style="margin-top:8px;min-height:80px"></textarea><div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn" id="askX">Cancel</button><button class="btn on" id="askGo">Send</button></div><div class="err" id="askErr"></div></div>
 <footer>HelixBoard By Mr. Hany Taha</footer>
 <script>
 (() => {
   const LANG = document.documentElement.lang === 'ar' ? 'ar' : 'en';
-  const AR = { 'Join the class': 'انضم إلى الصف', 'Type your real name so your teacher knows who you are.': 'اكتب اسمك الحقيقي ليعرفك معلمك.', 'Your name': 'اسمك', 'PIN': 'الرمز', 'Join': 'انضمام', 'Board': 'السبورة', 'Files': 'الملفات', 'Homework': 'الواجبات', 'Waiting for the teacher to share the board…': 'بانتظار أن يشارك المعلم السبورة…', 'View': 'عرض', 'Write': 'كتابة', 'Undo': 'تراجع', 'Your ink appears on the teacher’s board.': 'يظهر حبرك على سبورة المعلم.', 'Nothing shared yet.': 'لم تتم مشاركة شيء بعد.', 'Lesson video': 'فيديو الدرس', 'File': 'ملف', 'No homework shared right now.': 'لا توجد واجبات مشتركة الآن.', 'Due': 'التسليم', 'questions': 'أسئلة', 'Done ✓': 'تم ✓', 'Start': 'ابدأ', 'Question': 'السؤال', 'of': 'من', 'Back': 'السابق', 'Next': 'التالي', 'Submit': 'تسليم', 'Answer every question first.': 'أجب عن جميع الأسئلة أولاً.', 'Submitted!': 'تم التسليم!', 'Your score': 'درجتك', 'Correct answer': 'الإجابة الصحيحة', 'Back to homework': 'العودة إلى الواجبات', 'The class link has closed': 'تم إغلاق رابط الصف', 'Thanks for joining!': 'شكراً لانضمامك!', 'Reconnecting…': 'جارٍ إعادة الاتصال…', 'Cannot reach the board — check your connection.': 'تعذّر الوصول إلى السبورة — تحقق من اتصالك.', 'Please join again.': 'يرجى الانضمام مرة أخرى.', 'Writing is off.': 'الكتابة متوقفة.' };
+  const AR = { 'Join the class': 'انضم إلى الصف', 'Type your real name so your teacher knows who you are.': 'اكتب اسمك الحقيقي ليعرفك معلمك.', 'Your name': 'اسمك', 'PIN': 'الرمز', 'Join': 'انضمام', 'Board': 'السبورة', 'Files': 'الملفات', 'Homework': 'الواجبات', 'Waiting for the teacher to share the board…': 'بانتظار أن يشارك المعلم السبورة…', 'View': 'عرض', 'Write': 'كتابة', 'Undo': 'تراجع', 'Your ink appears on the teacher’s board.': 'يظهر حبرك على سبورة المعلم.', 'Nothing shared yet.': 'لم تتم مشاركة شيء بعد.', 'Lesson video': 'فيديو الدرس', 'File': 'ملف', 'No homework shared right now.': 'لا توجد واجبات مشتركة الآن.', 'Due': 'التسليم', 'questions': 'أسئلة', 'Done ✓': 'تم ✓', 'Start': 'ابدأ', 'Question': 'السؤال', 'of': 'من', 'Back': 'السابق', 'Next': 'التالي', 'Submit': 'تسليم', 'Answer every question first.': 'أجب عن جميع الأسئلة أولاً.', 'Submitted!': 'تم التسليم!', 'Your score': 'درجتك', 'Correct answer': 'الإجابة الصحيحة', 'Back to homework': 'العودة إلى الواجبات', 'The class link has closed': 'تم إغلاق رابط الصف', 'Thanks for joining!': 'شكراً لانضمامك!', 'Reconnecting…': 'جارٍ إعادة الاتصال…', 'Cannot reach the board — check your connection.': 'تعذّر الوصول إلى السبورة — تحقق من اتصالك.', 'Please join again.': 'يرجى الانضمام مرة أخرى.', 'Writing is off.': 'الكتابة متوقفة.', 'Activity': 'النشاط', 'No activity right now — your teacher will send one.': 'لا يوجد نشاط الآن — سيرسل معلمك نشاطاً.', 'Answers are closed.': 'تم إغلاق الإجابات.', 'Sent ✓': 'تم الإرسال ✓', 'Send': 'إرسال', 'Update': 'تحديث', 'Clear': 'مسح', 'Eraser': 'ممحاة', 'Pen': 'قلم', 'Type your answer…': 'اكتب إجابتك…', 'Add a word': 'أضف كلمة', 'Up to 3 words or short phrases.': 'حتى 3 كلمات أو عبارات قصيرة.', 'Take a photo': 'التقط صورة', 'Choose a picture': 'اختر صورة', 'Sending…': 'جارٍ الإرسال…', 'Write a note…': 'اكتب ملاحظة…', 'Post': 'نشر', 'Your notes': 'ملاحظاتك', 'Shared by your teacher': 'شاركه معلمك', 'Eyes on the board': 'انظر إلى السبورة', 'Your teacher has paused the phones for a moment.': 'أوقف معلمك الهواتف للحظة.', 'Ask your teacher a question': 'اسأل معلمك سؤالاً', 'Cancel': 'إلغاء', 'Question sent ✓': 'تم إرسال السؤال ✓', 'Hand raised ✋': 'تم رفع اليد ✋', 'Draw your answer, then it is sent by itself.': 'ارسم إجابتك وستُرسل تلقائياً.', 'Tap your answer. You can change it until answers close.': 'اختر إجابتك. يمكنك تغييرها حتى تُغلق الإجابات.', 'A classmate': 'زميل', 'Correct!': 'صحيح!', 'Not this time': 'ليس هذه المرة', 'Up to 6 notes.': 'حتى 6 ملاحظات.' };
   const t = s => LANG === 'ar' && AR[s] ? AR[s] : s;
   if (LANG === 'ar') document.documentElement.dir = 'rtl';
+  const NOTE_C = ['#FFE066', '#FFA8C5', '#A5D8FF', '#B2F2BB', '#FFC078', '#D0BFFF'];
   const C = ['#FF5FA2', '#22D3EE', '#FFC928', '#4ADE80', '#B197FC', '#FF9F5A'], L = 'ABCDEF';
   const m = document.getElementById('m'), nav = document.getElementById('nav'), off = document.getElementById('off'), q = new URLSearchParams(location.search);
   const pin = q.get('pin') || '', key = 'hbcl:' + pin;
   let pid = null, me = null, st = null, tab = 'board', ver = 0, loopId = 0, hwRun = null;
   try { const s = JSON.parse(localStorage.getItem(key) || 'null'); if (s) { pid = s.pid; me = s; } } catch (e) {}
-  const el = (tag, attrs, ...kids) => { const e = document.createElement(tag); Object.entries(attrs || {}).forEach(([k, v]) => k === 'class' ? e.className = v : k.startsWith('on') ? e[k] = v : e.setAttribute(k, v)); kids.flat().forEach(k => e.append(k && k.nodeType ? k : document.createTextNode(k == null ? '' : String(k)))); return e; };
+  const el = (tag, attrs, ...kids) => { const e = document.createElement(tag); Object.entries(attrs || {}).filter(([k, v]) => v != null).forEach(([k, v]) => k === 'class' ? e.className = v : k.startsWith('on') ? e[k] = v : e.setAttribute(k, v)); kids.flat().forEach(k => e.append(k && k.nodeType ? k : document.createTextNode(k == null ? '' : String(k)))); return e; };
   const set = (...kids) => m.replaceChildren(...kids);
   const post = (p, d) => fetch(p + '?pid=' + encodeURIComponent(pid || ''), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).then(r => r.json().then(j => ({ ok: r.ok, j })));
 
@@ -96,13 +125,17 @@
         } catch (e) { fails++; if (fails > 2) { off.textContent = t('Reconnecting…'); off.style.display = 'block'; } if (fails > 40) { closed(); return; } await new Promise(r => setTimeout(r, Math.min(5000, 800 * fails))); }
       } })();
   }
-  function closed() { pid = null; try { localStorage.removeItem(key); } catch (e) {} nav.hidden = true; off.style.display = 'none'; set(el('div', { class: 'center' }, el('h1', {}, t('The class link has closed')), el('p', { class: 'muted' }, t('Thanks for joining!')))); }
+  function closed() { document.getElementById('lockv').style.display = 'none'; handB.hidden = askB.hidden = true; pid = null; try { localStorage.removeItem(key); } catch (e) {} nav.hidden = true; off.style.display = 'none'; set(el('div', { class: 'center' }, el('h1', {}, t('The class link has closed')), el('p', { class: 'muted' }, t('Thanks for joining!')))); }
 
   function render(prev) {
-    nav.hidden = false;
-    const tabs = [['board', t('Board'), !!st.board], ['files', t('Files'), st.files.length > 0], ['hw', t('Homework'), st.homework.some(h => !h.done)]];
+    nav.hidden = false; chrome();
+    /* a new activity (or a shared answer) opens the Activity tab by itself, like Nearpod */
+    if (st.act && (!prev || !prev.act || prev.act.id !== st.act.id)) { tab = 'act'; hwRun = null; }
+    if (st.shared && (!prev || JSON.stringify(prev.shared) !== JSON.stringify(st.shared))) { tab = 'act'; hwRun = null; }
+    const tabs = [['act', t('Activity'), !!st.act && st.act.open && st.act.mine == null], ['board', t('Board'), !!st.board], ['files', t('Files'), st.files.length > 0], ['hw', t('Homework'), st.homework.some(h => !h.done)]];
     nav.replaceChildren(...tabs.map(([k, l, dot]) => el('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; hwRun = null; render(st); } }, l, dot && k !== tab ? el('span', { class: 'dot' }) : '')));
     if (hwRun && tab === 'hw') return;
+    if (tab === 'act') return actView(prev);
     if (tab === 'board') return boardView(prev);
     if (tab === 'files') return filesView();
     return hwList();
@@ -135,6 +168,96 @@
     img.onload = () => { mine = []; size(); };
     addEventListener('resize', size);
   }
+
+  /* ---------- top bar: stars, raised hand, questions; the lock screen ---------- */
+  const handB = document.getElementById('handB'), askB = document.getElementById('askB'), sheetq = document.getElementById('sheetq');
+  function chrome() {
+    document.getElementById('stars').textContent = st.stars ? '⭐ ' + st.stars : '';
+    handB.hidden = askB.hidden = false; handB.classList.toggle('on', !!st.hand);
+    const lv = document.getElementById('lockv'); lv.style.display = st.lock ? 'flex' : 'none';
+    document.getElementById('lockt').textContent = t('Eyes on the board'); document.getElementById('lockp').textContent = t('Your teacher has paused the phones for a moment.');
+  }
+  handB.onclick = () => { const up = !st.hand; st.hand = up; chrome(); post('/hand', { up }).then(r => { if (r.ok && up) toastMsg(t('Hand raised ✋')); }).catch(() => {}); };
+  askB.onclick = () => { document.getElementById('askT').textContent = t('Ask your teacher a question'); document.getElementById('askX').textContent = t('Cancel'); document.getElementById('askGo').textContent = t('Send'); document.getElementById('askErr').textContent = ''; sheetq.style.display = 'block'; setTimeout(() => document.getElementById('askQ').focus(), 50); };
+  document.getElementById('askX').onclick = () => { sheetq.style.display = 'none'; };
+  document.getElementById('askGo').onclick = async () => { const q = document.getElementById('askQ').value.trim(); if (!q) return; const r = await post('/hand', { q }).catch(() => null); if (!r || !r.ok) { document.getElementById('askErr').textContent = (r && r.j.error) || t('Cannot reach the board — check your connection.'); return; } document.getElementById('askQ').value = ''; sheetq.style.display = 'none'; toastMsg(t('Question sent ✓')); };
+  function toastMsg(msg) { off.textContent = msg; off.style.background = '#1E5A33'; off.style.display = 'block'; clearTimeout(toastMsg.t); toastMsg.t = setTimeout(() => { off.style.display = 'none'; off.style.background = ''; }, 2200); }
+
+  /* ---------- live activities: Draw It, poll, word cloud, short answer, photo, collaborate notes ---------- */
+  let actKey = '', clockT = 0, endAt = 0, pad = null;
+  function actView(prev) {
+    const a = st.act, sh = st.shared;
+    const key = (a ? a.id + '|' + a.open + '|' + a.reveal : '-') + '|' + (sh ? JSON.stringify(sh).length + sh.name : '');
+    if (a) endAt = a.left ? Date.now() + a.left : 0;
+    if (key === actKey && m.querySelector('#actRoot')) return tick();
+    actKey = key; pad = null;
+    const root = el('div', { id: 'actRoot', style: 'display:flex;flex-direction:column;gap:12px' });
+    if (sh) root.append(sharedCard(sh));
+    if (!a) { if (!sh) root.append(el('div', { class: 'center muted', style: 'margin-top:40px' }, t('No activity right now — your teacher will send one.'))); set(root); return; }
+    root.append(el('div', { class: 'card' }, el('div', { class: 'row', style: 'justify-content:space-between' }, el('span', { class: 'muted', style: 'font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em' }, ACT_NAME[a.type] ? t(ACT_NAME[a.type]) : ''), el('span', { class: 'clock', id: 'clock' })), el('div', { class: 'prompt' }, a.prompt || ''), a.open ? '' : el('div', { class: 'err' }, t('Answers are closed.'))));
+    const body = el('div', { style: 'display:flex;flex-direction:column;gap:10px' }); root.append(body); set(root);
+    ({ draw: drawAct, poll: pollAct, word: wordAct, text: textAct, image: imageAct, notes: notesAct })[a.type](a, body);
+    tick();
+  }
+  const ACT_NAME = { draw: 'Draw it', poll: 'Poll', word: 'Word cloud', text: 'Short answer', image: 'Photo', notes: 'Collaborate' };
+  function tick() { clearTimeout(clockT); const c = document.getElementById('clock'); if (!c) return; if (!endAt || !st.act || !st.act.open) { c.textContent = ''; return; } const s = Math.max(0, Math.ceil((endAt - Date.now()) / 1000)); c.textContent = '⏱ ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s > 0) clockT = setTimeout(tick, 500); }
+  function send(value, status) { const a = st.act; if (!a || !a.open) return Promise.resolve(false); if (status) status.textContent = t('Sending…');
+    return post('/answer', { id: a.id, value }).then(r => { if (!r.ok) { if (status) { status.textContent = r.j.error || 'Error'; status.className = 'err'; } return false; } a.mine = r.j.mine; if (status) { status.textContent = t('Sent ✓'); status.className = 'ok'; } return true; }).catch(() => { if (status) { status.textContent = t('Cannot reach the board — check your connection.'); status.className = 'err'; } return false; }); }
+  const statusEl = () => el('div', { class: 'ok', style: 'min-height:22px' });
+
+  function drawAct(a, body) {
+    const strokes = Array.isArray(a.mine) ? a.mine.map(s => ({ c: s.c, w: s.w, e: s.e, p: s.p.slice() })) : [];
+    const cv = el('canvas'), wrap = el('div', { class: 'pad' + (a.open ? '' : ' off'), style: 'aspect-ratio:' + a.ar }); if (a.bg) wrap.append(el('img', { src: '/actbg.jpg?pid=' + encodeURIComponent(pid) + '&a=' + a.id, alt: '' })); wrap.append(cv);
+    let color = '#111111', w = 4, erase = false, cur = null; const status = statusEl();
+    const COLS = ['#111111', '#E03131', '#1971C2', '#2F9E44', '#E8590C', '#9C36B5'];
+    const tools = el('div', { class: 'tools' });
+    const drawTools = () => tools.replaceChildren(...COLS.map(c => el('button', { class: 'sw' + (!erase && c === color ? ' on' : ''), style: 'background:' + c, 'aria-label': c, onclick: () => { color = c; erase = false; drawTools(); } })),
+      ...[2, 4, 9].map(n => el('button', { class: 'sz' + (n === w ? ' on' : ''), 'aria-label': 'Size ' + n, onclick: () => { w = n; drawTools(); } }, el('i', { style: 'width:' + (n + 3) + 'px;height:' + (n + 3) + 'px' }))),
+      el('button', { class: 'btn' + (erase ? ' on' : ''), onclick: () => { erase = !erase; drawTools(); } }, '◻ ' + t('Eraser')), el('button', { class: 'btn', onclick: () => { strokes.pop(); paint(); push(); } }, '↶ ' + t('Undo')), el('button', { class: 'btn', onclick: () => { strokes.length = 0; paint(); push(); } }, t('Clear')));
+    drawTools();
+    body.append(el('div', { class: 'muted', style: 'font-size:14px' }, t('Draw your answer, then it is sent by itself.')), wrap, tools, status);
+    const g = cv.getContext('2d');
+    function paint() { const r = cv.getBoundingClientRect(); if (!r.width) return; if (cv.width !== Math.round(r.width * devicePixelRatio)) { cv.width = Math.round(r.width * devicePixelRatio); cv.height = Math.round(r.height * devicePixelRatio); }
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); strokes.concat(cur ? [cur] : []).forEach(s => drawStroke(g, s, cv.width, cv.height)); }
+    let pushT = 0; const push = () => { clearTimeout(pushT); pushT = setTimeout(() => send(strokes, status), 250); };
+    const pos = e => { const r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))]; };
+    cv.onpointerdown = e => { if (!st.act || !st.act.open) return; e.preventDefault(); cv.setPointerCapture(e.pointerId); const p = pos(e); cur = { c: color, w: erase ? w * 4 : w, e: erase ? 1 : 0, p: [+p[0].toFixed(4), +p[1].toFixed(4)] }; paint(); };
+    cv.onpointermove = e => { if (!cur) return; (e.getCoalescedEvents ? e.getCoalescedEvents() : [e]).forEach(ev => { const p = pos(ev); cur.p.push(+p[0].toFixed(4), +p[1].toFixed(4)); }); paint(); };
+    cv.onpointerup = cv.onpointercancel = () => { if (!cur) return; strokes.push(cur); cur = null; paint(); push(); };
+    pad = paint; requestAnimationFrame(paint); addEventListener('resize', () => pad && pad());
+  }
+  function pollAct(a, body) { const status = statusEl();
+    body.append(el('div', { class: 'muted', style: 'font-size:14px' }, t('Tap your answer. You can change it until answers close.')),
+      el('div', { class: 'opts' }, a.options.map((o, k) => el('button', { class: 'opt' + (a.mine === k ? ' on' : '') + (a.reveal != null ? (k === a.reveal ? ' right' : a.mine === k ? ' wrong' : '') : ''), disabled: a.open ? null : '', onclick: () => { if (!a.open) return; send(k, status).then(ok => { if (ok) { m.querySelectorAll('.opt').forEach((b, i) => b.classList.toggle('on', i === k)); } }); } }, el('span', { class: 'lt', style: 'background:' + C[k] }, L[k]), o))), status);
+    if (a.reveal != null && a.mine != null) status.replaceChildren(el('b', { style: 'color:' + (a.mine === a.reveal ? 'var(--ok)' : 'var(--bad)') }, a.mine === a.reveal ? '🎉 ' + t('Correct!') : t('Not this time')));
+    else if (a.mine != null) status.textContent = t('Sent ✓'); }
+  function wordAct(a, body) { let words = Array.isArray(a.mine) ? a.mine.slice() : []; const status = statusEl(), chips = el('div', { class: 'chips' }), inp = el('input', { maxlength: '30', placeholder: t('Add a word'), style: 'text-align:start' });
+    const show = () => chips.replaceChildren(...words.map((w, i) => el('span', { class: 'chip' }, w, ' ', el('button', { class: 'hbtn', style: 'height:24px;min-width:24px;padding:0', onclick: () => { words.splice(i, 1); show(); send(words.length ? words : null, status); } }, '✕'))));
+    const add = () => { const v = inp.value.trim(); if (!v || words.length >= 3 || !a.open) return; words.push(v); inp.value = ''; show(); send(words, status); };
+    inp.onkeydown = e => { if (e.key === 'Enter') add(); };
+    body.append(el('div', { class: 'muted', style: 'font-size:14px' }, t('Up to 3 words or short phrases.')), inp, el('button', { class: 'go', style: 'margin-top:0', onclick: add }, t('Send')), chips, status); show(); if (words.length) status.textContent = t('Sent ✓'); }
+  function textAct(a, body) { const status = statusEl(), ta = el('textarea', { maxlength: '500', placeholder: t('Type your answer…') }); ta.value = typeof a.mine === 'string' ? a.mine : '';
+    const go = el('button', { class: 'go', style: 'margin-top:0', onclick: () => { if (ta.value.trim()) send(ta.value.trim(), status).then(ok => { if (ok) go.textContent = t('Update'); }); } }, a.mine ? t('Update') : t('Send'));
+    body.append(ta, go, status); if (a.mine) status.textContent = t('Sent ✓'); }
+  function imageAct(a, body) { const status = statusEl(), prev = el('div', {}); if (typeof a.mine === 'string') prev.append(el('img', { src: a.mine, style: 'width:100%;border-radius:12px' }));
+    const pick = cap => { const inp = el('input', { type: 'file', accept: 'image/*' }); if (cap) inp.setAttribute('capture', 'environment'); inp.onchange = () => { const f = inp.files[0]; if (!f) return; status.textContent = t('Sending…'); const im = new Image(); im.onload = () => { const k = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); const url = c.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(im.src); prev.replaceChildren(el('img', { src: url, style: 'width:100%;border-radius:12px' })); send(url, status); }; im.src = URL.createObjectURL(f); }; inp.click(); };
+    body.append(el('div', { class: 'row' }, el('button', { class: 'btn on', style: 'flex:1', onclick: () => pick(true) }, '📷 ' + t('Take a photo')), el('button', { class: 'btn', style: 'flex:1', onclick: () => pick(false) }, '🖼 ' + t('Choose a picture'))), prev, status); if (a.mine) status.textContent = t('Sent ✓'); }
+  function notesAct(a, body) { let notes = Array.isArray(a.mine) ? a.mine.slice() : [], col = 0; const status = statusEl(), list = el('div', { style: 'display:grid;gap:8px' }), ta = el('textarea', { maxlength: '200', placeholder: t('Write a note…'), style: 'min-height:80px' });
+    const cols = el('div', { class: 'tools' }); const drawCols = () => cols.replaceChildren(...NOTE_C.map((c, i) => el('button', { class: 'sw' + (i === col ? ' on' : ''), style: 'background:' + c, onclick: () => { col = i; drawCols(); } }))); drawCols();
+    const show = () => list.replaceChildren(...(notes.length ? [el('b', {}, t('Your notes'))] : []), ...notes.map((n, i) => el('div', { class: 'note', style: 'background:' + NOTE_C[n.c] }, n.t, a.open ? el('button', { 'aria-label': 'Delete', onclick: () => { notes.splice(i, 1); show(); send(notes.length ? notes : null, status); } }, '✕') : '')));
+    body.append(ta, cols, el('button', { class: 'go', style: 'margin-top:0', onclick: () => { const v = ta.value.trim(); if (!v || !a.open) return; if (notes.length >= 6) { status.textContent = t('Up to 6 notes.'); return; } notes.push({ t: v, c: col }); ta.value = ''; show(); send(notes, status); } }, t('Post')), status, list); show(); }
+  function sharedCard(sh) { const c = el('div', { class: 'card shared' }, el('div', { class: 'who' }, '📣 ' + t('Shared by your teacher') + ' · ' + (sh.name === 'A classmate' ? t('A classmate') : sh.name)));
+    if (sh.type === 'draw') { const wrap = el('div', { class: 'pad', style: 'aspect-ratio:' + sh.ar + ';margin-top:8px' }), cv = el('canvas'); if (sh.bg) wrap.append(el('img', { src: '/actbg.jpg?pid=' + encodeURIComponent(pid) + '&s=1', alt: '' })); wrap.append(cv); c.append(wrap); requestAnimationFrame(() => { const r = cv.getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio; const g = cv.getContext('2d'); sh.value.forEach(s => drawStroke(g, s, cv.width, cv.height)); }); }
+    else if (sh.type === 'image') c.append(el('img', { src: sh.value, style: 'width:100%;border-radius:12px;margin-top:8px' }));
+    else if (sh.type === 'notes') c.append(el('div', { style: 'display:grid;gap:8px;margin-top:8px' }, sh.value.map(n => el('div', { class: 'note', style: 'background:' + NOTE_C[n.c] }, n.t))));
+    else if (sh.type === 'word') c.append(el('div', { class: 'chips', style: 'margin-top:8px' }, sh.value.map(w => el('span', { class: 'chip' }, w))));
+    else c.append(el('div', { class: 'prompt', style: 'margin-top:6px;white-space:pre-wrap' }, String(sh.value)));
+    return c; }
+  /* a pen line in 0..1 coordinates; width is in thousandths of the drawing's width, so it looks the same on every screen */
+  function drawStroke(g, s, W, H) { const p = s.p; if (!p || p.length < 2) return; g.save(); g.globalCompositeOperation = s.e ? 'destination-out' : 'source-over'; g.strokeStyle = s.c; g.fillStyle = s.c; g.lineWidth = Math.max(1, s.w * W / 1000 * 2.2); g.lineCap = g.lineJoin = 'round'; g.beginPath(); g.moveTo(p[0] * W, p[1] * H);
+    if (p.length === 2) { g.arc(p[0] * W, p[1] * H, g.lineWidth / 2, 0, Math.PI * 2); g.fill(); g.restore(); return; }
+    for (let i = 2; i + 3 < p.length; i += 2) { const mx = (p[i] + p[i + 2]) / 2, my = (p[i + 1] + p[i + 3]) / 2; g.quadraticCurveTo(p[i] * W, p[i + 1] * H, mx * W, my * H); }
+    g.lineTo(p[p.length - 2] * W, p[p.length - 1] * H); g.stroke(); g.restore(); }
 
   /* ---------- files: lesson videos and other shared files ---------- */
   function filesView() {
