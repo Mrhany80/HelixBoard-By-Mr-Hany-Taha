@@ -218,6 +218,14 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   else if (cmd === 'stop') { await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
   return cl.snapshot();
 });
+/* Reports → PDF: the page switches to its print layout, Chromium prints it, the teacher picks where to save */
+ipcMain.handle('report:pdf', async (e, name) => {
+  if (!fromMain(e)) return null;
+  const r = await dialog.showSaveDialog(win, { title: 'Save the report as PDF', defaultPath: path.join(app.getPath('documents'), String(name || 'HelixBoard report.pdf').replace(/[\\/:*?"<>|]+/g, '-')), filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+  if (r.canceled || !r.filePath) return { ok: false };
+  const pdf = await win.webContents.printToPDF({ printBackground: true, landscape: true, pageSize: 'A4', margins: { marginType: 'none' } });
+  fs.writeFileSync(r.filePath, pdf); shell.showItemInFolder(r.filePath); return { ok: true, file: r.filePath };
+});
 /* school Wi-Fi is often a "Public" network, and the first-run firewall question only allows "Private" ones, so phones on the Wi-Fi are
    silently blocked. This adds one inbound rule for HelixBoard itself (all network types), after the usual Windows administrator prompt. */
 ipcMain.handle('fw:allow', async e => {

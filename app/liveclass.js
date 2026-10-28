@@ -135,7 +135,7 @@ function build() { if (L.el && L.el.isConnected) { L.el.hidden = false; hideChip
   if (window.gsap && !REDUCE) gsap.from(el, { opacity: 0, y: 12, duration: 0.25, ease: 'power2.out' });
 }
 function hide() { if (L.el) L.el.hidden = true; closeSpot(); if (L.act) showChip(); }
-function closed() { L.act = null; L.list.clear(); L.order = []; if (L.el) { L.el.remove(); L.el = null; } closeSpot(); hideChip(); }
+function closed() { if (L.act) record(); L.session = null; L.act = null; L.list.clear(); L.order = []; if (L.el) { L.el.remove(); L.el = null; } closeSpot(); hideChip(); }
 function showChip() { hideChip(); const c = document.createElement('div'); c.id = 'lcChip'; L.chip = c; chipText(); c.onclick = () => open(); document.body.appendChild(c); }
 function chipText() { if (!L.chip || !L.act) return; const t = TYPES[L.act.type]; L.chip.innerHTML = '<span class="dot"></span>Live: ' + esc(t.name) + ' · ' + L.list.size + '/' + players().length + ' answered<button class="btn sm primary" style="margin-inline-start:4px">Open</button>'; }
 function hideChip() { if (L.chip) { L.chip.remove(); L.chip = null; } }
@@ -176,10 +176,10 @@ function renderJoin() { const j = L.el && L.el.querySelector('#lcJoin'); const l
   const tn = ln.tn || {}, st = tn.state === 'ready' ? '🌐 Any network + 📶 Wi-Fi' : tn.state === 'connecting' ? '📶 Wi-Fi ready · 🌐 opening…' : tn.state === 'failed' ? '📶 Same Wi-Fi only' : '📶 Same Wi-Fi';
   j.innerHTML = '<div class="qr">' + qrSvg(ln.url) + '</div><div><div class="pin">' + esc(ln.pin) + '</div><small>' + st + ' · tap for both QR codes</small></div>'; }
 function renderTop() { const b = L.el.querySelector('#lcTopBtns'); const lock = L.snap && L.snap.lock;
-  b.innerHTML = (L.act ? '<button class="btn sm" id="lcNew">' + icon('plus') + 'New activity</button>' : '') + '<button class="btn sm' + (lock ? ' primary' : '') + '" id="lcLock" title="Pause every phone so students look at the board">' + icon(lock ? 'lock-open' : 'lock') + (lock ? 'Unlock phones' : 'Eyes on board') + '</button><button class="btn sm" id="lcLb">' + icon('trophy') + 'Stars</button>';
+  b.innerHTML = (L.act ? '<button class="btn sm" id="lcNew">' + icon('plus') + 'New activity</button>' : '') + '<button class="btn sm' + (lock ? ' primary' : '') + '" id="lcLock" title="Pause every phone so students look at the board">' + icon(lock ? 'lock-open' : 'lock') + (lock ? 'Unlock phones' : 'Eyes on board') + '</button><button class="btn sm" id="lcLb">' + icon('trophy') + 'Stars</button><button class="btn sm" id="lcRep">' + icon('chart-column-big') + 'Reports</button>';
   const n = b.querySelector('#lcNew'); if (n) n.onclick = () => endActivity(true);
   b.querySelector('#lcLock').onclick = () => D().cmd('lock', !lock).then(s => { L.snap = s; renderTop(); toast(!lock ? 'Phones paused — students see “Eyes on the board”.' : 'Phones unlocked.'); });
-  b.querySelector('#lcLb').onclick = leaderboard; }
+  b.querySelector('#lcLb').onclick = leaderboard; b.querySelector('#lcRep').onclick = async () => { if (L.act) await record(); window.HBRP && HBRP.open(L.session && L.session.id); }; }
 function renderMain() { const m = L.el.querySelector('#lcMain');
   if (!L.act) { m.innerHTML = '<div class="lc-hero"><div><h1>Choose a live activity</h1><p>It opens on every student’s phone at once. Answers arrive here live, with names.</p></div><div class="small muted">' + players().length + ' student' + (players().length === 1 ? '' : 's') + ' connected</div></div><div class="lc-cards">' +
     Object.entries(TYPES).map(([k, t]) => '<button class="lc-card" data-k="' + k + '" style="--tint:' + t.tint + '"><div class="ic">' + icon(t.ic) + '</div><b>' + esc(t.name) + '</b><span>' + esc(t.desc) + '</span></button>').join('') + '</div>' +
@@ -271,11 +271,20 @@ function renderSide() { const s = L.el && L.el.querySelector('#lcSide'); if (!s)
   const cq = s.querySelector('#lcClrQ'); if (cq) cq.onclick = () => D().cmd('clearQuestions').then(x => { L.snap = x; renderSide(); }); }
 
 /* ---------- actions ---------- */
-async function award(pid) { const s = await D().cmd('award', { pid, n: 1 }); if (s) L.snap = s; snd('chime'); const p = players().find(x => x.pid === pid);
+async function award(pid) { const s = await D().cmd('award', { pid, n: 1 }); if (s) L.snap = s; if (L.session && window.HBRP) HBRP.updateLive(sessionInfo()); snd('chime'); const p = players().find(x => x.pid === pid);
   if (p) toast('⭐ ' + esc(p.name) + ' — ' + p.stars + ' star' + (p.stars === 1 ? '' : 's'));
   $$('#lcStage .lc-tile[data-p="' + CSS.escape(pid) + '"] .lc-star span').forEach(x => x.textContent = p ? p.stars : ''); renderSide(); if (L.spot === pid) spotlight(pid, true); }
 async function share(pid) { await D().cmd('share', pid); L.shared = pid; if (pid) { snd('pop'); toast('📣 Shared with every phone' + (L.act.anon ? ' (without the name).' : '.')); } renderTools(); $$('#lcStage .lc-tile').forEach(t => t.classList.toggle('sh', t.dataset.p === pid)); if (L.spot) spotlight(L.spot, true); }
-async function endActivity(thenNew, quiet) { if (!L.act) return; if (!quiet && L.cont) L.cont = null; if (L.list.size && !thenNew && !quiet && !confirm('End this activity? Put it on the board or export it first if you want to keep the answers.')) return;
+/* ---------- Reports: every activity is saved with each student's answer (small pictures for drawings and photos) ---------- */
+function thumbOf(r) { try { if (L.act.type === 'draw') return composite(r, 320).toDataURL('image/jpeg', 0.72); } catch (e) {} return null; }
+function smallImg(src) { return new Promise(ok => { const im = new Image(); im.onload = () => { const k = Math.min(1, 320 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', 0.72)); }; im.onerror = () => ok(null); im.src = src; }); }
+function sessionInfo() { const ps = players(); return Object.assign({}, L.session, { roster: ps.map(p => p.name), stars: Object.fromEntries(ps.filter(p => p.stars).map(p => [p.name, p.stars])) }); }
+async function record() { const a = L.act; if (!a || !window.HBRP || !L.session) return; if (!L.list.size && !players().length) return; const info = sessionInfo();
+  const responses = []; for (const r of sorted()) { const x = { name: r.name, at: r.at, late: !!r.late };
+    if (a.type === 'draw') { x.value = null; x.thumb = thumbOf(r); } else if (a.type === 'image') { x.value = null; x.thumb = await smallImg(r.value); } else if (a.type === 'notes') x.value = (r.value || []).map(n => n.t); else x.value = r.value;
+    responses.push(x); }
+  try { await HBRP.addActivity(info, { id: a.id, type: a.type, prompt: a.prompt, options: a.options || [], correct: a.type === 'poll' && Number.isInteger(a.correct) ? a.correct : null, once: a.once !== false, secs: a.endsAt ? Math.round((a.endsAt - (a.started || Date.now())) / 1000) : 0, started: a.started || Date.now(), ended: Date.now(), responses }); } catch (e) { console.warn('report', e); } }
+async function endActivity(thenNew, quiet) { if (!L.act) return; await record(); if (!quiet && L.cont) L.cont = null; if (L.list.size && !thenNew && !quiet && !confirm('End this activity? Put it on the board or export it first if you want to keep the answers.')) return;
   window.HBA && HBA.log('live_activity', { type: L.act.type, answers: L.list.size, students: players().length });
   await D().cmd('endActivity'); L.act = null; L.list.clear(); L.order = []; L.shared = null; if (L.bgUrl) { URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; } closeSpot(); if (!quiet) render(); }
 /* other tools (video lessons) send a question to the phones and get a Continue button back */
@@ -323,7 +332,8 @@ async function start(cfg) {
   else { if (L.bgUrl) URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; }
   const r = await D().cmd('activity', { type: cfg.type, prompt: cfg.prompt, options: cfg.options, secs: cfg.secs, anon: cfg.anon, once: cfg.once !== false, auto: cfg.auto !== false, bg: bytes, ar });
   if (!r || r.error) { toast((r && r.error) || 'The activity could not start.'); return; }
-  load(r); L.act.correct = cfg.type === 'poll' ? cfg.correct : null; L.shared = null; snd('whoosh'); render();
+  load(r); L.act.correct = cfg.type === 'poll' ? cfg.correct : null; L.act.started = Date.now(); L.shared = null; snd('whoosh'); render();
+  if (!L.session) { const E = window.HBE, pg = E && E.page && E.page(); L.session = { id: 'l' + Date.now().toString(36), title: ((pg && pg.name && !/^Page \d+$/.test(pg.name)) ? pg.name : 'Live class') + ' · ' + new Date().toLocaleDateString([], { day: 'numeric', month: 'short' }), started: Date.now() }; }
   const n = players().length; toast(n ? 'Sent to ' + n + ' phone' + (n === 1 ? '' : 's') + ' — answers appear here live.' : 'Activity ready. Students who join now see it straight away.'); }
 
 /* ---------- spotlight: one answer, big ---------- */
@@ -381,5 +391,6 @@ function leaderboard() { const ps = players().slice().sort((a, b) => b.stars - a
 /* the Live class button in the top bar (red dot while an activity is running) */
 { const top = document.getElementById('aUndo'); if (top) { const b = document.createElement('button'); b.id = 'aLive'; b.title = 'Live class: polls, drawings, word clouds and more on students’ phones'; b.innerHTML = icon('radio') + '<span class="lbl">Live class</span><span class="dot"></span>'; b.onclick = () => open(); const sep = document.createElement('span'); sep.className = 'sep'; top.parentNode.insertBefore(b, top.parentNode.firstChild); top.parentNode.insertBefore(sep, b.nextSibling); } }
 setInterval(() => { const b = document.getElementById('aLive'); if (b) b.classList.toggle('on', !!L.act); }, 1000);
+addEventListener('beforeunload', () => { if (L.act) record(); });
 window.HBLC = { open, event, closed, hide, setup, run, get active() { return !!L.act; }, get students() { return window.HBCL && HBCL.on ? connected() : 0; } };
 })();

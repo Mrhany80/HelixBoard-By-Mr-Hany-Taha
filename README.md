@@ -3,7 +3,7 @@
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
-Version **2.3.0** — three ways to run it, all built from the same `app/` source:
+Version **2.3.2** — three ways to run it, all built from the same `app/` source:
 
 | Device | What | Install |
 |---|---|---|
@@ -113,6 +113,25 @@ one answer becomes a picture on the board), **Excel (.csv)**. Also: raised hands
 **Eyes on board** (locks every phone), plus **Write on my board** (students write on the live board) and the **Quiz game**.
 Server side: `desktop/classlink.js` (`setActivity`, `/answer`, `/hand`; every answer is validated by type and size and rate
 limited); phone page: `desktop/classlink-student.html`; dashboard: `app/liveclass.js` (`HBLC`).
+
+### Submit once and deadlines
+
+Activities default to **Submit once** (Nearpod/ClassPoint style): students work on a private draft, press **Submit**, and the
+answer locks (a second answer is refused by the server). With a **time limit** (up to 30 min) every phone shows a countdown bar
+that turns red in the last 10 s; when time is up, unsent drafts are **handed in automatically** (marked ⏰) and late answers are
+refused. The teacher sees ✓ submitted / ✎ working / ⏱ not started, can add a minute or reopen, and **Remove · let them redo**
+allows one student to answer again. **Live** mode (answers stream in and can change) remains for brainstorming; word clouds and
+collaborate boards default to it.
+
+## Reports (like Wayground/Quizizz reports, Power BI-ready)
+
+Every Live class activity and every phone quiz is saved automatically (IndexedDB on this computer), one report per lesson.
+**Study → Reports** (or **Reports** in the Live class dashboard) shows: headline cards (students, activities, participation,
+accuracy, on time, stars), participation and accuracy charts, class accuracy bands, who needs attention, top students, a
+colour-coded student grid (✓ ✗ ● ⏰ —, sortable, click a name for all their answers) and per-activity detail (answer bars,
+word lists, written answers, drawing and photo thumbnails). Exports: **Excel (.xlsx)** with Summary, Students, Activities and
+Responses sheets (written by a small built-in zip writer), **CSV for Power BI** (one tidy row per student per activity),
+**PDF report** (all views, printed by Chromium) and a shareable **.hbreport** file (`app/reports.js`, `HBRP`).
 
 ## Video lessons (split by questions, like Nearpod)
 
