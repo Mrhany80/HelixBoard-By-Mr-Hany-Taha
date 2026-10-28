@@ -33,8 +33,9 @@ function createUpdater(getWin, fetch) {
       if (response !== 0) return;
       if (portable || !info.setup || !/^[0-9a-f]{64}$/i.test(info.sha256 || '')) { shell.openExternal(PAGE); return; }
       const w = getWin(); if (w) w.setProgressBar(2);
-      const res = await fetch('https://github.com/' + REPO + '/releases/download/v' + info.version + '/' + encodeURIComponent(info.setup));
-      if (!res.ok) throw new Error('download HTTP ' + res.status);
+      /* the newest release first (works whatever its tag is called), then the tag named v<version>, then <version> */
+      let res = null; for (const u of ['latest/download/', 'download/v' + info.version + '/', 'download/' + info.version + '/']) { res = await fetch('https://github.com/' + REPO + '/releases/' + u + encodeURIComponent(info.setup)).catch(() => null); if (res && res.ok) break; }
+      if (!res || !res.ok) throw new Error('download HTTP ' + (res ? res.status : 'failed'));
       const buf = Buffer.from(await res.arrayBuffer());
       if (w) w.setProgressBar(-1);
       if (crypto.createHash('sha256').update(buf).digest('hex') !== info.sha256.toLowerCase()) throw new Error('the download did not match its checksum');
