@@ -112,7 +112,7 @@ document.head.appendChild(css);
 
 function needApp() { modal.open('<h2>Live class</h2><p>Students scan one QR code and answer on their own phones: drawings, polls, word clouds, short answers, photos and sticky notes — all live on your screen with their names.</p><p>This needs the <b>HelixBoard Windows app</b>, which runs the class link on this computer.</p><div class="foot"><button class="btn primary" data-close>OK</button></div>'); }
 const qrSvg = url => { try { const q = qrcode(0, 'M'); q.addData(url); q.make(); return q.createSvgTag({ cellSize: 3, margin: 1, scalable: true }); } catch (e) { return ''; } };
-const players = () => (L.snap && L.snap.players) || [];
+const players = () => ((L.snap || (window.HBCL && HBCL.snap)) || {}).players || [];
 const nameOf = r => L.act && L.act.anon ? 'Student ' + (L.order.indexOf(r.pid) + 1) : r.name;
 const starsOf = pid => { const p = players().find(x => x.pid === pid); return p ? p.stars : 0; };
 
@@ -180,9 +180,10 @@ function renderTop() { const b = L.el.querySelector('#lcTopBtns'); const lock = 
 function renderMain() { const m = L.el.querySelector('#lcMain');
   if (!L.act) { m.innerHTML = '<div class="lc-hero"><div><h1>Choose a live activity</h1><p>It opens on every student’s phone at once. Answers arrive here live, with names.</p></div><div class="small muted">' + players().length + ' student' + (players().length === 1 ? '' : 's') + ' connected</div></div><div class="lc-cards">' +
     Object.entries(TYPES).map(([k, t]) => '<button class="lc-card" data-k="' + k + '" style="--tint:' + t.tint + '"><div class="ic">' + icon(t.ic) + '</div><b>' + esc(t.name) + '</b><span>' + esc(t.desc) + '</span></button>').join('') + '</div>' +
-    '<div class="lc-cards" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))"><button class="lc-card" id="lcBoardWrite" style="--tint:#22D3EE"><div class="ic">' + icon('monitor-smartphone') + '</div><b>Write on my board</b><span>Students see your board live and write on it together, each in their own colour.</span></button><button class="lc-card" id="lcQuiz" style="--tint:#FFC928"><div class="ic">' + icon('trophy') + '</div><b>Phone quiz game</b><span>A timed quiz with points, a leaderboard and a podium — like Kahoot or Wayground.</span></button></div>';
+    '<div class="lc-cards" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))"><button class="lc-card" id="lcBoardWrite" style="--tint:#22D3EE"><div class="ic">' + icon('monitor-smartphone') + '</div><b>Write on my board</b><span>Students see your board live and write on it together, each in their own colour.</span></button><button class="lc-card" id="lcVideo" style="--tint:#FF9F5A"><div class="ic">' + icon('clapperboard') + '</div><b>Video lesson</b><span>A video split into parts by your questions — it pauses, asks the phones, then plays on. Like Nearpod.</span></button><button class="lc-card" id="lcQuiz" style="--tint:#FFC928"><div class="ic">' + icon('trophy') + '</div><b>Phone quiz game</b><span>A timed quiz with points, a leaderboard and a podium — like Kahoot or Wayground.</span></button></div>';
     $$('.lc-card[data-k]', m).forEach(b => b.onclick = () => setup(b.dataset.k));
     m.querySelector('#lcBoardWrite').onclick = () => { hide(); HBCL.start(); };
+    m.querySelector('#lcVideo').onclick = () => { hide(); window.HBVL && HBVL.open(); };
     m.querySelector('#lcQuiz').onclick = () => { hide(); window.HBL && HBL.phoneQuiz(); };
     if (window.gsap && !REDUCE) gsap.from($$('.lc-card', m), { y: 14, opacity: 0, duration: 0.3, stagger: 0.04, ease: 'power2.out' });
     return; }
@@ -200,7 +201,7 @@ function renderTools() { const b = L.el.querySelector('#lcTools'), a = L.act; if
     '<button class="btn sm" id="lcAnon">' + icon(a.anon ? 'eye' : 'eye-off') + (a.anon ? 'Show names' : 'Hide names') + '</button>' +
     (grid ? '<span class="seg" title="How many answers side by side">' + [2, 3, 4, 5, 6].map(n => '<button data-c="' + n + '" class="' + (n === L.cols ? 'on' : '') + '">' + n + '</button>').join('') + '</span><span class="seg">' + [['time', 'First in'], ['name', 'A–Z']].map(([k, l]) => '<button data-s="' + k + '" class="' + (k === L.sort ? 'on' : '') + '">' + l + '</button>').join('') + '</span>' : '') +
     (L.shared ? '<button class="btn sm primary" id="lcUnshare">' + icon('megaphone') + 'Stop sharing</button>' : '') +
-    '<span style="flex:1"></span><button class="btn sm" id="lcBoard">' + icon('image-down') + 'Put on board</button><button class="btn sm" id="lcCsv">' + icon('download') + 'Excel (.csv)</button><button class="btn sm" id="lcEnd">' + icon('x') + 'End</button>';
+    '<span style="flex:1"></span>' + (L.cont ? '<button class="btn sm primary" id="lcCont">' + icon('play') + esc(L.cont.label || 'Continue') + '</button>' : '') + '<button class="btn sm" id="lcBoard">' + icon('image-down') + 'Put on board</button><button class="btn sm" id="lcCsv">' + icon('download') + 'Excel (.csv)</button><button class="btn sm" id="lcEnd">' + icon('x') + 'End</button>';
   const q = id => b.querySelector(id);
   q('#lcOpen').onclick = () => D().cmd('actOptions', { open: !a.open }).then(r => { if (r) { a.open = r.open; a.endsAt = r.endsAt; } renderTools(); renderHead(); toast(a.open ? 'Answers are open again.' : 'Answers closed — phones show their final answer.'); });
   const rv = q('#lcReveal'); if (rv) rv.onclick = () => D().cmd('actOptions', { reveal: a.reveal != null ? null : a.correct }).then(r => { a.reveal = r ? r.reveal : null; renderTools(); renderBody(); if (a.reveal != null) snd('fanfare'); });
@@ -209,6 +210,7 @@ function renderTools() { const b = L.el.querySelector('#lcTools'), a = L.act; if
   $$('[data-c]', b).forEach(x => x.onclick = () => { L.cols = +x.dataset.c; set.put('lcCols', L.cols); renderTools(); renderBody(); });
   $$('[data-s]', b).forEach(x => x.onclick = () => { L.sort = x.dataset.s; set.put('lcSort', L.sort); renderTools(); renderBody(); });
   const us = q('#lcUnshare'); if (us) us.onclick = () => share(null);
+  const ct = q('#lcCont'); if (ct) ct.onclick = async () => { const c = L.cont; L.cont = null; await endActivity(true, true); hide(); c && c.onContinue && c.onContinue(); };
   q('#lcBoard').onclick = () => toBoard(); q('#lcCsv').onclick = csv; q('#lcEnd').onclick = () => endActivity(false); }
 function sorted() { const ids = L.order.filter(p => L.list.has(p)); if (L.sort === 'name') ids.sort((x, y) => nameOf(L.list.get(x)).localeCompare(nameOf(L.list.get(y)))); return ids.map(p => L.list.get(p)); }
 function renderBody() { const b = L.el && L.el.querySelector('#lcBody'); if (!b || !L.act) return; const a = L.act;
@@ -268,9 +270,12 @@ async function award(pid) { const s = await D().cmd('award', { pid, n: 1 }); if 
   if (p) toast('⭐ ' + esc(p.name) + ' — ' + p.stars + ' star' + (p.stars === 1 ? '' : 's'));
   $$('#lcStage .lc-tile[data-p="' + CSS.escape(pid) + '"] .lc-star span').forEach(x => x.textContent = p ? p.stars : ''); renderSide(); if (L.spot === pid) spotlight(pid, true); }
 async function share(pid) { await D().cmd('share', pid); L.shared = pid; if (pid) { snd('pop'); toast('📣 Shared with every phone' + (L.act.anon ? ' (without the name).' : '.')); } renderTools(); $$('#lcStage .lc-tile').forEach(t => t.classList.toggle('sh', t.dataset.p === pid)); if (L.spot) spotlight(L.spot, true); }
-async function endActivity(thenNew) { if (!L.act) return; if (L.list.size && !thenNew && !confirm('End this activity? Put it on the board or export it first if you want to keep the answers.')) return;
+async function endActivity(thenNew, quiet) { if (!L.act) return; if (!quiet && L.cont) L.cont = null; if (L.list.size && !thenNew && !quiet && !confirm('End this activity? Put it on the board or export it first if you want to keep the answers.')) return;
   window.HBA && HBA.log('live_activity', { type: L.act.type, answers: L.list.size, students: players().length });
-  await D().cmd('endActivity'); L.act = null; L.list.clear(); L.order = []; L.shared = null; if (L.bgUrl) { URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; } closeSpot(); render(); }
+  await D().cmd('endActivity'); L.act = null; L.list.clear(); L.order = []; L.shared = null; if (L.bgUrl) { URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; } closeSpot(); if (!quiet) render(); }
+/* other tools (video lessons) send a question to the phones and get a Continue button back */
+async function run(cfg, cont) { await open(); if (!L.el) return false; if (L.act) await endActivity(true, true); L.cont = cont || null; await start(cfg); return true; }
+const connected = () => players().filter(p => p.online).length;
 
 /* ---------- starting an activity ---------- */
 function setup(type) { const t = TYPES[type]; const timeOpts = [[0, 'No time limit'], [30, '30 seconds'], [60, '1 minute'], [120, '2 minutes'], [180, '3 minutes'], [300, '5 minutes'], [600, '10 minutes']];
@@ -303,7 +308,7 @@ function paperCanvas(kind) { const W = 1200, H = 900, c = document.createElement
     g.strokeStyle = '#1E1419'; g.lineWidth = 3; g.beginPath(); g.moveTo(120, 40); g.lineTo(120, H - 120); g.lineTo(W - 40, H - 120); g.stroke(); g.fillStyle = '#1E1419'; g.beginPath(); g.moveTo(120, 30); g.lineTo(110, 52); g.lineTo(130, 52); g.fill(); g.beginPath(); g.moveTo(W - 30, H - 120); g.lineTo(W - 52, H - 130); g.lineTo(W - 52, H - 110); g.fill(); }
   return c; }
 async function start(cfg) {
-  let src = null; if (cfg.type === 'draw') src = cfg.bg === 'board' ? HBCL.boardCanvas(1400) : cfg.bg !== 'blank' ? paperCanvas(cfg.bg) : null;
+  let src = null; if (cfg.type === 'draw') src = cfg.bgCanvas || (cfg.bg === 'board' ? HBCL.boardCanvas(1400) : cfg.bg && cfg.bg !== 'blank' ? paperCanvas(cfg.bg) : null);
   const ar = src ? src.width / src.height : 4 / 3; let bytes = null;
   if (src) { const blob = await new Promise(r => src.toBlob(r, 'image/jpeg', 0.85)); bytes = new Uint8Array(await blob.arrayBuffer()); if (L.bgUrl) URL.revokeObjectURL(L.bgUrl); L.bgUrl = URL.createObjectURL(blob); L.bgImg = await new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = L.bgUrl; }); }
   else { if (L.bgUrl) URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; }
@@ -367,5 +372,5 @@ function leaderboard() { const ps = players().slice().sort((a, b) => b.stars - a
 /* the Live class button in the top bar (red dot while an activity is running) */
 { const top = document.getElementById('aUndo'); if (top) { const b = document.createElement('button'); b.id = 'aLive'; b.title = 'Live class: polls, drawings, word clouds and more on students’ phones'; b.innerHTML = icon('radio') + '<span class="lbl">Live class</span><span class="dot"></span>'; b.onclick = () => open(); const sep = document.createElement('span'); sep.className = 'sep'; top.parentNode.insertBefore(b, top.parentNode.firstChild); top.parentNode.insertBefore(sep, b.nextSibling); } }
 setInterval(() => { const b = document.getElementById('aLive'); if (b) b.classList.toggle('on', !!L.act); }, 1000);
-window.HBLC = { open, event, closed, hide, setup, get active() { return !!L.act; } };
+window.HBLC = { open, event, closed, hide, setup, run, get active() { return !!L.act; }, get students() { return window.HBCL && HBCL.on ? connected() : 0; } };
 })();

@@ -13,6 +13,8 @@ function play(force) { const el = $('#intro'); if (!el || running) return; if (!
   const A = $('#isA', el), Bs = $('#isB', el), pen = $('#iPen', el), la = A.getTotalLength(), lb = Bs.getTotalLength();
   [[A, la], [Bs, lb]].forEach(([p, l]) => { p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
   let done = false; const finish = () => { if (done) return; done = true; SND.writeStop(); set.put('seenIntro', true); document.removeEventListener('keydown', onKey, true); const end = () => { el.hidden = true; el.innerHTML = ''; running = false; }; if (window.gsap && !REDUCE) { gsap.killTweensOf(el); gsap.to(el, { opacity: 0, duration: 0.45, ease: 'power2.in', onComplete: end }); } else end(); };
+  /* whatever happens (a hidden window pauses animations), the titles never stay longer than 9 seconds */
+  setTimeout(finish, 9000);
   const onKey = e => { e.preventDefault(); e.stopPropagation(); finish(); }; document.addEventListener('keydown', onKey, true); $('#iSkip', el).onclick = finish; el.onclick = e => { if (e.target === el) finish(); };
   if (!window.gsap || REDUCE) { [A, Bs].forEach(p => p.style.strokeDashoffset = 0); el.querySelectorAll('.rung').forEach(r => r.setAttribute('opacity', 1)); el.querySelector('.t1').style.opacity = 1; el.querySelector('.t1b').style.opacity = 1; el.querySelector('.t2').style.opacity = 1; setTimeout(finish, 1600); return; }
   [A, Bs].forEach(p => p.style.visibility = 'hidden');
