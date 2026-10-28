@@ -164,6 +164,8 @@ function drawScreenOverlayBg(g, p) { if (B.mode !== 'scroll') drawDates(g, p, tr
 /* ---------- strokes: perfect-freehand outlines, Living Ink textures ---------- */
 /* ink responsiveness: 'low' follows the finger closely (best for touch boards), 'smooth' gives rounder lines */
 const INK_SMOOTH = { low: { stream: 0.4, thin: 0.3 }, normal: { stream: 0.75, thin: 0.6 }, smooth: { stream: 1.15, thin: 1 } };
+/* pen sensitivity 1–10 (Draw → Options): higher = ink follows the pen more tightly, light pressure shows more, tiny movements count */
+const SENS = () => { const s = Math.max(1, Math.min(10, +set.get('penSens', 8) || 8)); return { s, stream: 1.4 - s * 0.11, gamma: 1.25 - s * 0.09, minMove: 0.9 - s * 0.07, floor: 0.06 + s * 0.012 }; };
 const PEN = { pen: { thinning: 0.58, smoothing: 0.5, streamline: 0.45, k: 1 }, pencil: { thinning: 0.25, smoothing: 0.4, streamline: 0.35, k: 0.85, tex: 'grain' }, marker: { thinning: 0, smoothing: 0.6, streamline: 0.5, k: 1.5 }, chalk: { thinning: 0.12, smoothing: 0.45, streamline: 0.4, k: 1.7, tex: 'chalk' }, glow: { thinning: 0.45, smoothing: 0.5, streamline: 0.45, k: 1, glow: true }, arrow: { thinning: 0.4, smoothing: 0.5, streamline: 0.5, k: 1 }, hi: { thinning: 0, smoothing: 0.6, streamline: 0.6, k: 4.2 } };
 const svgPath = pts => { if (pts.length < 4) { const p = new Path2D(); if (pts.length) { p.arc(pts[0][0], pts[0][1], 1, 0, 7); } return p; } let d = 'M' + pts[0][0].toFixed(2) + ',' + pts[0][1].toFixed(2) + ' Q'; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; d += a[0].toFixed(2) + ',' + a[1].toFixed(2) + ' ' + ((a[0] + b[0]) / 2).toFixed(2) + ',' + ((a[1] + b[1]) / 2).toFixed(2) + ' '; } return new Path2D(d + 'Z'); };
 const ptsOf = o => { const a = [], P = o.pts; for (let i = 0; i < P.length; i += 3) a.push([P[i], P[i + 1], P[i + 2]]); return a; };
@@ -176,7 +178,7 @@ function strokePath(o) { if (o._p) return o._p; if (o._live && o.pts.length > LI
   return o._p = p; }
 function outline(o, P) { const C = PEN[o.pen] || PEN.pen, SM = INK_SMOOTH[set.get('inkSmooth', 'low')] || INK_SMOOTH.low;
   /* smartboard touch frames jitter a little, so their strokes get at least the 'Normal' steadying */
-  const stream = o.sb ? Math.max(SM.stream, INK_SMOOTH.normal.stream) : SM.stream;
+  const stream = (o.sb ? Math.max(SM.stream, INK_SMOOTH.normal.stream) : SM.stream) * SENS().stream;
   return svgPath(getStroke(P, { size: o.w * C.k, thinning: o.sp ? C.thinning * SM.thin : C.thinning, smoothing: C.smoothing, streamline: Math.max(0.05, C.streamline * stream), simulatePressure: !!o.sp && SM.thin > 0.5, last: true, start: { taper: 0, cap: true }, end: { taper: 0, cap: true } })); }
 const LIVE_CHUNK = 40;
 /* while the pen is down only the newest stretch is recomputed; finished stretches are merged once, so long lines never lag behind the pen on slower smartboard PCs */
@@ -271,7 +273,9 @@ function drawPin(g, o, dark) { g.save(); const col = o.c || '#E03131'; g.strokeS
 function drawScale(g, o, dark) { const im = o.img && byId(o.img); const L = im ? o.rel * im.w : o.len, x = im ? im.x + o.dx * im.w : o.x, y = im ? im.y + o.dy * im.h : o.y; g.save(); const col = o.c || (dark ? '#fff' : '#111'); g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 3; g.fillRect(x, y, L, 7); g.beginPath(); g.moveTo(x, y - 8); g.lineTo(x, y + 14); g.moveTo(x + L, y - 8); g.lineTo(x + L, y + 14); g.stroke(); g.font = '700 18px JetBrains Mono, monospace'; g.textAlign = 'center'; g.fillText(o.label || '10 µm', x + L / 2, y - 10); g.restore(); }
 
 /* ---------- master object painter ---------- */
-function drawObj(g, o, p, opt) { if (o.off) return; if (p && p.deck && p.deck.inkOff && !o.deckBase && (o.layer == null ? 1 : o.layer) >= 1 && !(opt && opt.ink)) return; const dark = isDark(p);
+/* PowerPoint click animations: the slideshow decides which build steps are showing */
+let stepFilter = null; const setStepFilter = f => { stepFilter = f; };
+function drawObj(g, o, p, opt) { if (o.off) return; if (o.step && stepFilter && stepFilter(o)) return; if (p && p.deck && p.deck.inkOff && !o.deckBase && (o.layer == null ? 1 : o.layer) >= 1 && !(opt && opt.ink)) return; const dark = isDark(p);
   switch (o.t) {
     case 'stroke': drawStroke(g, o, p); break;
     case 'shape': drawShape(g, o); break;
@@ -280,7 +284,7 @@ function drawObj(g, o, p, opt) { if (o.off) return; if (p && p.deck && p.deck.in
     case 'conn': drawConn(g, o); break;
     case 'pin': drawPin(g, o, dark); break;
     case 'scalebar': drawScale(g, o, dark); break;
-    case 'img': case 'stamp': case 'wid': { g.save(); g.globalAlpha = o.a == null ? 1 : o.a; if (o.rot) { const cx = o.x + o.w / 2, cy = o.y + o.h / 2; g.translate(cx, cy); g.rotate(o.rot); g.translate(-cx, -cy); }
+    case 'img': case 'stamp': case 'wid': { g.save(); g.globalAlpha = (o.a == null ? 1 : o.a) * (o._fa == null ? 1 : o._fa); if (o.rot) { const cx = o.x + o.w / 2, cy = o.y + o.h / 2; g.translate(cx, cy); g.rotate(o.rot); g.translate(-cx, -cy); }
       let im = null; if (o.t === 'img') { const src = B.assets[o.asset]; if (src) im = imageFor(o.asset, src); } else if (o.t === 'wid') { if (o.src) im = imageFor('w:' + o.id + ':' + (o.v || 0), o.src); } else if (window.HBStamps) im = window.HBStamps.image(o.k, o.fill, o.stroke);
       if (o.t === 'wid' && o.frame) { g.fillStyle = dark ? 'rgba(255,255,255,.96)' : '#fff'; g.shadowColor = 'rgba(0,0,0,.18)'; g.shadowBlur = 14; g.shadowOffsetY = 4; g.fillRect(o.x - 8, o.y - 8, o.w + 16, o.h + 16); g.shadowColor = 'transparent'; }
       drawBoxImage(g, o, im);
@@ -306,6 +310,6 @@ function renderToCanvas(p, rect, scale, opt) { opt = opt || {}; const c = docume
 const pageRect = p => { p = p || page(); if (B.mode === 'scroll') { const cb = contentBox(p); const h = cb ? Math.min(p.H, Math.max(1080, cb[1] + cb[3] + 80)) : 1080; return [0, 0, B.width, h]; } const cb = contentBox(p); return cb ? [cb[0] - 60, cb[1] - 60, cb[2] + 120, cb[3] + 120] : [0, 0, 1920, 1080]; };
 
 new ResizeObserver(resize).observe(stage);
-window.HBE = { PEN, bound, scrollTo, addHooks, pageDates, B, V, page, byId, newPage, add, del, mod, tx, undo, redo, reorder, push, changed, saveNow, serial, loadBoard, clean, invalidate, toB, toS, setView, zoomAt, fitWidth, fitPage, viewRect, contentBox, resize, THEMES, PALETTE, isDark, drawObj, drawBackground, renderPage, renderToCanvas, pageRect, bbox, inter, strokePath, textLayout, ptsOf, connPts, dirty, liveDrawers, imageFor, imgCache, quizReveal, get hidden() { return hidden; }, set hidden(h) { hidden = h; dirty.main = true; }, get SW() { return SW; }, get SH() { return SH; }, get DPR() { return DPR; }, cvLive, gLive, cvMain, drawFrame, grow, H, roughFor, shapePath, arrowHead, hexRgb, edgePoint, rnd };
+window.HBE = { PEN, SENS, setStepFilter, bound, scrollTo, addHooks, pageDates, B, V, page, byId, newPage, add, del, mod, tx, undo, redo, reorder, push, changed, saveNow, serial, loadBoard, clean, invalidate, toB, toS, setView, zoomAt, fitWidth, fitPage, viewRect, contentBox, resize, THEMES, PALETTE, isDark, drawObj, drawBackground, renderPage, renderToCanvas, pageRect, bbox, inter, strokePath, textLayout, ptsOf, connPts, dirty, liveDrawers, imageFor, imgCache, quizReveal, get hidden() { return hidden; }, set hidden(h) { hidden = h; dirty.main = true; }, get SW() { return SW; }, get SH() { return SH; }, get DPR() { return DPR; }, cvLive, gLive, cvMain, drawFrame, grow, H, roughFor, shapePath, arrowHead, hexRgb, edgePoint, rnd };
 })();
 

@@ -49,6 +49,16 @@ data = ('/* GSAP 3.15.0 — GreenSock Standard No-Charge License, inlined */\n' 
         + 'window.ELEMENTS=' + elements + ';\n' + 'window.HB_AR=' + json.dumps(json.loads(ar), ensure_ascii=False, separators=(',',':')) + ';\n' + pf + '\n/* qrcode-generator 1.4.4 — MIT (Kazuhiko Arase), for phone-quiz join codes */\n' + qr + '\n/* supabase-js 2.117.3 — MIT (Supabase), accounts */\n' + sbjs)
 
 shell = open(A + 'shell.html', encoding='utf-8').read()
+# fonts, inlined so the app never waits for (or needs) the internet
+import base64
+FONTS = [('Lexend', 'lexend-latin-wght-normal', '100 900'), ('Space Grotesk', 'space-grotesk-latin-wght-normal', '300 700'), ('JetBrains Mono', 'jetbrains-mono-latin-500-normal', '500'), ('JetBrains Mono', 'jetbrains-mono-latin-700-normal', '700'), ('Caveat', 'caveat-latin-500-normal', '500'), ('Caveat', 'caveat-latin-700-normal', '700')]
+ff = ''
+for fam, fn, wt in FONTS:
+    fp = V + 'fonts/' + fn + '.woff2'
+    if os.path.exists(fp): ff += "@font-face{font-family:'%s';font-style:normal;font-display:swap;font-weight:%s;src:url(data:font/woff2;base64,%s) format('woff2')}\n" % (fam, wt, base64.b64encode(open(fp, 'rb').read()).decode())
+shell = shell.replace('<!--FONTS-->', '<style>' + ff + '</style>')
+# the design layer (app/design.css) goes last in <head>, so it refines everything before it
+if os.path.exists(A + 'design.css'): shell = shell.replace('</head>', '<style id="design">' + open(A + 'design.css', encoding='utf-8').read() + '</style>\n</head>', 1)
 safe = lambda t: t.replace('</script', '<\\/script')
 out = shell.replace('/*DATA*/', safe(data)).replace('/*APP*/', safe('\n'.join(parts)))
 

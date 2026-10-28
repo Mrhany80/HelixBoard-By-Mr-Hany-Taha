@@ -65,7 +65,8 @@ const INK_TOOLS = ['draw', 'shape', 'text', 'note', 'magic', 'conn', 'pin'];
 /* notebook pages: writing stays inside the page — points are kept within its edges */
 const evPos = e => { const p = toB(e.clientX, e.clientY); if (B.mode === 'scroll' && INK_TOOLS.includes(T.tool)) { p[0] = clamp(p[0], 2, B.width - 2); p[1] = clamp(p[1], 2, page().H - 2); } return p; };
 const outsidePage = e => { if (B.mode !== 'scroll' || !INK_TOOLS.includes(T.tool)) return false; const [x, y] = toB(e.clientX, e.clientY); return x < 0 || x > B.width || y < 0 || y > page().H; };
-const pressureOf = e => (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0.5;
+/* real pen pressure, lifted by the sensitivity curve so light strokes still show clearly */
+const pressureOf = e => { if (!(e.pointerType === 'pen' && e.pressure > 0)) return 0.5; const k = E.SENS(); return Math.round(Math.max(k.floor, Math.min(1, Math.pow(e.pressure, k.gamma))) * 1000) / 1000; };
 function startPan(e) { activeId = e.pointerId; act = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: V.x, vy: V.y }; cv.style.cursor = 'grabbing'; }
 function startPinch() { const [a, b] = [...ptrs.values()]; act = { k: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), m0: [(a.x + b.x) / 2, (a.y + b.y) / 2], s0: V.s, vx: V.x, vy: V.y }; }
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -95,7 +96,12 @@ cv.addEventListener('pointermove', e => { const p = ptrs.get(e.pointerId); if (p
   if (act.k === 'pan') { setViewKeep(V.s, act.vx + e.clientX - act.sx, act.vy + e.clientY - act.sy); return; }
   if (act.k === 'pinch') { if (ptrs.size < 2) return; const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y), m = [(a.x + b.x) / 2, (a.y + b.y) / 2], r = stage.getBoundingClientRect(); const s = clamp(act.s0 * d / act.d0, 0.1, 8); const mx = act.m0[0] - r.left, my = act.m0[1] - r.top; E.setView(s, mx - (mx - act.vx) * s / act.s0 + (m[0] - act.m0[0]), my - (my - act.vy) * s / act.s0 + (m[1] - act.m0[1])); return; }
   if (act.k === 'inst') { HBInst.move(x, y, e); return; }
+  if (act.k === 'draw' && RAW && act.raw) { const pr = e.getPredictedEvents ? e.getPredictedEvents() : []; act.pred = pr.length ? evPos(pr[pr.length - 1]) : null; return; }
   const h = TOOLS[T.tool]; if (h && h.move) { if (act.k === 'draw') { const pr = e.getPredictedEvents ? e.getPredictedEvents() : []; act.pred = pr.length ? evPos(pr[pr.length - 1]) : null; } const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; if (h.coalesce && evs.length > 1) evs.forEach(ev => h.move(...evPos(ev), ev)); else h.move(x, y, e); } });
+/* ink uses 'pointerrawupdate' where the browser offers it: pen samples arrive as soon as the digitiser sends them instead of once per frame */
+const RAW = 'onpointerrawupdate' in window;
+if (RAW) cv.addEventListener('pointerrawupdate', e => { if (!act || act.k !== 'draw' || e.pointerId !== activeId) return; act.raw = true; const h = TOOLS[T.tool]; if (!h || !h.move) return;
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; (evs.length ? evs : [e]).forEach(ev => h.move(...evPos(ev), ev)); });
 const up = e => { clearTimeout(longT); ptrs.delete(e.pointerId); if (act && act.k !== 'pinch' && activeId != null && e.pointerId !== activeId) return; if (e.pointerId === activeId) activeId = null; if (!act) return; if (act.k === 'pan') { act = null; cv.style.cursor = T.tool === 'hand' ? 'grab' : ''; setTool(T.tool); return; } if (act.k === 'pinch') { if (!ptrs.size) act = null; return; } if (act.k === 'inst') { HBInst.up(e); act = null; return; } const h = TOOLS[T.tool]; if (h && h.up) h.up(...evPos(e), e); };
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 cv.addEventListener('lostpointercapture', e => { if (ptrs.has(e.pointerId)) up(e); });
@@ -114,8 +120,8 @@ const TOOLS = {
   draw: { coalesce: true,
     down(x, y, e) { const sp = !(e.pointerType === 'pen' && e.pressure > 0 && e.pressure !== 0.5); live = { t: 'stroke', pen: T.pen, c: T.color, w: T.size * (T.pen === 'hi' ? 1 : 1), a: T.alpha, pts: [x, y, pressureOf(e)], tm: [0], sp, t0: performance.now(), _live: true }; if (T.board && e.pointerType === 'touch') live.sb = 1; if (T.pen === 'calli') live.ang = T.nib;
       if (window.HBInst) { const sn = HBInst.snapStart(x, y); if (sn) live.snap = sn; }
-      act = { k: 'draw', o: live, last: [x, y, performance.now()] }; SND.writeStart(T.pen === 'chalk' || E.THEMES[page().theme].chalk ? 'chalk' : null); still = { x, y, t: performance.now(), done: false }; dirty.live = true; },
-    move(x, y, e) { if (!act || act.k !== 'draw') return; const o = act.o; if (o.snap) [x, y] = HBInst.snapPoint(o.snap, x, y); const n = o.pts.length; if (Math.hypot(x - o.pts[n - 3], y - o.pts[n - 2]) < 0.6 / V.s) return; o.pts.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, pressureOf(e)); o.tm.push(Math.round(performance.now() - o.t0)); delete o._p; delete o._b;
+      act = { k: 'draw', o: live, last: [x, y, performance.now()], minMove: E.SENS().minMove }; SND.writeStart(T.pen === 'chalk' || E.THEMES[page().theme].chalk ? 'chalk' : null); still = { x, y, t: performance.now(), done: false }; dirty.live = true; },
+    move(x, y, e) { if (!act || act.k !== 'draw') return; const o = act.o; if (o.snap) [x, y] = HBInst.snapPoint(o.snap, x, y); const n = o.pts.length; if (Math.hypot(x - o.pts[n - 3], y - o.pts[n - 2]) < (act.minMove || 0.6) / V.s) return; o.pts.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, pressureOf(e)); o.tm.push(Math.round(performance.now() - o.t0)); delete o._p; delete o._b;
       const now = performance.now(), dt = Math.max(1, now - act.last[2]), sp = Math.hypot(x - act.last[0], y - act.last[1]) * V.s / dt; SND.writeMove(sp, Math.atan2(y - act.last[1], x - act.last[0])); act.last = [x, y, now];
       if ((o.pen === 'chalk' || E.THEMES[page().theme].chalk) && Math.random() < 0.35) dust.push({ x, y, vx: (Math.random() - 0.5) * 0.4, vy: 0.3 + Math.random() * 0.6, t: now, c: o.c });
       if (Math.hypot(x - still.x, y - still.y) > 4 / V.s) { still.x = x; still.y = y; still.t = now; }

@@ -20,6 +20,7 @@ function structural(fn) { const p = P(); const a = JSON.stringify(p.deck), h0 = 
 function create(name, slides, opts) { opts = opts || {}; const W = pageW(), w = Math.min(W - 160, 1600), x0 = (W - w) / 2; const p = E.newPage('slate'); p.name = name.replace(/\.(pptx|pdf)$/i, '').slice(0, 40); p.deck = { w, x0, top: TOP, gap: GAP, slides: [], trans: 'fade', src: name, cur: 0 };
   let y = TOP; slides.forEach(sl => { const h = Math.round(w * sl.h / sl.w); p.deck.slides.push({ h }); if (sl.asset) p.objs.push({ id: uid(), ts: Date.now(), t: 'img', asset: sl.asset, x: x0, y, w, h, layer: 0, deckBase: 1, pdf: name });
     else p.objs.push({ id: uid(), ts: Date.now(), t: 'shape', k: 'rect', x: x0, y, w, h, c: '#CED4DA', sw: 2, fill: '#FFFFFF', layer: 0, deckBase: 1 });
+    (sl.steps || []).forEach((a, k) => p.objs.push({ id: uid(), ts: Date.now(), t: 'img', asset: a, x: x0, y, w, h, layer: 0, deckBase: 1, step: k + 1, pdf: name }));
     (sl.texts || []).forEach(t => { const k = w / sl.w; const o = Object.assign({}, t, { id: uid(), ts: Date.now(), x: x0 + t.x * k, y: y + t.y * k, w: t.w ? t.w * k : 0, size: Math.max(10, Math.round(t.size * k)), layer: 1, deckBase: 1 }); p.objs.push(o); });
     y += h + GAP; });
   p.H = Math.max(2160, totalH(p)); B.pages.splice(B.cur + 1, 0, p); window.HBUI && HBUI.goPage(B.cur + 1); E.changed(); SND.page && SND.page(); setTimeout(() => goSlide(0, false), 60); return p; }
@@ -29,15 +30,21 @@ let cur = 0, show = false, railW = 0;
 let full = false; const barMin = () => document.body.classList.contains('deckbar-min');
 const area = () => show ? { x: 0, y: 0, w: E.SW, h: E.SH } : full ? { x: 8, y: barMin() ? 40 : 52, w: E.SW - 40, h: E.SH - (barMin() ? 40 : 52) - 86 } : { x: railW + 10, y: barMin() ? 40 : 58, w: E.SW - railW - 50, h: E.SH - (barMin() ? 40 : 58) - 96 };
 function fitTo(i) { const r = rects()[i]; if (!r) return null; const a = area(), pad = show ? 1 : 0.97; const s = Math.min(a.w * pad / r[2], a.h * pad / r[3]); return { s, x: a.x + (a.w - r[2] * s) / 2 - r[0] * s, y: a.y + (a.h - r[3] * s) / 2 - r[1] * s }; }
-function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; cur = i; P().deck.cur = i; how = how || (show ? P().deck.trans : 'push');
+function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; cur = i; P().deck.cur = i; how = how || (show ? P().deck.trans : 'push');
   const V = E.V, from = { s: V.s, x: V.x, y: V.y };
   if (!anim || REDUCE || !window.gsap || how === 'none') E.setView(t.s, t.x, t.y);
   else if (how === 'fade') { const cvs = $$('#stage canvas'); gsap.to(cvs, { opacity: 0, duration: 0.14, onComplete: () => { E.setView(t.s, t.x, t.y); gsap.to(cvs, { opacity: 1, duration: 0.26 }); } }); }
   else if (how === 'zoom') { const cvs = $$('#stage canvas'); gsap.to(cvs, { opacity: 0, duration: 0.12, onComplete: () => { const z = { s: t.s * 0.82, x: t.x + (E.SW * 0.09), y: t.y + (E.SH * 0.09) }; E.setView(z.s, z.x, z.y); gsap.to(cvs, { opacity: 1, duration: 0.3 }); gsap.to(z, { s: t.s, x: t.x, y: t.y, duration: 0.42, ease: 'power3.out', onUpdate: () => E.setView(z.s, z.x, z.y) }); } }); }
   else { gsap.to(from, { s: t.s, x: t.x, y: t.y, duration: Math.abs(prev - i) > 3 ? 0.35 : 0.5, ease: 'power3.inOut', onUpdate: () => E.setView(from.s, from.x, from.y) }); }
   updUI(); }
-const next = () => { if (!isDeck()) return; const sl = P().deck.slides; let i = cur + 1; while (show && i < sl.length && sl[i].hid) i++; if (i >= sl.length) { if (show) endCard(); return; } goSlide(i, true); SND.tick && SND.tick(); };
-const prev = () => { if (!isDeck()) return; const sl = P().deck.slides; let i = cur - 1; while (show && i > 0 && sl[i].hid) i--; if (i < 0) return; goSlide(i, true); };
+/* PowerPoint click animations: each build step is a picture with a step number; in the slideshow they appear one click at a time */
+let step = 0, wantStep = null;
+const stepsOf = i => { const b = buckets()[i] || []; return b.reduce((m, o) => Math.max(m, o.step || 0), 0); };
+E.setStepFilter(o => show && o.step > step);
+function reveal() { const objs = (buckets()[cur] || []).filter(o => o.step === step); objs.forEach(o => { o._fa = 0; }); E.dirty.all();
+  if (!window.gsap || REDUCE) { objs.forEach(o => { delete o._fa; }); E.dirty.all(); return; } const t = { v: 0 }; gsap.to(t, { v: 1, duration: 0.45, ease: 'power2.out', onUpdate: () => { objs.forEach(o => { o._fa = t.v; }); E.dirty.main = true; }, onComplete: () => { objs.forEach(o => { delete o._fa; }); E.dirty.all(); } }); }
+const next = () => { if (!isDeck()) return; if (show && step < stepsOf(cur)) { step++; reveal(); SND.tick && SND.tick(); updShow(); return; } const sl = P().deck.slides; let i = cur + 1; while (show && i < sl.length && sl[i].hid) i++; if (i >= sl.length) { if (show) endCard(); return; } goSlide(i, true); SND.tick && SND.tick(); };
+const prev = () => { if (!isDeck()) return; if (show && step > 0) { step--; E.dirty.all(); updShow(); return; } const sl = P().deck.slides; let i = cur - 1; while (show && i > 0 && sl[i].hid) i--; if (i < 0) return; wantStep = show ? stepsOf(i) : 0; goSlide(i, true); E.dirty.all(); };
 /* follow the view when the teacher scrolls by hand */
 bus.on('view', () => { if (!isDeck() || show) return; const vr = E.viewRect(), cy = vr[1] + vr[3] / 2, R = rects(); let best = cur, bd = 1e12; R.forEach((r, i) => { const d = Math.abs(r[1] + r[3] / 2 - cy); if (d < bd) { bd = d; best = i; } }); if (best !== cur) { cur = best; P().deck.cur = cur; updUI(); } });
 
@@ -166,7 +173,7 @@ function exportDeck() { const p = P(), d = p.deck; modal.open('<h2>Export deck a
 
 /* ---------- slideshow ---------- */
 let ctl = null, pbar = null, idleT = 0, clockIv = 0, t0 = 0, savedTheme = null, savedTool = null, blank = null;
-function startShow(i) { if (!isDeck()) return; show = true; css(); const p = P(); savedTheme = p.theme; p.theme = 'black'; savedTool = [I.T.tool, I.T.pen]; document.body.classList.add('deckshow'); I.clearSel();
+function startShow(i) { if (!isDeck()) return; show = true; step = 0; css(); const p = P(); savedTheme = p.theme; p.theme = 'black'; savedTool = [I.T.tool, I.T.pen]; document.body.classList.add('deckshow'); I.clearSel();
   const fs = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen().catch(() => {}) : Promise.resolve();
   ctl = document.createElement('div'); ctl.id = 'showCtl'; document.body.appendChild(ctl); pbar = document.createElement('div'); pbar.id = 'showBar'; document.body.appendChild(pbar);
   ctl.append(bt('chevron-left', '', prev, 'Previous (←)'), Object.assign(document.createElement('span'), { className: 'cnt', id: 'shCnt' }), bt('chevron-right', '', next, 'Next (→, Space, click)'), sep(),
@@ -179,7 +186,7 @@ function startShow(i) { if (!isDeck()) return; show = true; css(); const p = P()
 function endShow() { if (!show) return; show = false; const p = P(); if (savedTheme) p.theme = savedTheme; document.body.classList.remove('deckshow'); [ctl, pbar, blank, $('#showEnd')].forEach(x => x && x.remove()); ctl = pbar = blank = null; clearInterval(clockIv); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); if (savedTool) I.setTool(savedTool[0], savedTool[1]); setTimeout(() => { E.resize && E.resize(); E.dirty.all(); rebuild(); goSlide(cur, false); }, 160); }
 function tool(t, pen) { I.setTool(t, pen); updShowBtns(); poke(); }
 function updShowBtns() { if (!ctl) return; const bs = ctl.querySelectorAll('button'); const T = I.T; [[2, T.tool === 'laser'], [3, T.tool === 'draw' && T.pen !== 'hi'], [4, T.tool === 'draw' && T.pen === 'hi'], [5, T.tool === 'erase'], [7, isDeck() && P().deck.inkOff]].forEach(([k, on]) => bs[k] && bs[k].classList.toggle('on', !!on)); }
-function updShow() { if (!show || !ctl || !isDeck()) return; const n = P().deck.slides.length; const c = $('#shCnt'); if (c) c.textContent = (cur + 1) + ' / ' + n; if (pbar) pbar.style.width = ((cur + 1) / n * 100) + '%'; updShowBtns(); }
+function updShow() { if (!show || !ctl || !isDeck()) return; const n = P().deck.slides.length; const c = $('#shCnt'), ns = stepsOf(cur); if (c) c.textContent = (cur + 1) + ' / ' + n + (ns ? ' · ✦ ' + step + '/' + ns : ''); if (pbar) pbar.style.width = ((cur + 1) / n * 100) + '%'; updShowBtns(); }
 function updClock() { const c = $('#shClk'); if (!c) return; const s = Math.floor((Date.now() - t0) / 1000); c.textContent = '⏱ ' + String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') + '  ·  ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function poke() { if (!ctl) return; ctl.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => ctl && ctl.classList.add('idle'), 2800); }
 function blankScreen(col) { if (blank) { blank.remove(); blank = null; return; } blank = document.createElement('div'); blank.id = 'showBlank'; blank.style.background = col; blank.style.color = col === '#000' ? '#333' : '#ccc'; blank.textContent = 'Click or press any key to return'; blank.onclick = () => { blank.remove(); blank = null; }; document.body.appendChild(blank); }
