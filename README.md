@@ -3,7 +3,7 @@
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
-Version **2.2.0** — three ways to run it, all built from the same `app/` source:
+Version **2.3.0** — three ways to run it, all built from the same `app/` source:
 
 | Device | What | Install |
 |---|---|---|
@@ -26,6 +26,8 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 - `app/*.js` — the 26 app modules (see Modules below)
 - `app/icons.json`, `app/elements.json` — Lucide icons and the periodic table
 - `vendor/*` — pdf.js, pptx-preview, mammoth and jsPDF, inlined for offline
+- `vendor/fonts/*` — Lexend, Space Grotesk, JetBrains Mono and Caveat (SIL Open Font License), inlined so the app looks the same offline
+- `app/design.css` — the 2.3 design layer, added last so it refines the base styles
 
 ## Modules (load order)
 
@@ -86,13 +88,56 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 Nine tabs: **Draw** (pens, erase, select, colour, ink magic) · **Shapes** · **Text** (styles, fonts, photo → text) ·
 **Notes** (rich note-taking kit + note templates and thinking maps) · **Insert** (images, documents, PowerPoint, stamps, screen) ·
 **Science** (Biology, Chemistry, Physics, Lab, Maths, Roots — filter chips at the top) ·
-**Teach** (lesson, timers, wheel and pickers, live/phone quiz, assessment, focus tools, water — filter chips) ·
-**Study** (student practice tools) · **Page** (page, backgrounds, files, intro setting — filter chips).
+**Teach** (lesson, timers, wheel and pickers, quiz on the board, assessment, focus tools, water — filter chips) ·
+**Study** (Live class on phones — and student self-study tools; filter chips) · **Page** (page, backgrounds, files, intro setting — filter chips).
 Tab definitions live in `ui.js`: `SRC` holds every tool group, `TABS` assembles the nine tabs from them.
+
+## Live class (Windows app) — Nearpod / ClassPoint-style activities
+
+**Study → Live class** (or the gradient **Live class** button in the top bar) opens one dashboard for the whole lesson. Students
+scan one QR code (the class link) and their phones switch to whatever the teacher sends:
+
+| Activity | On the phone | On the board |
+|---|---|---|
+| **Draw it** | a canvas (blank, grid, lines, graph axes, or the teacher's board) with colours, sizes, eraser, undo | every drawing side by side **by name** — 2 to 6 per row (split screen), live as they draw |
+| **Quick poll** | A–F, True/False, Yes/No, agree scale; can change until answers close | live bars, who voted, **Reveal answer** turns phones green/red |
+| **Word cloud** | up to 3 words | a live word cloud (repeats grow) |
+| **Short answer** | a text box | every answer as a card |
+| **Photo** | camera or gallery (compressed on the phone) | a photo gallery |
+| **Collaborate board** | up to 6 sticky notes in 6 colours | a wall of notes with names |
+
+For every activity: optional time limit (phones show a countdown), **Hide names** (anonymous on screen), **spotlight** one
+answer full screen (← → to move), **Share with class** (it appears on every phone), **Give a star** (ClassPoint-style;
+students see their stars, **Stars** shows a podium), **Remove** an unsuitable answer, **Put on board** (the whole gallery or
+one answer becomes a picture on the board), **Excel (.csv)**. Also: raised hands ✋ and private questions **?** from phones,
+**Eyes on board** (locks every phone), plus **Write on my board** (students write on the live board) and the **Quiz game**.
+Server side: `desktop/classlink.js` (`setActivity`, `/answer`, `/hand`; every answer is validated by type and size and rate
+limited); phone page: `desktop/classlink-student.html`; dashboard: `app/liveclass.js` (`HBLC`).
+
+## Video lessons (split by questions, like Nearpod)
+
+**Study → Video lesson**: open an MP4/WebM, pause anywhere and **Add question here** (quick poll with a right answer, short
+answer, word cloud, or **Draw it on the paused video frame**). The timeline shows each stop and the side panel lists the parts.
+In **Teach** mode the video stops by itself at every question: with phones connected the question goes to Live class and a
+**Continue video** button plays on; without phones the question shows big on the screen (with **Reveal answer**).
+Questions are remembered per video on this computer and can be saved/loaded as `.hbvid` files (`app/videolesson.js`, `HBVL`).
+
+## PowerPoint animations
+
+When a PowerPoint has click animations, the import offers **Play animations**. `io.js` reads each slide's `<p:timing>` (a tiny
+zip reader, no library) and renders one picture per click with the not-yet-shown shapes or bullet points hidden. In the
+slideshow (F5) each click reveals the next step with a fade; going back from the next slide shows the finished slide.
+Motion paths, emphasis effects and videos are not reproduced; animated slides import as pictures so the steps line up.
+
+## Pen
+
+Draw → Options → **Sensitivity** (1–10, default 8): higher follows the pen more tightly (less smoothing lag), shows light
+pressure more strongly and records smaller movements. Ink uses `pointerrawupdate` where available, so samples arrive as soon
+as the digitiser sends them.
 
 ## Phone quiz (Windows app)
 
-**Teach → Phone quiz (QR)** runs a quiz the way Wayground/Quizizz does: students scan the QR code on the board,
+**Study → Quiz game** runs a quiz the way Wayground/Quizizz does: students scan the QR code on the board,
 type their name and the 6-digit game PIN, and answer on their phones; faster correct answers score more, streaks earn a bonus,
 and the board shows answer bars, a leaderboard and a podium; results export to Excel (.csv).
 

@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 const { $, $$, esc, icon, set, bus, toast, modal, SND, REDUCE } = window.HB;
-const CFG = { url: 'https://ddmofmdaqvgtsceqfumh.supabase.co', key: 'sb_publishable_pjz6Af0luicBPQH2xmNu1g_eBilq9lE', domain: 'users.helixboard.app', version: '2.2.0' };
+const CFG = { url: 'https://ddmofmdaqvgtsceqfumh.supabase.co', key: 'sb_publishable_pjz6Af0luicBPQH2xmNu1g_eBilq9lE', domain: 'users.helixboard.app', version: '2.3.0' };
 const snd = k => { try { SND[k] && SND[k](); } catch (e) {} };
 const S = { sb: null, user: null, profile: null, queue: set.get('accQueue', []), flushing: false, tools: {}, lastAct: Date.now() };
 const platform = () => window.helixDesktop ? 'windows-app' : /iPad|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1 ? 'ipad' : /Android/.test(navigator.userAgent) ? 'android' : /iPhone/.test(navigator.userAgent) ? 'iphone' : 'browser';
@@ -88,7 +88,7 @@ function welcome(tab) { if (!client()) { toast('Accounts need the internet the f
     $('#aGo', ov).onclick = () => mode === 'in' ? signIn() : signUp(role);
     ov.querySelectorAll('input').forEach(i => i.onkeydown = e => { if (e.key === 'Enter') $('#aGo', ov).click(); e.stopPropagation(); });
     const u = $('#aU', ov); if (mode === 'up') { let t = 0; u.oninput = () => { clearTimeout(t); const v = cleanUser(u.value), h = $('#aUh', ov); if (!okUser(v)) { h.className = 'hint'; h.textContent = '3–24 characters: a–z, 0–9, dot, dash or underscore.'; return; } t = setTimeout(async () => { try { const { data } = await client().rpc('username_available', { p_username: v }); h.className = 'hint ' + (data ? 'ok' : ''); h.style.color = data ? '' : 'var(--bad)'; h.textContent = data ? '✓ “' + v + '” is free' : '“' + v + '” is taken — try another'; } catch (e) {} }, 400); }; }
-    setTimeout(() => (mode === 'in' ? u : $('#aN', ov)).focus(), 60); };
+    setTimeout(() => { const f = document.activeElement; if (f && f !== document.body && ov.contains(f) && /INPUT|TEXTAREA|SELECT/.test(f.tagName)) return; (mode === 'in' ? u : $('#aN', ov)).focus(); }, 60); };
   draw(); if (window.gsap && !REDUCE) gsap.from(ov.firstChild, { y: 20, opacity: 0, duration: 0.35 }); }
 const closeWelcome = () => { const o = document.getElementById('accOv'); if (o) o.remove(); };
 const logo = () => '<svg viewBox="0 0 256 256" width="64" height="64" aria-hidden="true"><rect x="8" y="8" width="240" height="240" rx="56" fill="#1C1220"/><g stroke-linecap="round" stroke-width="10"><line x1="98" y1="60" x2="158" y2="60" stroke="#FFC928"/><line x1="94" y1="128" x2="162" y2="128" stroke="#FFC928"/><line x1="98" y1="196" x2="158" y2="196" stroke="#FFC928"/></g><path d="M78 36c0 64 100 64 100 92s-100 28-100 92" fill="none" stroke="#FF5FA2" stroke-width="16" stroke-linecap="round"/><path d="M178 36c0 64-100 64-100 92s100 28 100 92" fill="none" stroke="#22D3EE" stroke-width="16" stroke-linecap="round"/></svg>';

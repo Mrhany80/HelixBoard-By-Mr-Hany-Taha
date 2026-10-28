@@ -112,3 +112,8 @@ body.ar #toast::before{left:auto;right:0;border-radius:4px 0 0 4px}
 #stStage{background:radial-gradient(1200px 640px at 50% -12%,color-mix(in srgb,#C266FF 14%,var(--bg)),var(--bg))!important}
 #lcStage{background:var(--bg)}
 #lcStage .lc-top{background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 70%,var(--panel)),var(--panel))}
+/* roomy, consistent text boxes with a soft accent focus ring */
+#sheet input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),#sheet select{min-height:38px;padding:7px 12px;border:1px solid var(--line2)!important;background:var(--panel2);outline:none}
+#sheet textarea{padding:10px 12px;border:1px solid var(--line2)!important;background:var(--panel2);outline:none}
+#sheet input:focus,#sheet textarea:focus,#sheet select:focus,.inp:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)!important;outline:none}
+#sheet label.small,#sheet .small{color:var(--muted)}
