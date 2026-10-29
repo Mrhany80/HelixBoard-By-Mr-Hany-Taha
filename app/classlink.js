@@ -19,7 +19,7 @@ async function start(opts) { opts = opts || {}; if (!D()) return needApp('Class 
 async function stop() { if (!S.on) return; S.on = false; clearInterval(S.t); await D().cmd('stop'); window.HBLC && HBLC.closed(); const f = window.HB.floats.classlink; if (f) f.destroy(); toast('Class link closed.'); }
 
 function onEvent(type, data, snap) { S.snap = snap; drawBig(); if (window.HBLC) HBLC.event(type, data, snap);
-  if (type === 'response' || type === 'hand' || type === 'question') return;
+  if (type === 'response' || type === 'hand' || type === 'question' || type === 'reaction') return;
   if (type === 'stroke') return addInk(data);
   if (type === 'homework') { window.HBL && HBL.hwResult && HBL.hwResult(data.id, data.result); toast('📝 ' + esc(data.result.name) + ' handed in homework.'); return draw(); }
   draw(); }
@@ -109,5 +109,5 @@ window.HBJoin = HBJoin;
 document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('[data-jfw]'); if (!a) return; e.preventDefault(); e.stopPropagation(); const big = document.getElementById('clBigQr'); if (big) big.remove();
   modal.open('<h2>' + icon('monitor-smartphone') + ' Phones can’t connect on Wi-Fi?</h2><ol style="line-height:1.6;padding-inline-start:20px;margin:6px 0 10px"><li><b>Windows Firewall</b> — school Wi-Fi is often a “Public” network, and Windows only allowed HelixBoard on “Private” ones. Press the button below once; Windows asks for permission.</li><li><b>Same Wi-Fi</b> — the phone must be on the same Wi-Fi as this computer, not on mobile data or a guest network.</li><li><b>The Wi-Fi keeps devices apart</b> — many school and guest networks block phones from reaching computers. Then use the <b>🌐 Any network</b> code instead (mobile data always works).</li></ol><div class="foot"><button class="btn" data-close>Close</button><button class="btn primary" id="fwGo">' + icon('lock-open') + 'Allow HelixBoard on all networks</button></div>', sh => {
     sh.querySelector('#fwGo').onclick = async () => { const b = sh.querySelector('#fwGo'); b.disabled = true; b.textContent = 'Waiting for Windows…'; const r = await helixDesktop.allowFirewall(); modal.close(); toast(r && r.ok ? '✓ Done — phones on this Wi-Fi can now reach HelixBoard. Ask them to scan the 📶 code again.' : (r && r.error) || 'Windows could not add the rule.', 6000); }; }); }, true);
-window.HBCL = { start, stop, shareFile, shareHomework, clearInk, bigQr, boardCanvas, links: () => { if (!S.on) return null; const l = links(); return Object.assign({ pin: S.info.pin, url: S.url }, l); }, get snap() { return S.snap; }, get on() { return S.on; }, get available() { return !!D(); } };
+window.HBCL = { start, stop, sync: snap => { S.snap = snap; S.dirty = true; draw(); }, shareFile, shareHomework, clearInk, bigQr, boardCanvas, links: () => { if (!S.on) return null; const l = links(); return Object.assign({ pin: S.info.pin, url: S.url }, l); }, get snap() { return S.snap; }, get on() { return S.on; }, get available() { return !!D(); } };
 })();

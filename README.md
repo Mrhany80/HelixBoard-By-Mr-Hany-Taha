@@ -46,6 +46,7 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 | classtools.js | Timer, stopwatch, groups, dice, spotlight, curtain, traffic light, noise |
 | notes.js | 26 note templates (Cornell, KWL, Frayer, Venn, mind-map, fishbone, CER, POE, lab report …) |
 | smart.js | Smart templates: zones, auto-fit, Fit/Fill screen, 8-direction resize, handwriting-only |
+| mindmap.js | Miro-style concept maps (`HBMM`): idea nodes, curved coloured branches, Tab/Enter, fold, layouts, cross-links, templates, outline → map |
 | deck.js | PDF / PowerPoint one-tab decks: slide panel, slideshow, transitions, sorter, blank slides, export |
 | wheel.js | Wheel of Names |
 | timer.js | Lesson timer |
@@ -123,6 +124,17 @@ refused. The teacher sees ✓ submitted / ✎ working / ⏱ not started, can add
 allows one student to answer again. **Live** mode (answers stream in and can change) remains for brainstorming; word clouds and
 collaborate boards default to it.
 
+### Running the session
+
+**Eyes on board** pauses every phone; the phones show the teacher's live board (shared just for the pause if *Show my board*
+was off) with "Look at the board". Starting a new activity unlocks the phones automatically. **Pick** spins the names of
+connected students and lands on one (nobody twice until everyone has been; give a star from there). **Reactions** lets students
+tap 👍 ❤️ 😂 😮 🤔 👏 on their phone; the emojis float up over whatever is on screen (one per student every 1.2 s, can be
+turned off). With the dashboard hidden, a small pill (top right) shows what is running, with Eyes on board, End and minimise; it
+hides itself during the slideshow, video lessons, reports and the big QR code. **End session** (dashboard, pill or
+Study → End live session) saves the activity to Reports, closes the link so phones show "The live session has ended", and can
+open the lesson's report.
+
 ## Reports (like Wayground/Quizizz reports, Power BI-ready)
 
 Every Live class activity and every phone quiz is saved automatically (IndexedDB on this computer), one report per lesson.
@@ -146,6 +158,8 @@ Questions are remembered per video on this computer and can be saved/loaded as `
 When a PowerPoint has click animations, the import offers **Play animations**. `io.js` reads each slide's `<p:timing>` (a tiny
 zip reader, no library) and renders one picture per click with the not-yet-shown shapes or bullet points hidden. In the
 slideshow (F5) each click reveals the next step with a fade; going back from the next slide shows the finished slide.
+Slide transitions (Fade, Push, Wipe, Zoom, Glide, None; picked in the slide bar) lay a picture of the old slide over the
+new one and dissolve, push or wipe it away, so there is no dark flash between slides.
 Motion paths, emphasis effects and videos are not reproduced; animated slides import as pictures so the steps line up.
 
 ## Pen

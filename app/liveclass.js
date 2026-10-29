@@ -104,10 +104,26 @@ const css = document.createElement('style'); css.textContent = `
 #lcSpot .txt{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px 34px;font:600 clamp(20px,2.4vw,34px)/1.4 var(--head);color:var(--ink);white-space:pre-wrap;max-width:1000px;max-height:70vh;overflow:auto}
 #lcSpot .nm{font:800 22px var(--head);color:var(--ink)}
 #lcSpot .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-#lcChip{position:fixed;left:50%;transform:translateX(-50%);top:62px;z-index:35;display:flex;align-items:center;gap:10px;padding:7px 8px 7px 14px;border-radius:999px;background:var(--panel);border:1px solid var(--accent);box-shadow:0 12px 30px -12px rgba(0,0,0,.7);font-weight:700;font-size:13.5px;cursor:pointer}
-#lcChip .dot{width:9px;height:9px;border-radius:50%;background:#ff3b5c;animation:lcPulse 1.6s infinite}
+#lcChip{position:fixed;right:30px;top:104px;z-index:35;display:flex;align-items:center;gap:4px;height:30px;padding:0 3px 0 10px;border-radius:999px;background:color-mix(in srgb,var(--panel) 86%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);box-shadow:0 8px 22px -10px rgba(0,0,0,.6);font-weight:700;font-size:12px;cursor:pointer;opacity:.9;transition:opacity .2s}
+#lcChip:hover{opacity:1;border-color:var(--accent)}
+#lcChip .dot{width:8px;height:8px;border-radius:50%;background:#ff3b5c;animation:lcPulse 1.6s infinite;flex:none}
+#lcChip .tx{padding:0 4px;white-space:nowrap}
+#lcChip button{height:24px;min-width:24px;padding:0 5px;border:0;border-radius:999px;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+#lcChip button:hover{background:var(--panel2)} #lcChip button.on{color:var(--gold)} #lcChip button svg{width:14px;height:14px}
+#lcChip.min{width:30px;padding:0;justify-content:center} #lcChip.min>:not(.dot){display:none}
+body.deckshow #lcChip,body.deckfull #lcChip,body:has(#vlStage:not([hidden])) #lcChip,body:has(#rpStage:not([hidden])) #lcChip,body:has(#clBigQr) #lcChip,body:has(#lcSpot) #lcChip{display:none}
 @media (max-width:1000px){#lcStage{grid-template-columns:minmax(0,1fr)}#lcStage .lc-side{display:none}}
-body.ar #lcStage,body.ar #lcSpot,body.ar #lcChip{direction:rtl}
+body.ar #lcStage,body.ar #lcSpot,body.ar #lcChip,body.ar #lcPick{direction:rtl}
+.lc-react{position:fixed;bottom:20px;z-index:80;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;opacity:0}
+.lc-react .e{font-size:44px;line-height:1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+.lc-react small{font:700 11px var(--ui);color:#fff;background:rgba(0,0,0,.55);padding:1px 7px;border-radius:999px;white-space:nowrap}
+#lcPick{position:fixed;inset:0;z-index:70;background:rgba(10,4,12,.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
+#lcPick .pk-box{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:28px 40px;min-width:min(560px,90vw);text-align:center;box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+#lcPick .pk-lab{display:flex;align-items:center;justify-content:center;gap:8px;font:800 13px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#lcPick .pk-name{font:800 clamp(34px,6vw,72px)/1.2 var(--head);color:var(--ink);margin:18px 0;min-height:1.2em}
+#lcPick .pk-name.win{animation:pkWin .6s ease-out}
+@keyframes pkWin{0%{transform:scale(.7)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+#lcPick .pk-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 `;
 document.head.appendChild(css);
 
@@ -134,14 +150,57 @@ function build() { if (L.el && L.el.isConnected) { L.el.hidden = false; hideChip
   el.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#lcSpot')) { e.stopPropagation(); hide(); } });
   if (window.gsap && !REDUCE) gsap.from(el, { opacity: 0, y: 12, duration: 0.25, ease: 'power2.out' });
 }
-function hide() { if (L.el) L.el.hidden = true; closeSpot(); if (L.act) showChip(); }
+function hide() { if (L.el) L.el.hidden = true; closeSpot(); syncChip(); }
 function closed() { if (L.act) record(); L.session = null; L.act = null; L.list.clear(); L.order = []; if (L.el) { L.el.remove(); L.el = null; } closeSpot(); hideChip(); }
-function showChip() { hideChip(); const c = document.createElement('div'); c.id = 'lcChip'; L.chip = c; chipText(); c.onclick = () => open(); document.body.appendChild(c); }
-function chipText() { if (!L.chip || !L.act) return; const t = TYPES[L.act.type]; L.chip.innerHTML = '<span class="dot"></span>Live: ' + esc(t.name) + ' · ' + L.list.size + '/' + players().length + ' answered<button class="btn sm primary" style="margin-inline-start:4px">Open</button>'; }
+/* a small pill while the dashboard is hidden: what is running, Eyes on board, end, minimise; it hides itself during slideshows, video lessons, reports and the big QR */
+const locked = () => !!(L.snap && L.snap.lock);
+function syncChip() { const want = window.HBCL && HBCL.on && (!L.el || L.el.hidden) && (L.act || locked()); if (!want) return hideChip(); if (!L.chip) showChip(); else chipText(); }
+function showChip() { hideChip(); const c = document.createElement('div'); c.id = 'lcChip'; L.chip = c; c.classList.toggle('min', set.get('lcChipMin', false)); chipText();
+  c.onclick = e => { const b = e.target.closest('button');
+    if (c.classList.contains('min')) { c.classList.remove('min'); set.put('lcChipMin', false); return; }
+    if (b && b.dataset.k === 'min') { c.classList.add('min'); set.put('lcChipMin', true); return; }
+    if (b && b.dataset.k === 'lock') return toggleLock();
+    if (b && b.dataset.k === 'end') return endSession();
+    open(); };
+  c.title = 'Live class — click to open'; document.body.appendChild(c); }
+function chipText() { if (!L.chip) return; const t = L.act && TYPES[L.act.type], lk = locked();
+  L.chip.innerHTML = '<span class="dot"></span><span class="tx">' + (t ? esc(t.name) + ' · ' + L.list.size + '/' + players().length : 'Live') + '</span><button data-k="lock" class="' + (lk ? 'on' : '') + '" title="' + (lk ? 'Unlock phones' : 'Eyes on board — pause every phone') + '">' + icon(lk ? 'lock' : 'eye') + '</button><button data-k="end" title="End live session">' + icon('power') + '</button><button data-k="min" title="Make smaller">' + icon('minus') + '</button>'; }
+function toggleLock() { const lock = locked(); return D().cmd('lock', !lock).then(s => { L.snap = s; window.HBCL && HBCL.sync && HBCL.sync(s); if (L.el && !L.el.hidden) renderTop(); syncChip(); toast(!lock ? 'Phones paused — students see your board and “Eyes on the board”.' : 'Phones unlocked.'); }); }
+/* End live session: saves the answers to Reports, closes the phones' link ("The live session has ended") and can open the report */
+function endSession() { if (!window.HBCL || !HBCL.on) { toast('No live session is running.'); return; }
+  const n = players().length;
+  modal.open('<h2>' + icon('power') + ' End live session?</h2><p class="muted">' + (n ? n + ' student' + (n === 1 ? '' : 's') + ' will see “The live session has ended”. ' : '') + (L.act ? 'The current activity is saved to Reports first. ' : '') + 'To start again later, open Live class — students scan the new QR code.</p><div class="foot"><button class="btn" data-close>Cancel</button><button class="btn" id="lcEndOnly">End session</button><button class="btn primary" id="lcEndRep">' + icon('chart-column-big') + 'End and open report</button></div>');
+  const go = async rep => { modal.close(); if (L.act) await endActivity(true, true); const sid = L.session && L.session.had ? L.session.id : null; window.HBA && HBA.log('live_end', { students: n });
+    await HBCL.stop(); toast('Live session ended.'); if (rep && window.HBRP) HBRP.open(sid); };
+  $('#lcEndOnly').onclick = () => go(false); $('#lcEndRep').onclick = () => go(true); }
 function hideChip() { if (L.chip) { L.chip.remove(); L.chip = null; } }
+
+/* ---------- emoji reactions float up from the bottom of the screen, over anything (slides, video, board) ---------- */
+let reactN = 0;
+function floatReact(d) { if (reactN > 24 || document.hidden) return; reactN++; const b = document.createElement('div'); b.className = 'lc-react';
+  b.innerHTML = '<span class="e">' + esc(d.e) + '</span>' + (L.showNames ? '<small>' + esc(d.name) + '</small>' : ''); b.style.left = (6 + Math.random() * 18) + 'vw'; document.body.appendChild(b);
+  const end = () => { b.remove(); reactN--; };
+  if (!window.gsap || REDUCE) { setTimeout(end, 1800); return; }
+  gsap.fromTo(b, { y: 0, opacity: 0, scale: 0.6 }, { y: -(window.innerHeight * (0.45 + Math.random() * 0.25)), opacity: 1, scale: 1, duration: 2.8, ease: 'sine.out', onComplete: end });
+  gsap.to(b, { x: (Math.random() - 0.5) * 80, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 1 }); gsap.to(b, { opacity: 0, delay: 2, duration: 0.8 }); }
+function toggleReact() { const on = !(L.snap && L.snap.reactOn !== false); D().cmd('options', { reactOn: on }).then(s => { L.snap = s; window.HBCL && HBCL.sync && HBCL.sync(s); renderTop(); toast(on ? 'Reactions on — students tap 😊 on their phone.' : 'Reactions off.'); }); }
+
+/* ---------- random name picker (ClassPoint style): names spin, slow down and land on one student; nobody is picked twice until everyone has been ---------- */
+function pickName() { const ps = players().filter(p => p.online); if (!ps.length) { toast('Nobody is connected yet.'); return; }
+  L.picked = L.picked || new Set(); let pool = ps.filter(p => !L.picked.has(p.pid)); if (!pool.length) { L.picked.clear(); pool = ps; }
+  const win = pool[Math.floor(Math.random() * pool.length)]; L.picked.add(win.pid);
+  let o = $('#lcPick'); if (o) o.remove(); o = document.createElement('div'); o.id = 'lcPick';
+  o.innerHTML = '<div class="pk-box"><div class="pk-lab">' + icon('dices') + ' Random pick</div><div class="pk-name" id="pkName"></div><div class="pk-btns" hidden><button class="btn" id="pkStar">' + icon('star') + 'Give a star</button><button class="btn" id="pkAgain">' + icon('shuffle') + 'Pick again</button><button class="btn primary" id="pkClose">Done</button></div></div>';
+  document.body.appendChild(o); const nm = o.querySelector('#pkName'), btns = o.querySelector('.pk-btns');
+  o.querySelector('#pkClose').onclick = () => o.remove(); o.onclick = e => { if (e.target === o) o.remove(); };
+  o.querySelector('#pkAgain').onclick = pickName; o.querySelector('#pkStar').onclick = () => { o.remove(); award(win.pid); };
+  const land = () => { nm.textContent = win.name; nm.style.color = win.color; nm.classList.add('win'); btns.hidden = false; snd('chime'); };
+  if (REDUCE || ps.length === 1) return land();
+  let k = 0, delay = 50; const spin = () => { nm.textContent = ps[k++ % ps.length].name; nm.style.color = ''; snd('tick'); delay *= 1.12; if (delay > 380) return land(); setTimeout(spin, delay); }; spin(); }
 
 /* ---------- events from the class link ---------- */
 function event(type, data, snap) { L.snap = snap;
+  if (type === 'reaction') return floatReact(data);
   if (type === 'response' && L.act && data.actId === L.act.id) {
     const isNew = !L.list.has(data.pid);
     if (data.value == null) { L.list.delete(data.pid); L.order = L.order.filter(p => p !== data.pid); }
@@ -151,7 +210,7 @@ function event(type, data, snap) { L.snap = snap;
   if (type === 'question') { snd('chime'); if (!L.el || L.el.hidden) toast('❓ ' + esc(data.name) + ' asked: ' + esc(data.q), 6000); }
   if (type === 'working') { if (L.el && !L.el.hidden) { renderSide(); renderHead(); } return; }
   if (type === 'act' && L.act) { D().cmd('responses').then(r => { if (r && r.id) { L.act.open = r.open; L.act.endsAt = r.endsAt; } renderHead(); }); }
-  if (L.el && !L.el.hidden) { renderSide(); renderJoin(); renderHead(); } chipText(); }
+  if (L.el && !L.el.hidden) { renderSide(); renderJoin(); renderHead(); renderTop(); } syncChip(); }
 /* answers can arrive many times a second — redraw once per frame */
 const pending = new Set(); let pendingFresh = new Set();
 function schedule(fresh, pid) { pending.add(pid); if (fresh) pendingFresh.add(fresh); if (L.raf) return;
@@ -176,9 +235,9 @@ function renderJoin() { const j = L.el && L.el.querySelector('#lcJoin'); const l
   const tn = ln.tn || {}, st = tn.state === 'ready' ? '🌐 Any network + 📶 Wi-Fi' : tn.state === 'connecting' ? '📶 Wi-Fi ready · 🌐 opening…' : tn.state === 'failed' ? '📶 Same Wi-Fi only' : '📶 Same Wi-Fi';
   j.innerHTML = '<div class="qr">' + qrSvg(ln.url) + '</div><div><div class="pin">' + esc(ln.pin) + '</div><small>' + st + ' · tap for both QR codes</small></div>'; }
 function renderTop() { const b = L.el.querySelector('#lcTopBtns'); const lock = L.snap && L.snap.lock;
-  b.innerHTML = (L.act ? '<button class="btn sm" id="lcNew">' + icon('plus') + 'New activity</button>' : '') + '<button class="btn sm' + (lock ? ' primary' : '') + '" id="lcLock" title="Pause every phone so students look at the board">' + icon(lock ? 'lock-open' : 'lock') + (lock ? 'Unlock phones' : 'Eyes on board') + '</button><button class="btn sm" id="lcLb">' + icon('trophy') + 'Stars</button><button class="btn sm" id="lcRep">' + icon('chart-column-big') + 'Reports</button>';
+  b.innerHTML = (L.act ? '<button class="btn sm" id="lcNew">' + icon('plus') + 'New activity</button>' : '') + '<button class="btn sm' + (lock ? ' primary' : '') + '" id="lcLock" title="Pause every phone so students look at the board">' + icon(lock ? 'lock-open' : 'lock') + (lock ? 'Unlock phones' : 'Eyes on board') + '</button><button class="btn sm" id="lcPickB" title="Pick a random student">' + icon('dices') + 'Pick</button><button class="btn sm' + (L.snap && L.snap.reactOn === false ? '' : ' primary') + '" id="lcReact" title="Students send emoji reactions that float up on your screen">' + icon('smile-plus') + 'Reactions</button><button class="btn sm" id="lcLb">' + icon('trophy') + 'Stars</button><button class="btn sm" id="lcRep">' + icon('chart-column-big') + 'Reports</button><button class="btn sm" id="lcEndS" style="color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line))" title="Save the answers, close the phones’ link and finish the class">' + icon('power') + 'End session</button>';
   const n = b.querySelector('#lcNew'); if (n) n.onclick = () => endActivity(true);
-  b.querySelector('#lcLock').onclick = () => D().cmd('lock', !lock).then(s => { L.snap = s; renderTop(); toast(!lock ? 'Phones paused — students see “Eyes on the board”.' : 'Phones unlocked.'); });
+  b.querySelector('#lcLock').onclick = toggleLock; b.querySelector('#lcPickB').onclick = pickName; b.querySelector('#lcReact').onclick = toggleReact; b.querySelector('#lcEndS').onclick = endSession;
   b.querySelector('#lcLb').onclick = leaderboard; b.querySelector('#lcRep').onclick = async () => { if (L.act) await record(); window.HBRP && HBRP.open(L.session && L.session.id); }; }
 function renderMain() { const m = L.el.querySelector('#lcMain');
   if (!L.act) { m.innerHTML = '<div class="lc-hero"><div><h1>Choose a live activity</h1><p>It opens on every student’s phone at once. Answers arrive here live, with names.</p></div><div class="small muted">' + players().length + ' student' + (players().length === 1 ? '' : 's') + ' connected</div></div><div class="lc-cards">' +
@@ -283,7 +342,7 @@ async function record() { const a = L.act; if (!a || !window.HBRP || !L.session)
   const responses = []; for (const r of sorted()) { const x = { name: r.name, at: r.at, late: !!r.late };
     if (a.type === 'draw') { x.value = null; x.thumb = thumbOf(r); } else if (a.type === 'image') { x.value = null; x.thumb = await smallImg(r.value); } else if (a.type === 'notes') x.value = (r.value || []).map(n => n.t); else x.value = r.value;
     responses.push(x); }
-  try { await HBRP.addActivity(info, { id: a.id, type: a.type, prompt: a.prompt, options: a.options || [], correct: a.type === 'poll' && Number.isInteger(a.correct) ? a.correct : null, once: a.once !== false, secs: a.endsAt ? Math.round((a.endsAt - (a.started || Date.now())) / 1000) : 0, started: a.started || Date.now(), ended: Date.now(), responses }); } catch (e) { console.warn('report', e); } }
+  L.session.had = true; try { await HBRP.addActivity(info, { id: a.id, type: a.type, prompt: a.prompt, options: a.options || [], correct: a.type === 'poll' && Number.isInteger(a.correct) ? a.correct : null, once: a.once !== false, secs: a.endsAt ? Math.round((a.endsAt - (a.started || Date.now())) / 1000) : 0, started: a.started || Date.now(), ended: Date.now(), responses }); } catch (e) { console.warn('report', e); } }
 async function endActivity(thenNew, quiet) { if (!L.act) return; await record(); if (!quiet && L.cont) L.cont = null; if (L.list.size && !thenNew && !quiet && !confirm('End this activity? Put it on the board or export it first if you want to keep the answers.')) return;
   window.HBA && HBA.log('live_activity', { type: L.act.type, answers: L.list.size, students: players().length });
   await D().cmd('endActivity'); L.act = null; L.list.clear(); L.order = []; L.shared = null; if (L.bgUrl) { URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; } closeSpot(); if (!quiet) render(); }
@@ -392,5 +451,5 @@ function leaderboard() { const ps = players().slice().sort((a, b) => b.stars - a
 { const top = document.getElementById('aUndo'); if (top) { const b = document.createElement('button'); b.id = 'aLive'; b.title = 'Live class: polls, drawings, word clouds and more on students’ phones'; b.innerHTML = icon('radio') + '<span class="lbl">Live class</span><span class="dot"></span>'; b.onclick = () => open(); const sep = document.createElement('span'); sep.className = 'sep'; top.parentNode.insertBefore(b, top.parentNode.firstChild); top.parentNode.insertBefore(sep, b.nextSibling); } }
 setInterval(() => { const b = document.getElementById('aLive'); if (b) b.classList.toggle('on', !!L.act); }, 1000);
 addEventListener('beforeunload', () => { if (L.act) record(); });
-window.HBLC = { open, event, closed, hide, setup, run, get active() { return !!L.act; }, get students() { return window.HBCL && HBCL.on ? connected() : 0; } };
+window.HBLC = { open, event, closed, hide, setup, run, endSession, pick: () => window.HBCL && HBCL.on ? pickName() : toast('Start Live class first — students join with the QR code.'), get active() { return !!L.act; }, get students() { return window.HBCL && HBCL.on ? connected() : 0; } };
 })();

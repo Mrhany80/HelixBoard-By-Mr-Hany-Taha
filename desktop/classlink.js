@@ -23,7 +23,7 @@ class ClassLink {
     this.lang = opts && opts.lang === 'ar' ? 'ar' : 'en';
     this.pin = String(crypto.randomInt(100000, 1000000));
     this.players = new Map(); this.badPins = new Map();
-    this.board = null; this.boardVer = 0; this.boardOn = false; this.drawOn = false;
+    this.board = null; this.boardVer = 0; this.boardOn = false; this.drawOn = false; this.reactOn = true;
     this.files = []; this.homework = new Map(); this.ver = 0; this.act = null; this.shared = null; this.lock = false; this.questions = []; this.tunnel = { state: 'off' }; this.closing = false;
     this.html = fs.readFileSync(PAGE, 'utf8');
     this.server = http.createServer((req, res) => this.handle(req, res).catch(e => { try { json(res, 500, { error: 'Server error' }); } catch (er) {} }));
@@ -48,7 +48,7 @@ class ClassLink {
 
   /* ---------- what the teacher sends ---------- */
   setBoard(jpeg, view) { this.board = jpeg; this.boardView = view; this.boardVer++; this.changed(); }
-  setOptions(o) { if ('boardOn' in o) this.boardOn = !!o.boardOn; if ('drawOn' in o) this.drawOn = !!o.drawOn; if (o.title) this.title = String(o.title).slice(0, 80); this.changed(); }
+  setOptions(o) { if ('reactOn' in o) this.reactOn = !!o.reactOn; if ('boardOn' in o) this.boardOn = !!o.boardOn; if ('drawOn' in o) this.drawOn = !!o.drawOn; if (o.title) this.title = String(o.title).slice(0, 80); this.changed(); }
   addFile(f) { const id = crypto.randomBytes(6).toString('hex'); this.files.unshift({ id, name: String(f.name).slice(0, 120), kind: f.kind || 'file', size: f.size || 0, path: f.path || null, data: f.data || null, type: f.type || 'application/octet-stream', at: Date.now() }); this.changed(); return id; }
   removeFile(id) { this.files = this.files.filter(f => f.id !== id); this.changed(); }
   addHomework(hw) { this.homework.set(hw.id, hw); this.changed(); }
@@ -64,7 +64,7 @@ class ClassLink {
        auto: when time is up (or the teacher closes answers), phones hand in unsent work by themselves during a short grace period */
     this.act = { id: crypto.randomBytes(5).toString('hex'), type, prompt: String(a.prompt || '').slice(0, 300), options, bg: a.bg ? Buffer.from(a.bg) : null, ar: Math.max(0.3, Math.min(4, +a.ar || 4 / 3)),
       open: true, endsAt: secs ? Date.now() + secs * 1000 : 0, anon: !!a.anon, once: a.once !== false, auto: a.auto !== false, closedAt: 0, responses: new Map(), started: Date.now() };
-    this.shared = null; this.players.forEach(pl => { pl.working = 0; }); this.armTimer();
+    this.shared = null; if (this.lock) this.setLock(false); this.players.forEach(pl => { pl.working = 0; }); this.armTimer();
     this.changed(); return this.act.id;
   }
   armTimer() { clearTimeout(this.actTimer); const a = this.act; if (!a || !a.open || !a.endsAt) return;
@@ -85,7 +85,8 @@ class ClassLink {
     if (a.type === 'notes' && Number.isInteger(idx)) { r.value.splice(idx, 1); if (!r.value.length) a.responses.delete(pid); } else a.responses.delete(pid);
     if (this.shared && this.shared.actId === a.id) this.shared = null; const pl = this.players.get(pid); if (pl) this.flush(pl); this.changed(); }
   award(pid, n) { const pl = this.players.get(pid); if (!pl) return; pl.stars = Math.max(0, (pl.stars || 0) + (Number.isInteger(n) ? n : 1)); this.changed(); }
-  setLock(v) { this.lock = !!v; this.changed(); }
+  /* "Eyes on board": phones pause and show the teacher's board (shared just for the pause if board sharing was off) */
+  setLock(v) { v = !!v; if (v && !this.lock) { this.lockBoard = !this.boardOn; this.boardOn = true; } else if (!v && this.lock && this.lockBoard) { this.boardOn = false; this.lockBoard = false; } this.lock = v; this.changed(); }
   lowerHand(pid) { if (pid) { const pl = this.players.get(pid); if (pl) pl.hand = 0; } else this.players.forEach(pl => { pl.hand = 0; }); this.changed(); }
   clearQuestions() { this.questions = []; this.emit('status'); }
   responses() { const a = this.act; if (!a) return null;
@@ -114,6 +115,7 @@ class ClassLink {
     if (req.method === 'GET' && url.pathname === '/actbg.jpg') { const a = this.act; if (!a || !a.bg) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': a.bg.length }); return res.end(a.bg); }
     if (req.method === 'POST' && url.pathname === '/answer') return this.body(req, res, d => this.answer(pl, d, res), 3 * 1024 * 1024);
     if (req.method === 'POST' && url.pathname === '/working') return this.working(pl, res);
+    if (req.method === 'POST' && url.pathname === '/react') return this.body(req, res, d => this.react(pl, d, res), 1024);
     if (req.method === 'POST' && url.pathname === '/hand') return this.body(req, res, d => this.hand(pl, d, res), 4096);
     if (req.method === 'POST' && url.pathname === '/hwsubmit') return this.body(req, res, d => this.hwSubmit(pl, d, res), 64 * 1024);
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
@@ -145,7 +147,7 @@ class ClassLink {
       board: this.boardOn && this.board ? { ver: this.boardVer, ar: this.boardView ? this.boardView.ar : 1.6 } : null, draw: this.boardOn && this.drawOn,
       files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })),
       homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })),
-      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, hand: !!pl.hand, lock: this.lock };
+      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, hand: !!pl.hand, lock: this.lock, react: this.reactOn };
   }
   actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
     return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar, once: a.once, auto: a.auto, grace: !a.open && a.auto && a.closedAt ? Math.max(0, 6000 - (Date.now() - a.closedAt)) : 0,
@@ -171,6 +173,9 @@ class ClassLink {
   }
   /* "working on it": a phone says so while a student draws or types, so the teacher sees who is busy and who has not started */
   working(pl, res) { const a = this.act; if (a && a.open && !a.responses.has(pl.id)) { const was = pl.working && Date.now() - pl.working < 15000; pl.working = Date.now(); if (!was) this.emit('working', { pid: pl.id }); } json(res, 200, { ok: true }); }
+  /* emoji reactions float up on the teacher's screen (Mentimeter/ClassPoint style); one every 1.2 s per student */
+  react(pl, d, res) { const e = REACTIONS.includes(d.e) ? d.e : null; if (!e) return json(res, 400, { error: 'Unknown reaction.' }); if (!this.reactOn) return json(res, 403, { error: 'Reactions are off.' });
+    if (Date.now() - (pl.reactAt || 0) < 1200) return json(res, 429, { error: 'Slow down.' }); pl.reactAt = Date.now(); this.emit('reaction', { name: pl.name, color: pl.color, e }); json(res, 200, { ok: true }); }
   hand(pl, d, res) {
     const q = String(d.q || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
     if (q) { if (this.questions.filter(x => x.pid === pl.id && Date.now() - x.at < 60000).length >= 3) return json(res, 429, { error: 'Wait a minute before asking again.' }); this.questions.push({ pid: pl.id, name: pl.name, q, at: Date.now() }); if (this.questions.length > 200) this.questions.shift(); }
@@ -217,13 +222,14 @@ class ClassLink {
   }
 
   snapshot() { return { pin: this.pin, port: this.port, tunnel: this.tunnel, boardOn: this.boardOn, drawOn: this.drawOn, files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })), homework: [...this.homework.keys()], players: [...this.players.values()].map(p => ({ pid: p.id, name: p.name, color: p.color, stars: p.stars || 0, hand: p.hand || 0, working: !!(p.working && Date.now() - p.working < 15000), online: p.waiters.length > 0 || Date.now() - p.seen < 30000 })),
-    act: this.act ? { id: this.act.id, type: this.act.type, open: this.act.open, count: this.act.responses.size, endsAt: this.act.endsAt, once: this.act.once } : null, lock: this.lock, questions: this.questions.slice(-50) }; }
+    act: this.act ? { id: this.act.id, type: this.act.type, open: this.act.open, count: this.act.responses.size, endsAt: this.act.endsAt, once: this.act.once } : null, lock: this.lock, reactOn: this.reactOn, questions: this.questions.slice(-50) }; }
   emit(type, data) { this.onEvent && this.onEvent(type, data, this.snapshot()); }
   update() { this.emit('status'); }
 }
 
 /* ---------- answers are checked strictly: right shape, right size, nothing that could break the teacher's screen ---------- */
 const ACT_TYPES = ['draw', 'poll', 'word', 'text', 'image', 'notes'];
+const REACTIONS = ['👍', '❤️', '😂', '😮', '🤔', '👏'];
 const HEX = /^#[0-9a-f]{6}$/i;
 const cleanText = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
 function cleanAnswer(a, v, old) {

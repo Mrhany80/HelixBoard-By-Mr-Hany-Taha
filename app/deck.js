@@ -33,10 +33,26 @@ function fitTo(i) { const r = rects()[i]; if (!r) return null; const a = area(),
 function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; cur = i; P().deck.cur = i; how = how || (show ? P().deck.trans : 'push');
   const V = E.V, from = { s: V.s, x: V.x, y: V.y };
   if (!anim || REDUCE || !window.gsap || how === 'none') E.setView(t.s, t.x, t.y);
-  else if (how === 'fade') { const cvs = $$('#stage canvas'); gsap.to(cvs, { opacity: 0, duration: 0.14, onComplete: () => { E.setView(t.s, t.x, t.y); gsap.to(cvs, { opacity: 1, duration: 0.26 }); } }); }
-  else if (how === 'zoom') { const cvs = $$('#stage canvas'); gsap.to(cvs, { opacity: 0, duration: 0.12, onComplete: () => { const z = { s: t.s * 0.82, x: t.x + (E.SW * 0.09), y: t.y + (E.SH * 0.09) }; E.setView(z.s, z.x, z.y); gsap.to(cvs, { opacity: 1, duration: 0.3 }); gsap.to(z, { s: t.s, x: t.x, y: t.y, duration: 0.42, ease: 'power3.out', onUpdate: () => E.setView(z.s, z.x, z.y) }); } }); }
+  else if (how === 'fade' || how === 'zoom' || how === 'slide' || how === 'wipe') morph(how, t, i < prev ? -1 : 1)
   else { gsap.to(from, { s: t.s, x: t.x, y: t.y, duration: Math.abs(prev - i) > 3 ? 0.35 : 0.5, ease: 'power3.inOut', onUpdate: () => E.setView(from.s, from.x, from.y) }); }
   updUI(); }
+/* smooth transitions like PowerPoint: a picture of the old slide sits on top while the new one is drawn underneath, then it
+   dissolves (Fade), pushes out sideways (Push), is wiped away (Wipe) or grows and fades as the new slide settles in (Zoom) — no dark flash */
+let trEl = null;
+function snapStage() { const cvs = ['#cvBg', '#cvMain', '#cvLive'].map(s => $(s)).filter(Boolean); if (!cvs.length) return null; const st = cvs[0].parentElement, r = st.getBoundingClientRect(), k = devicePixelRatio || 1;
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(r.width * k)); c.height = Math.max(1, Math.round(r.height * k)); const g = c.getContext('2d');
+  g.fillStyle = getComputedStyle(st).backgroundColor || '#000'; if (g.fillStyle !== 'rgba(0, 0, 0, 0)') g.fillRect(0, 0, c.width, c.height);
+  cvs.forEach(cv => { const q = cv.getBoundingClientRect(); if (!q.width) return; try { g.drawImage(cv, (q.left - r.left) * k, (q.top - r.top) * k, q.width * k, q.height * k); } catch (e) {} });
+  c.id = 'dkTr'; c.style.cssText = 'position:absolute;left:0;top:0;width:' + r.width + 'px;height:' + r.height + 'px;pointer-events:none;will-change:transform,opacity,clip-path;transform-origin:50% 50%';
+  cvs[cvs.length - 1].after(c); return c; }
+function morph(how, t, dir) { if (trEl) { gsap.killTweensOf(trEl); trEl.remove(); trEl = null; } const cvs = $$('#cvBg,#cvMain,#cvLive'); gsap.killTweensOf(cvs); gsap.set(cvs, { clearProps: 'transform,opacity' });
+  const o = snapStage(); E.setView(t.s, t.x, t.y); if (!o) return; trEl = o; const done = () => { o.remove(); if (trEl === o) trEl = null; gsap.set(cvs, { clearProps: 'transform,opacity' }); };
+  requestAnimationFrame(() => {
+    if (how === 'fade') gsap.to(o, { opacity: 0, duration: 0.55, ease: 'power1.inOut', onComplete: done });
+    else if (how === 'zoom') { gsap.to(o, { opacity: 0, scale: 1.12, duration: 0.5, ease: 'power2.in', onComplete: done }); gsap.fromTo(cvs, { scale: 0.94 }, { scale: 1, duration: 0.6, ease: 'power3.out', clearProps: 'transform' }); }
+    else if (how === 'slide') { const w = o.clientWidth; gsap.to(o, { x: -dir * w, duration: 0.6, ease: 'power3.inOut', onComplete: done }); gsap.fromTo(cvs, { x: dir * w }, { x: 0, duration: 0.6, ease: 'power3.inOut', clearProps: 'transform' }); }
+    else { const p = { v: 0 }; gsap.to(p, { v: 100, duration: 0.6, ease: 'power2.inOut', onUpdate: () => { o.style.clipPath = dir > 0 ? 'inset(0 0 0 ' + p.v + '%)' : 'inset(0 ' + p.v + '% 0 0)'; }, onComplete: done }); }
+  }); }
 /* PowerPoint click animations: each build step is a picture with a step number; in the slideshow they appear one click at a time */
 let step = 0, wantStep = null;
 const stepsOf = i => { const b = buckets()[i] || []; return b.reduce((m, o) => Math.max(m, o.step || 0), 0); };
@@ -115,7 +131,7 @@ function rebuild() { mount(); const on = isDeck() && !show; document.body.classL
 function buildBar() { bar.innerHTML = ''; const d = P().deck, n = d.slides.length;
   const inp = document.createElement('input'); inp.id = 'dkNo'; inp.value = cur + 1; inp.title = 'Type a slide number and press Enter'; inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { goSlide((parseInt(inp.value, 10) || 1) - 1, true); inp.blur(); } };
   const of = document.createElement('span'); of.className = 'of'; of.id = 'dkOf'; of.textContent = '/ ' + n;
-  const tr = document.createElement('select'); tr.title = 'Transition between slides in the slideshow'; [['fade', 'Fade'], ['push', 'Push'], ['zoom', 'Zoom'], ['none', 'None']].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; tr.appendChild(o); }); tr.value = d.trans || 'fade'; tr.onchange = () => { d.trans = tr.value; E.changed(); };
+  const tr = document.createElement('select'); tr.title = 'Transition between slides in the slideshow'; [['fade', 'Fade'], ['slide', 'Push'], ['wipe', 'Wipe'], ['zoom', 'Zoom'], ['push', 'Glide'], ['none', 'None']].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; tr.appendChild(o); }); tr.value = d.trans || 'fade'; tr.onchange = () => { d.trans = tr.value; E.changed(); };
   bar.append(bt('panel-left', '', togglePanel, 'Show / hide the slide panel'), bt('folder-open', 'Open', () => window.HBIO && HBIO.openDocument(), 'Open another PDF, PowerPoint or Word file'), sep(), bt('chevron-left', '', prev, 'Previous slide (←, PageUp)'), inp, of, bt('chevron-right', '', next, 'Next slide (→, PageDown)'), sep(),
     bt('play', 'Slideshow', () => startShow(0), 'Start from the beginning (F5)', 'go'), bt('monitor-play', 'From here', () => startShow(cur), 'Start from this slide (Shift+F5)'), sep(),
     full ? bt('minimize-2', 'Exit full screen', exitFull, 'Leave full screen (Esc)', 'on') : bt('maximize', 'Full screen', enterFull, 'Full screen — keep writing, typing and editing on the slides'), bt('focus', '', () => goSlide(cur, true), 'Fit this slide to the screen'), bt(d.inkOff ? 'eye-off' : 'eye', '', toggleInk, d.inkOff ? 'Your writing is hidden — click to show it' : 'Hide your writing (clean slides)', d.inkOff ? 'on' : ''), bt('eraser', '', () => clearInk(cur), 'Clear your writing from this slide'), sep(),
