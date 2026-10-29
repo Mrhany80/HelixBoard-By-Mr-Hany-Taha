@@ -200,6 +200,37 @@ Draw → Options → **Sensitivity** (1–10, default 8): higher follows the pen
 pressure more strongly and records smaller movements. Ink uses `pointerrawupdate` where available, so samples arrive as soon
 as the digitiser sends them.
 
+## One join for the whole lesson
+
+The phone quiz runs **inside the class link** when the Windows app is used: one QR code and PIN for the lesson. `live.js`
+starts in *attached* mode (no server of its own); `classlink.js` serves it under `/quiz/` and tells the phones a quiz is on;
+`classlink-student.html` moves each phone to `quiz/?pin=…&name=…&auto=1&back=…`, `live-student.html` joins with that name and
+returns to the class when the quiz closes. The quiz page is in Arabic when the app is (`__LANG__`). Load test: 40 phones
+answering at once — all in, slowest answer 61 ms.
+
+## Concept map details
+
+Notes → **Concept map**. Round **+** handles on the selected idea add a child (on the side its branches grow) or a sibling
+(below); the centre has one on each side. Ideas have no resize/rotate handles; the bar above an idea moves wherever it does not
+cover another idea. A pen tap selects an idea, a double tap types in it, a pen drag moves its branch (no ink). A new idea left
+empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/`E.squash`). Arrow keys walk the map.
+
+## Smoothness
+
+- Panning reuses the picture already drawn (`mainSnap`) and draws only the strips that came into view; a full redraw follows
+  140 ms after the movement stops. Boards over 150 objects only.
+- Pictures over 4.2 megapixels (4K slides) are drawn from a screen-sized `ImageBitmap`; the full picture is decoded only when
+  zoomed in past it, and at most three stay decoded.
+- Startup: interactive after about 0.6 s plus 0.25 s to open the board. A 60-round lesson simulation shows no memory growth.
+
+## Tests
+
+The test scripts (Playwright) run through one runner that gives every suite a fresh, empty profile: the Windows app reads
+`HB_USER_DATA` (test mode also skips the opening titles and the sign-in screen). Suites cover Live class, activities, reports,
+video lessons, class link, internet link, phone quiz (teams, boss, power-ups, confidence, ghost), one join with a 40-phone
+load, concept maps (keyboard, mouse, pen), PowerPoint animations and transitions, notes, paper cards and a crawl that clicks
+every tool in every tab and checks it visibly does something.
+
 ## Phone quiz game modes
 
 In the lobby: **Classic**, **Teams** (2–4 teams, team score = average of members, tug-of-war or race bars) or **Boss battle**

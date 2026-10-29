@@ -212,7 +212,7 @@ class LiveQuiz {
     this.broadcastViews(); this.update(); }
   smallestTeam() { const n = Array(this.opts ? this.opts.teams : 2).fill(0); this.players.forEach(p => { if (p.team < n.length) n[p.team]++; }); return n.indexOf(Math.min(...n)); }
   teamScores() { if (this.opts.mode !== 'teams') return null; return TEAMS.slice(0, this.opts.teams).map((t, k) => { const P = [...this.players.values()].filter(p => p.team === k);
-    return { name: t.name, color: t.color, emoji: t.emoji, n: P.length, score: P.length ? Math.round(P.reduce((a, p) => a + p.score, 0) / P.length) : 0 }; }); }
+    return { name: this.lang === 'ar' ? t.ar : t.name, color: t.color, emoji: t.emoji, n: P.length, score: P.length ? Math.round(P.reduce((a, p) => a + p.score, 0) / P.length) : 0 }; }); }
   bossPer() { return Math.round(this.qs.filter(q => this.scored(q)).length * 560); }
   bossStart() { if (this.opts.mode !== 'boss' || this.boss) return; const max = Math.max(1000, this.bossPer() * Math.max(1, this.players.size)); this.boss = { max, hp: max, hit: 0, heal: 0, n: 0 }; }
   /* the class damages the boss with every point it scores; a question most of the class missed lets it heal */
@@ -222,7 +222,7 @@ class LiveQuiz {
 
   viewFor(pl) {
     const T = this.opts.mode === 'teams' ? TEAMS[pl.team] : null;
-    const base = { title: this.title, name: pl.name, score: pl.score, total: this.qs.length, team: T ? { name: T.name, color: T.color, emoji: T.emoji } : null, pw: this.opts.power ? pl.pw.slice() : null, conf: this.opts.conf, mode: this.opts.mode,
+    const base = { title: this.title, name: pl.name, score: pl.score, total: this.qs.length, team: T ? { name: this.lang === 'ar' ? T.ar : T.name, color: T.color, emoji: T.emoji } : null, pw: this.opts.power ? pl.pw.slice() : null, conf: this.opts.conf, mode: this.opts.mode,
       boss: this.boss ? { hp: this.boss.hp, max: this.boss.max } : null };
     const qv = (q, qi) => ({ qi, q: q.q, o: q.t === 'order' ? q.sh.map(k => q.o[k]) : q.o, oi: q.t === 'order' ? q.sh : null, t: q.t || null, used: pl.use[qi] || null, hide: pl.hide && pl.hide.qi === qi ? pl.hide.hide : null });
     const rv = (q, qi) => ({ a: q.a, order: q.t === 'order' ? q.o : null, mine: pl.ans[qi] ? pl.ans[qi].c : null });
@@ -237,7 +237,7 @@ class LiveQuiz {
     const q = this.qs[this.qi];
     if (this.phase === 'question') return Object.assign(base, qv(q, this.qi), { v: 'question', limit: this.limit, left: this.limit ? Math.max(0, this.limit - (Date.now() - this.t0) / 1000) : 0, answered: pl.ans[this.qi] ? pl.ans[this.qi].c : null });
     if (this.phase === 'reveal' || this.phase === 'board') return Object.assign(base, qv(q, this.qi), rv(q, this.qi), { v: 'reveal', ex: q.ex, last: pl.last || null, rank: pl.rankNow, players: this.players.size });
-    const ts = this.teamScores(), tr = ts && T ? ts.slice().sort((a, b) => b.score - a.score).findIndex(t => t.name === T.name) + 1 : 0;
+    const ts = this.teamScores(), tr = ts && T ? ts.slice().sort((a, b) => b.score - a.score).findIndex(t => t.color === T.color) + 1 : 0;
     return Object.assign(base, { v: 'end', rank: pl.rankNow, players: this.players.size, teamRank: tr, won: this.boss ? this.boss.hp <= 0 : null });
   }
   send(pl, data) { pl.ver++; pl.view = data; this.flush(pl); }
@@ -268,7 +268,7 @@ class LiveQuiz {
 }
 
 const POWERS = ['double', 'fifty', 'freeze', 'shield'];
-const TEAMS = [{ name: 'Red Cells', color: '#FF5F7E', emoji: '🔴' }, { name: 'Blue Neurons', color: '#3BA7FF', emoji: '🔵' }, { name: 'Green Leaves', color: '#4ADE80', emoji: '🟢' }, { name: 'Gold Enzymes', color: '#FFC928', emoji: '🟡' }];
+const TEAMS = [{ name: 'Red Cells', ar: 'الخلايا الحمراء', color: '#FF5F7E', emoji: '🔴' }, { name: 'Blue Neurons', ar: 'العصبونات الزرقاء', color: '#3BA7FF', emoji: '🔵' }, { name: 'Green Leaves', ar: 'الأوراق الخضراء', color: '#4ADE80', emoji: '🟢' }, { name: 'Gold Enzymes', ar: 'الإنزيمات الذهبية', color: '#FFC928', emoji: '🟡' }];
 function shuffledArr(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function shuffled(n) { const id = [...Array(n).keys()]; for (let t = 0; t < 6; t++) { const s = shuffledArr(id); if (n < 2 || s.some((k, i) => k !== i)) return s; } return id.slice().reverse(); }
 function clientIp(req) { return String(req.headers['cf-connecting-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0] || req.socket.remoteAddress || '').trim(); }
