@@ -174,7 +174,9 @@ const vecLabel = l => { const unit = set.get('vecUnit', 'N'), scale = set.get('v
 
 
 /* ---------- selection transforms ---------- */
-function handleAt(x, y) { const b = selBox(); if (!b) return null; const r = 9 / V.s, pts = handlePts(b); for (const [k, hx, hy] of pts) if (Math.abs(x - hx) < r && Math.abs(y - hy) < r) return k; return null; }
+/* concept-map ideas size themselves: no resize or rotate handles (they would cover the neighbouring ideas) */
+const onlyNodes = () => { const L = selObjs(); return L.length > 0 && L.every(o => o.nd); };
+function handleAt(x, y) { const b = selBox(); if (!b || onlyNodes()) return null; const r = 9 / V.s, pts = handlePts(b); for (const [k, hx, hy] of pts) if (Math.abs(x - hx) < r && Math.abs(y - hy) < r) return k; return null; }
 function handlePts(b) { const [x, y, w, h] = b, rot = [ 'rot', x + w / 2, y - 30 / V.s ]; return [['nw', x, y], ['n', x + w / 2, y], ['ne', x + w, y], ['e', x + w, y + h / 2], ['se', x + w, y + h], ['s', x + w / 2, y + h], ['sw', x, y + h], ['w', x, y + h / 2], rot]; }
 function xfMove(x, y, e) { const a = act, b = a.sb; if (!b) return; a.moved = true; let f;
   if (a.mode === 'move') { let dx = x - a.x0, dy = y - a.y0; if (T.snap || e.altKey) { const nx = Math.round((b[0] + dx) / 20) * 20, ny = Math.round((b[1] + dy) / 20) * 20; dx = nx - b[0]; dy = ny - b[1]; }
@@ -215,7 +217,7 @@ liveDrawers.push({ active: () => laserPts.length > 0 || magic.length > 0 || dust
   if (T.tool === 'erase' && cursor && cursor[2] !== 'touch') { const r = Math.max(8, T.size * 2.5) / V.s; g.strokeStyle = 'rgba(255,95,162,.9)'; g.lineWidth = 1.5 / s; g.setLineDash([4 / s, 3 / s]); g.beginPath(); g.arc(cursor[0], cursor[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
   if (act && act.k === 'band') { g.strokeStyle = '#22D3EE'; g.fillStyle = 'rgba(34,211,238,.08)'; g.lineWidth = 1.5 / s; g.setLineDash([6 / s, 4 / s]); const r = [Math.min(act.x0, act.x), Math.min(act.y0, act.y), Math.abs(act.x - act.x0), Math.abs(act.y - act.y0)]; g.fillRect(...r); g.strokeRect(...r); g.setLineDash([]); }
   if (act && act.k === 'lasso') { g.strokeStyle = '#22D3EE'; g.fillStyle = 'rgba(34,211,238,.08)'; g.lineWidth = 1.5 / s; g.setLineDash([6 / s, 4 / s]); g.beginPath(); act.pts.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); g.fill(); g.stroke(); g.setLineDash([]); }
-  const b = selBox(); if (b && T.tool === 'select') { g.strokeStyle = '#22D3EE'; g.lineWidth = 1.6 / s; g.setLineDash([7 / s, 5 / s]); g.strokeRect(b[0] - 4 / s, b[1] - 4 / s, b[2] + 8 / s, b[3] + 8 / s); g.setLineDash([]); const hs = 6 / s; handlePts(b).forEach(([k, x, y]) => { g.fillStyle = k === 'rot' ? '#FF5FA2' : '#fff'; g.strokeStyle = '#22D3EE'; g.lineWidth = 1.6 / s; g.beginPath(); if (k === 'rot') g.arc(x, y, hs * 1.15, 0, 7); else g.rect(x - hs, y - hs, hs * 2, hs * 2); g.fill(); g.stroke(); }); g.beginPath(); g.moveTo(b[0] + b[2] / 2, b[1]); g.lineTo(b[0] + b[2] / 2, b[1] - 30 / s + 7 / s); g.stroke(); }
+  const b = selBox(); if (b && T.tool === 'select') { g.strokeStyle = '#22D3EE'; g.lineWidth = 1.6 / s; g.setLineDash([7 / s, 5 / s]); g.strokeRect(b[0] - 4 / s, b[1] - 4 / s, b[2] + 8 / s, b[3] + 8 / s); g.setLineDash([]); if (onlyNodes()) return; const hs = 6 / s; handlePts(b).forEach(([k, x, y]) => { g.fillStyle = k === 'rot' ? '#FF5FA2' : '#fff'; g.strokeStyle = '#22D3EE'; g.lineWidth = 1.6 / s; g.beginPath(); if (k === 'rot') g.arc(x, y, hs * 1.15, 0, 7); else g.rect(x - hs, y - hs, hs * 2, hs * 2); g.fill(); g.stroke(); }); g.beginPath(); g.moveTo(b[0] + b[2] / 2, b[1]); g.lineTo(b[0] + b[2] / 2, b[1] - 30 / s + 7 / s); g.stroke(); }
 } });
 
 /* ---------- radial menu (right-click or long-press) ---------- */

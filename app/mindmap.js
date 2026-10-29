@@ -9,7 +9,7 @@
 const { $, $$, esc, icon, set, bus, toast, modal, uid, SND, REDUCE } = window.HB;
 const E = window.HBE, I = window.HBI;
 const PAL = ['#FF5FA2', '#22D3EE', '#F59F00', '#40C057', '#7950F2', '#FD7E14', '#15AABF', '#E64980'];
-const GX = 64, GY = 18, DGX = 26, DGY = 70;
+const GX = 64, GY = 26, DGX = 30, DGY = 72;
 const P = () => E.page().objs;
 const isNode = o => o && o.t === 'note' && o.nd && o.mm;
 const nodes = mm => P().filter(o => isNode(o) && o.mm === mm);
@@ -50,26 +50,31 @@ function layout(mm, anchor) { const all = nodes(mm), root = all.find(o => o.root
 /* ---------- building ---------- */
 function makeNode(mm, props) { const o = Object.assign({ id: uid(), t: 'note', nd: 1, mm, s: '', size: 22, font: 'Lexend', shape: 'round', c: '#FFFFFF', bc: '#7950F2', x: 0, y: 0, w: 140, h: 52 }, props); const f = fit(o); o.w = f.w; o.h = f.h; return o; }
 function branch(mm, a, b, color) { return { id: uid(), t: 'conn', mm, tree: 1, cv: 1, k: 'line', a: a.id, b: b.id, c: color, w: 3 }; }
-function newMap(title, children, lay) { const vr = E.viewRect(), mm = 'm' + uid(); const root = makeNode(mm, { root: true, s: title || 'Main idea', size: 30, c: '#2B1B3D', tc: '#FFFFFF', bc: '#2B1B3D', shape: 'pill', lay: lay || 'mind' });
+function newMap(title, children, lay) { const vr = E.viewRect(), mm = 'm' + uid(); const root = makeNode(mm, { root: true, s: title == null ? 'Main idea' : title, size: 30, c: '#2B1B3D', tc: '#FFFFFF', bc: '#2B1B3D', shape: 'pill', lay: lay || 'mind' });
   root.x = Math.round(vr[0] + vr[2] / 2 - root.w / 2); root.y = Math.round(vr[1] + vr[3] / 2 - root.h / 2); const objs = [root];
   const add = (parent, list, depth, color, sideOf) => list.forEach((it, i) => { const [text, sub] = Array.isArray(it) ? it : [it, []]; const col = depth === 1 ? PAL[i % PAL.length] : color;
     const n = makeNode(mm, { par: parent.id, ord: i, s: text, bc: col, c: depth === 1 ? tint(col, 0.82) : '#FFFFFF', size: depth === 1 ? 22 : 19, side: depth === 1 ? (lay === 'mind' || !lay ? (i % 2 ? -1 : 1) : 1) : sideOf });
     objs.push(n, branch(mm, parent, n, col)); add(n, sub || [], depth + 1, col, n.side); });
   add(root, children || [], 1, null, 1);
   E.tx(() => E.add(objs, 1)); layout(mm, root); I.select(root); snd('pop'); return root; }
-function addChild(n, edit) { const all = nodes(n.mm), ks = kids(n, all); let side = n.side || 1, color = n.bc;
-  if (n.root) { const r = kids(n, all).filter(k => (k.side || 1) === 1).length, l = ks.length - r; side = (n.lay || 'mind') === 'mind' ? (r > l ? -1 : 1) : 1; color = PAL[ks.length % PAL.length]; }
-  if (n.col) E.mod(n, q => { delete q.col; });
+/* a new idea: one Undo step removes it again; it is scrolled into view and opened for typing; left empty, it disappears */
+function addChild(n, edit, forceSide) { n = E.byId(n.id) || n; const h0 = E.histLen(); const all = nodes(n.mm), ks = kids(n, all); let side = n.side || 1, color = n.bc;
+  if (n.root) { const r = ks.filter(k => (k.side || 1) === 1).length, l = ks.length - r; side = (n.lay || 'mind') === 'mind' ? (forceSide || (r > l ? -1 : 1)) : 1; color = PAL[ks.length % PAL.length]; }
   const k = makeNode(n.mm, { par: n.id, ord: ks.length ? Math.max(...ks.map(x => x.ord || 0)) + 1 : 0, side, bc: color, c: n.root ? tint(color, 0.82) : '#FFFFFF', size: n.root ? 22 : 19, x: n.x + n.w + GX, y: n.y });
-  E.tx(() => E.add([k, branch(n.mm, n, k, color)], 1)); layout(n.mm, n); I.select(k); if (edit !== false) setTimeout(() => I.openEditor(k), 30); snd('pop'); return k; }
-function addSibling(n) { if (n.root || !n.par) return addChild(n); const p = E.byId(n.par); if (!p) return; const all = nodes(n.mm), sib = kids(p, all), at = (n.ord || 0) + 0.5;
+  E.tx(() => { if (n.col) E.mod(n, q => { delete q.col; }); E.add([k, branch(n.mm, n, k, color)], 1); layout(n.mm, n); }); after(k, edit, h0); return k; }
+function addSibling(n) { n = E.byId(n.id) || n; const h0 = E.histLen(); if (n.root || !n.par) return addChild(n); const p = E.byId(n.par); if (!p) return; const all = nodes(n.mm), sib = kids(p, all), at = (n.ord || 0) + 0.5;
   const k = makeNode(n.mm, { par: p.id, ord: at, side: n.side, bc: n.bc, c: n.c, size: n.size, x: n.x, y: n.y + n.h + GY });
-  E.tx(() => { E.add([k, branch(n.mm, p, k, n.bc)], 1); sib.concat([k]).sort((a, b) => (a.ord || 0) - (b.ord || 0)).forEach((s, i) => { if (s.ord !== i) E.mod(s, q => { q.ord = i; }); }); });
-  layout(n.mm, p); I.select(k); setTimeout(() => I.openEditor(k), 30); snd('pop'); return k; }
+  E.tx(() => { E.add([k, branch(n.mm, p, k, n.bc)], 1); sib.concat([k]).sort((a, b) => (a.ord || 0) - (b.ord || 0)).forEach((s, i) => { if (s.ord !== i) E.mod(s, q => { q.ord = i; }); }); layout(n.mm, p); });
+  after(k, true, h0); return k; }
+const fresh = new Map();
+function after(k, edit, h0) { fresh.set(k.id, h0); I.select(k); show(k); if (edit !== false) setTimeout(() => I.openEditor(E.byId(k.id) || k), 30); snd('pop'); }
+/* pan just enough that the idea (and room to keep typing) is on screen */
+function show(n) { const V = E.V, m = 70, x0 = n.x * V.s + V.x, y0 = n.y * V.s + V.y, x1 = (n.x + n.w) * V.s + V.x, y1 = (n.y + n.h) * V.s + V.y; let dx = 0, dy = 0;
+  if (x0 < m + 40) dx = m + 40 - x0; else if (x1 > E.SW - m) dx = E.SW - m - x1; if (y0 < m + 40) dy = m + 40 - y0; else if (y1 > E.SH - m - 80) dy = E.SH - m - 80 - y1; if (dx || dy) E.setView(V.s, V.x + dx, V.y + dy); }
 function descendants(n) { const all = nodes(n.mm), out = []; const walk = x => kids(x, all).forEach(k => { out.push(k); walk(k); }); walk(n); return out; }
-function removeBranch(n) { if (n.root) { const all = nodes(n.mm), ids = new Set(all.map(x => x.id)); E.tx(() => E.del(P().filter(o => ids.has(o.id) || (o.t === 'conn' && o.mm === n.mm)))); I.clearSel(); toast('Concept map deleted (Undo brings it back).'); return; }
+function removeBranch(n, quiet) { if (n.root) { const all = nodes(n.mm), ids = new Set(all.map(x => x.id)); E.tx(() => E.del(P().filter(o => ids.has(o.id) || (o.t === 'conn' && o.mm === n.mm)))); I.clearSel(); toast('Concept map deleted (Undo brings it back).'); return; }
   const gone = [n].concat(descendants(n)), ids = new Set(gone.map(x => x.id)), p = E.byId(n.par);
-  E.tx(() => E.del(P().filter(o => ids.has(o.id) || (o.t === 'conn' && (ids.has(o.a) || ids.has(o.b)))))); I.clearSel(); if (p) { layout(p.mm, p); I.select(p); } }
+  E.tx(() => E.del(P().filter(o => ids.has(o.id) || (o.t === 'conn' && (ids.has(o.a) || ids.has(o.b)))))); if (!quiet || !I.editing) I.clearSel(); if (p) { layout(p.mm, p); if (!quiet || !I.editing) I.select(p); } }
 function recolor(n, col) { const list = [n].concat(descendants(n)); E.tx(() => { list.forEach((x, i) => E.mod(x, q => { q.bc = col; if (!q.root) q.c = x.par && E.byId(x.par) && E.byId(x.par).root ? tint(col, 0.82) : (i === 0 ? tint(col, 0.82) : '#FFFFFF'); }));
     const ids = new Set(list.map(x => x.id)); P().filter(c => c.t === 'conn' && c.tree && ids.has(c.b)).forEach(c => E.mod(c, q => { q.c = col; })); }); E.dirty.all(); E.changed(); }
 function setShape(n, sh) { const list = I.selObjs().filter(isNode); E.tx(() => (list.length ? list : [n]).forEach(x => E.mod(x, q => { q.shape = sh; }))); E.dirty.all(); E.changed(); }
@@ -86,7 +91,9 @@ function fitView(n) { const all = nodes(n.mm).filter(x => !x.off); if (!all.leng
 
 /* ---------- the bar above the selected node ---------- */
 const css = document.createElement('style'); css.textContent = `
-#mmBar{position:fixed;z-index:31;display:flex;align-items:center;gap:2px;padding:4px;border-radius:14px;background:var(--glass);border:1px solid var(--line2,var(--line));box-shadow:var(--shadow);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transform:translate(-50%,-100%);white-space:nowrap}
+#mmBar{position:fixed;z-index:31;display:flex;align-items:center;gap:2px;padding:4px;border-radius:14px;background:var(--glass);border:1px solid var(--line2,var(--line));box-shadow:var(--shadow);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);white-space:nowrap}
+#mmPlus button{position:fixed;z-index:30;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:2px solid #fff;background:var(--bc);color:#fff;font:800 18px/1 var(--ui);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.28);transition:transform .12s;padding:0}
+#mmPlus button:hover{transform:scale(1.18)}#mmPlus button.sib{width:24px;height:24px;margin:-12px 0 0 -12px;font-size:15px;opacity:.9}
 #mmBar button{display:inline-flex;align-items:center;gap:5px;height:32px;min-width:32px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--ink);font:600 12px var(--ui);cursor:pointer}
 #mmBar button:hover{background:var(--panel3)}#mmBar button.on{background:var(--grad,var(--accent));color:#fff}
 #mmBar svg.ic{width:16px;height:16px}#mmBar .sep{width:1px;height:20px;background:var(--line);margin:0 2px}
@@ -95,20 +102,37 @@ const css = document.createElement('style'); css.textContent = `
 #mmPop .row{display:flex;gap:6px}#mmPop button{border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:9px;padding:6px 10px;font:600 12px var(--ui);cursor:pointer}
 #mmPop .c{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}`;
 document.head.appendChild(css);
-let barEl = null, popEl = null;
+let barEl = null, popEl = null, lastBar = null;
 function closePop() { if (popEl) { popEl.remove(); popEl = null; } }
 function bar() { const sel = I.selObjs(), n = sel.length >= 1 && sel.every(isNode) ? sel[sel.length - 1] : null;
-  if (!n || I.editing || document.body.classList.contains('deckshow') || document.body.classList.contains('presenting')) { if (barEl) { barEl.remove(); barEl = null; } closePop(); return; }
+  if (!n || I.editing || document.body.classList.contains('deckshow') || document.body.classList.contains('presenting')) { if (barEl) { barEl.remove(); barEl = null; } if (plusEl) { plusEl.remove(); plusEl = null; } closePop(); return; }
   if (!barEl) { barEl = document.createElement('div'); barEl.id = 'mmBar'; document.body.appendChild(barEl); ['pointerdown', 'wheel'].forEach(ev => barEl.addEventListener(ev, e => e.stopPropagation())); }
   const root = rootOf(n.mm), lay = (root && root.lay) || 'mind', d = descendants(n).length;
   barEl.innerHTML = '<button data-a="child" title="Add a child idea (Tab)">' + icon('git-branch-plus') + 'Child</button><button data-a="sib" title="Add a sibling idea (Enter)">' + icon('plus') + 'Sibling</button><span class="sep"></span>' +
     '<button data-a="color" title="Branch colour"><span class="sw" style="background:' + esc(n.bc || '#7950F2') + '"></span></button><button data-a="shape" title="Shape">' + icon('square') + '</button><button data-a="link" class="' + (linking ? 'on' : '') + '" title="Link to another idea with linking words">' + icon('link') + 'Link</button>' +
     (d || n.col ? '<button data-a="fold" title="' + (n.col ? 'Show the branch' : 'Fold the branch') + '">' + icon(n.col ? 'unfold-horizontal' : 'fold-horizontal') + '</button>' : '') + '<span class="sep"></span>' +
     '<button data-a="layout" title="Layout">' + icon(lay === 'down' ? 'network' : 'list-tree') + '</button><button data-a="fit" title="Show the whole map">' + icon('maximize-2') + '</button><button data-a="del" title="Delete this idea and its branch (Delete)">' + icon('trash-2') + '</button>';
-  const [sx, sy] = E.toS(n.x + n.w / 2, n.y), r = document.getElementById('stage').getBoundingClientRect(); barEl.style.left = Math.max(r.left + 200, Math.min(r.right - 200, r.left + sx)) + 'px'; barEl.style.top = Math.max(r.top + 50, r.top + sy - 10) + 'px';
+  if (n.id !== lastBar) { lastBar = n.id; if (!I.editing) { const before = E.V.y + ',' + E.V.x; show(n); if (before !== E.V.y + ',' + E.V.x) return; } }
+  place(n); plus(n);
   $$('button', barEl).forEach(b => b.onclick = e => { e.stopPropagation(); const a = b.dataset.a; closePop();
     if (a === 'child') addChild(n); else if (a === 'sib') addSibling(n); else if (a === 'fold') toggleFold(n); else if (a === 'fit') fitView(n); else if (a === 'del') removeBranch(n); else if (a === 'link') { if (linking) { linking = null; bar(); } else startLink(n); }
     else pop(a, n, b); }); }
+/* the bar goes above the idea, or below it, wherever it does not cover another idea (so a click always lands where it looks) */
+function place(n) { const st = document.getElementById('stage').getBoundingClientRect(), bw = barEl.offsetWidth, bh = barEl.offsetHeight, V = E.V;
+  const rectOf = o => [st.left + o.x * V.s + V.x, st.top + o.y * V.s + V.y, o.w * V.s, o.h * V.s], me = rectOf(n), gap = 14;
+  const others = P().filter(o => isNode(o) && !o.off && o.id !== n.id).map(rectOf), hits = (x, y) => others.some(r => x < r[0] + r[2] && x + bw > r[0] && y < r[1] + r[3] && y + bh > r[1]);
+  const cx = Math.max(st.left + 8, Math.min(st.right - bw - 8, me[0] + me[2] / 2 - bw / 2)), cands = [[cx, me[1] - bh - gap - 14], [cx, me[1] + me[3] + gap + 14], [me[0] + me[2] + 40, me[1] + me[3] / 2 - bh / 2], [me[0] - bw - 40, me[1] + me[3] / 2 - bh / 2]];
+  const ok = ([x, y]) => x >= st.left + 4 && x + bw <= st.right - 4 && y >= st.top + 44 && y + bh <= st.bottom - 90 && !hits(x, y);
+  const c = cands.find(ok) || [st.left + st.width / 2 - bw / 2, st.top + 52]; barEl.style.left = Math.round(c[0]) + 'px'; barEl.style.top = Math.round(c[1]) + 'px'; }
+/* round + handles on the selected idea, like Miro: on the side where its branches grow (child) and below it (sibling) — easy to hit with a finger or pen */
+let plusEl = null;
+function plus(n) { if (!plusEl) { plusEl = document.createElement('div'); plusEl.id = 'mmPlus'; document.body.appendChild(plusEl); ['pointerdown', 'wheel'].forEach(ev => plusEl.addEventListener(ev, e => e.stopPropagation())); }
+  const st = document.getElementById('stage').getBoundingClientRect(), V = E.V, x = st.left + n.x * V.s + V.x, y = st.top + n.y * V.s + V.y, w = n.w * V.s, h = n.h * V.s, root = rootOf(n.mm), lay = (root && root.lay) || 'mind', H = [];
+  if (lay === 'down') { H.push(['c', x + w / 2, y + h + 18, 'Add a child idea below']); if (!n.root) H.push(['s', x + w + 18, y + h / 2, 'Add a sibling idea']); }
+  else if (n.root) { H.push(['c', x + w + 18, y + h / 2, 'Add an idea on the right', 1]); if (lay === 'mind') H.push(['c', x - 18, y + h / 2, 'Add an idea on the left', -1]); }
+  else { const sd = n.side || 1; H.push(['c', sd > 0 ? x + w + 18 : x - 18, y + h / 2, 'Add a child idea (Tab)']); H.push(['s', x + w / 2, y + h + 16, 'Add a sibling idea below (Enter)']); }
+  plusEl.innerHTML = H.map(([k, hx, hy, t], i) => '<button data-i="' + i + '" class="' + (k === 's' ? 'sib' : '') + '" title="' + t + '" style="left:' + Math.round(hx) + 'px;top:' + Math.round(hy) + 'px;--bc:' + esc(n.bc || '#7950F2') + '">+</button>').join('');
+  $$('button', plusEl).forEach(b => b.onclick = e => { e.stopPropagation(); const h = H[+b.dataset.i]; if (h[0] === 'c') addChild(n, true, h[4]); else addSibling(n); }); }
 function pop(kind, n, btn) { closePop(); popEl = document.createElement('div'); popEl.id = 'mmPop'; const r = btn.getBoundingClientRect(); popEl.style.left = r.left + 'px'; popEl.style.top = (r.bottom + 6) + 'px';
   if (kind === 'color') popEl.innerHTML = '<div class="row">' + PAL.concat(['#495057', '#2B1B3D']).map(c => '<button class="c" data-c="' + c + '" style="background:' + c + '"></button>').join('') + '</div>';
   if (kind === 'shape') popEl.innerHTML = '<div class="row">' + [['round', 'Rounded'], ['pill', 'Pill'], ['rect', 'Box'], ['ellipse', 'Oval']].map(([k, l]) => '<button data-s="' + k + '">' + l + '</button>').join('') + '</div>';
@@ -122,8 +146,14 @@ function pop(kind, n, btn) { closePop(); popEl = document.createElement('div'); 
 document.addEventListener('pointerdown', e => { if (popEl && !e.target.closest('#mmPop,#mmBar')) closePop(); }, true);
 bus.on('selection', objs => { if (linking && objs && objs.length === 1 && isNode(objs[0]) && objs[0].id !== linking.id) finishLink(objs[0]); });
 
+/* a new idea left empty (Esc, or a click elsewhere before typing) is removed again */
+let editingNode = null;
+bus.on('editing', on => { if (on) { const ed = I.editing; editingNode = ed && isNode(ed.o) ? ed.o.id : null; return; } const id = editingNode; editingNode = null; if (!id) return;
+  setTimeout(() => { const n = E.byId(id); if (!n || !fresh.has(id)) return; const h0 = fresh.get(id); fresh.delete(id);
+    /* typed: adding it and typing in it are one Undo step. Left empty: it is removed and leaves nothing to undo */
+    if ((n.s || '').trim() || n.root || kids(n).length) { E.squash(h0); return; } removeBranch(n, true); E.squash(h0, true); }, 20); });
 /* after typing: the node grows to fit its words and the map tidies itself */
-bus.on('text-done', o => { if (!isNode(o)) return; const f = fit(o); if (Math.abs(f.w - o.w) > 1 || Math.abs(f.h - o.h) > 1) { E.mod(o, q => { q.w = f.w; q.h = f.h; }); } layout(o.mm, o); });
+bus.on('text-done', o => { if (!isNode(o)) return; const f = fit(o); E.tx(() => { if (Math.abs(f.w - o.w) > 1 || Math.abs(f.h - o.h) > 1) { E.mod(o, q => { q.w = f.w; q.h = f.h; }); } layout(o.mm, o); }); });
 /* dragging an idea takes its whole branch with it */
 bus.on('moved', ev => { if (!ev || ev.mode !== 'move') return; const moved = (ev.objs || []).filter(isNode); if (!moved.length) return; const ids = new Set(ev.objs.map(o => o.id));
   E.tx(() => moved.forEach(n => { if (n.mx == null) return; const dx = n.x - n.mx, dy = n.y - n.my; if (!dx && !dy) return;
@@ -140,12 +170,32 @@ document.addEventListener('keydown', e => { const ed = I.editing;
   const sel = I.selObjs(); if (sel.length !== 1 || !isNode(sel[0])) return; const n = sel[0];
   if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); addChild(n); }
   else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addSibling(n); }
+  else if (/^Arrow/.test(e.key)) { const t = neighbour(n, e.key); if (t) { e.preventDefault(); e.stopPropagation(); I.select(t); show(t); } }
   else if (e.key === 'F2' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); I.openEditor(n); }
   else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); removeBranch(n); } }, true);
 
+/* arrow keys walk the map: towards the branches, back to the parent, up and down through the siblings */
+function neighbour(n, key) { const root = rootOf(n.mm), down = root && root.lay === 'down', all = nodes(n.mm).filter(o => !o.off), ks = kids(n, all), p = n.par && E.byId(n.par);
+  const out = down ? 'ArrowDown' : (n.side || 1) > 0 ? 'ArrowRight' : 'ArrowLeft', back = down ? 'ArrowUp' : (n.side || 1) > 0 ? 'ArrowLeft' : 'ArrowRight', prevK = down ? 'ArrowLeft' : 'ArrowUp', nextK = down ? 'ArrowRight' : 'ArrowDown';
+  if (n.root && !down) { const want = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0; return want ? ks.find(k => (k.side || 1) === want) : null; }
+  if (key === out) return ks[0] || null; if (key === back) return p || null;
+  if (p && (key === prevK || key === nextK)) { const sib = kids(p, all).filter(k => p.root && !down ? (k.side || 1) === (n.side || 1) : true), i = sib.findIndex(k => k.id === n.id); return sib[i + (key === nextK ? 1 : -1)] || null; } return null; }
+
+/* ---------- pen on a smartboard: a tap on an idea selects it, a double tap types in it, a drag moves its branch (no stray ink) ---------- */
+let penTap = null;
+document.addEventListener('pointerdown', e => { if (e.target.id !== 'cvLive' || e.button !== 0 || I.editing) return; const T = I.T; if (!T || !['draw', 'laser'].includes(T.tool)) return;
+  const r = e.target.getBoundingClientRect(), V = E.V, x = (e.clientX - r.left - V.x) / V.s, y = (e.clientY - r.top - V.y) / V.s, n = P().filter(o => isNode(o) && !o.off).reverse().find(o => x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h); if (!n) return;
+  e.stopImmediatePropagation(); e.preventDefault(); const dbl = penTap && penTap.id === n.id && Date.now() - penTap.t < 380; penTap = null;
+  if (dbl) { I.openEditor(n); return; }
+  const sx = e.clientX, sy = e.clientY, start = [n].concat(descendants(n)).map(o => [o, o.x, o.y]); let moved = false;
+  const mv = ev => { const dx = (ev.clientX - sx) / V.s, dy = (ev.clientY - sy) / V.s; if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return; moved = true; start.forEach(([o, ox, oy]) => { o.x = ox + dx; o.y = oy + dy; E.invalidate(o); }); E.dirty.all(); };
+  const up = () => { removeEventListener('pointermove', mv, true); removeEventListener('pointerup', up, true); removeEventListener('pointercancel', up, true);
+    if (!moved) { penTap = { id: n.id, t: Date.now() }; I.select(n); return; } const fx = n.x, fy = n.y; start.forEach(([o, ox, oy]) => { o.x = ox; o.y = oy; E.invalidate(o); }); E.tx(() => E.mod(n, q => { q.x = fx; q.y = fy; })); bus.emit('moved', { objs: [n], mode: 'move' }); I.select(n); };
+  addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true); }, true);
+
 /* ---------- starting a map: blank, from a template, or from an outline ---------- */
 const TEMPLATES = {
-  'Blank map': ['Main idea', [], 'mind'],
+  'Blank map': ['', [], 'mind'],
   'Cellular respiration': ['Cellular respiration', [['Where', ['Cytoplasm', 'Mitochondria']], ['Needs', ['Glucose', 'Oxygen']], ['Produces', ['ATP', 'CO₂', 'Water']], ['Stages', ['Glycolysis', 'Krebs cycle', 'Electron transport chain']]], 'mind'],
   'Photosynthesis': ['Photosynthesis', [['Inputs', ['Light', 'CO₂', 'Water']], ['Outputs', ['Glucose', 'Oxygen']], ['Where', ['Chloroplast', 'Chlorophyll']], ['Limiting factors', ['Light intensity', 'CO₂ level', 'Temperature']]], 'mind'],
   'Ecosystem': ['Ecosystem', [['Producers', ['Plants', 'Algae']], ['Consumers', ['Herbivores', 'Carnivores', 'Omnivores']], ['Decomposers', ['Fungi', 'Bacteria']], ['Abiotic factors', ['Light', 'Water', 'Temperature']]], 'mind'],
