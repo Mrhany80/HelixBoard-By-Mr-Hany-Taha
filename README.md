@@ -46,6 +46,9 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 | classtools.js | Timer, stopwatch, groups, dice, spotlight, curtain, traffic light, noise |
 | notes.js | 26 note templates (Cornell, KWL, Frayer, Venn, mind-map, fishbone, CER, POE, lab report …) |
 | smart.js | Smart templates: zones, auto-fit, Fit/Fill screen, 8-direction resize, handwriting-only |
+| notes2.js | Expert notes (`HBNX`): lesson audio recorded with the ink (replay, tap ink to jump), find/outline/tags across pages (Ctrl+F), export to Word/Markdown, date stamp |
+| xp.js | Classes and session names, Class XP levels and badges from Reports, Redemption quiz (`HBX`) |
+| cards.js | Paper answer cards like Plickers (`HBPC`): printable coded cards, webcam scanning, roster per class |
 | mindmap.js | Miro-style concept maps (`HBMM`): idea nodes, curved coloured branches, Tab/Enter, fold, layouts, cross-links, templates, outline → map |
 | deck.js | PDF / PowerPoint one-tab decks: slide panel, slideshow, transitions, sorter, blank slides, export |
 | wheel.js | Wheel of Names |
@@ -135,6 +138,34 @@ hides itself during the slideshow, video lessons, reports and the big QR code. *
 Study → End live session) saves the activity to Reports, closes the link so phones show "The live session has ended", and can
 open the lesson's report.
 
+### Session names, full names, more activities
+
+Starting a live session asks for the **class** and the **lesson name** (phones, Reports and Class XP use them; "Ask me every
+time" can be turned off). Students must type a **full name** (two words) to join — on the class link and the phone quiz. The
+**Live** button in the top bar turns red while a session runs (green while an activity is open) and shows how many phones are
+connected. New activities: **Tap the picture** (heat map or dots, mark the right spot to score it, reveal it on the phones) and
+**Put in order** (drag cards; % in each position, most common order, reveal). Students who answered see their level (Class XP).
+
+### Question buttons on slides (like ClassPoint)
+
+In a deck, **Question** adds a live question to the current slide (`deck.slides[i].q`). In the slideshow a ❓ button sits on
+that slide: one click sends it to the phones; **Back to slides** returns to the same slide (the button shows **Show answers**
+while it runs).
+
+### Class XP and Redemption
+
+**Study → Class XP** adds up every saved report of a class: +5 per lesson attended, +10 per answer, +15 per right answer, +20
+per star (+score/200 in quizzes). Levels: Cell → Tissue → Organ → Organ system → Organism → Population → Community → Ecosystem →
+Biosphere; badges: On a roll, Sharpshooter, Star collector, Most improved, Always on time, Perfect lesson, Every voice.
+**Redemption quiz** gathers the questions the class got under 60% right in its last 3 lessons into a quiz set.
+
+### Paper answer cards (like Plickers)
+
+**Study → Paper cards**: card owners per class, **Print cards** (PDF, 2 per A4 page; 100 unique codes), **Quick scan**. Each
+card is a 7×7-cell code (5×5 data bits, each code distinct in all four turns); the side at the top is the answer. In **Live
+quiz**, **Scan cards** reads the room with the webcam (adaptive threshold → blobs → corners → projective sampling → code
+match), fills in the counts and saves a report with names.
+
 ## Reports (like Wayground/Quizizz reports, Power BI-ready)
 
 Every Live class activity and every phone quiz is saved automatically (IndexedDB on this computer), one report per lesson.
@@ -155,10 +186,11 @@ Questions are remembered per video on this computer and can be saved/loaded as `
 
 ## PowerPoint animations
 
+Slides are drawn at up to **4K** (Quality: Standard / High / Premium 4K, the default) with high-quality image smoothing.
 When a PowerPoint has click animations, the import offers **Play animations**. `io.js` reads each slide's `<p:timing>` (a tiny
 zip reader, no library) and renders one picture per click with the not-yet-shown shapes or bullet points hidden. In the
 slideshow (F5) each click reveals the next step with a fade; going back from the next slide shows the finished slide.
-Slide transitions (Fade, Push, Wipe, Zoom, Glide, None; picked in the slide bar) lay a picture of the old slide over the
+Slide transitions (**As in PowerPoint** — each slide's own `<p:transition>` with its direction, speed and automatic timing — or Fade, Fade through black, Push, Cover, Uncover, Wipe, Split, Circle, Zoom, Glide, None; picked in the slide bar) lay a picture of the old slide over the
 new one and dissolve, push or wipe it away, so there is no dark flash between slides.
 Motion paths, emphasis effects and videos are not reproduced; animated slides import as pictures so the steps line up.
 
@@ -167,6 +199,14 @@ Motion paths, emphasis effects and videos are not reproduced; animated slides im
 Draw → Options → **Sensitivity** (1–10, default 8): higher follows the pen more tightly (less smoothing lag), shows light
 pressure more strongly and records smaller movements. Ink uses `pointerrawupdate` where available, so samples arrive as soon
 as the digitiser sends them.
+
+## Phone quiz game modes
+
+In the lobby: **Classic**, **Teams** (2–4 teams, team score = average of members, tug-of-war or race bars) or **Boss battle**
+(the class damages a virus with every point; if most of the class misses a question it heals 8%). **Power-ups** (every second
+right answer in a row: double points, 50/50, time freeze, streak shield), **How sure?** (sure ×1.25 / guess ×0.75, sure and
+wrong −150, and the teacher sees "Sure but wrong" names — a misconception alert) and **Ghost** (race an earlier run of the same
+quiz, per class). Quiz sets accept **Order:** questions (items written in the right order; phones drag them).
 
 ## Phone quiz (Windows app)
 

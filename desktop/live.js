@@ -31,7 +31,11 @@ class LiveQuiz {
     await this.stop();
     if (!quiz || !Array.isArray(quiz.questions) || !quiz.questions.length) throw new Error('This set has no questions.');
     this.title = String(quiz.title || 'Quiz').slice(0, 80);
-    this.qs = quiz.questions.slice(0, 100).map(q => ({ q: String(q.q || '').slice(0, 600), o: (q.o || []).slice(0, 6).map(x => String(x).slice(0, 200)), a: Number.isInteger(q.a) ? q.a : -1, ex: String(q.ex || '').slice(0, 400) }));
+    this.qs = quiz.questions.slice(0, 100).map(q => { const o = (q.o || []).slice(0, q.t === 'order' ? 8 : 6).map(x => String(x).slice(0, 200)), x = { q: String(q.q || '').slice(0, 600), o, a: Number.isInteger(q.a) ? q.a : -1, ex: String(q.ex || '').slice(0, 400) };
+      /* "put in order": the options are written in the right order; every phone shows the same shuffle */
+      if (q.t === 'order') { x.t = 'order'; x.a = -1; x.sh = shuffled(o.length); } return x; });
+    /* game options (chosen in the lobby): mode classic | teams | boss, number of teams, power-ups, confidence */
+    this.opts = { mode: 'classic', teams: 2, power: false, conf: false }; this.boss = null;
     this.pin = String(crypto.randomInt(100000, 1000000));
     this.badPins = new Map(); this.tunnel = { state: 'off' };
     this.players = new Map();
@@ -73,7 +77,7 @@ class LiveQuiz {
       return res.end(this.html.split('__TITLE__').join(escapeHtml(this.title)));
     }
     if (req.method === 'GET' && url.pathname === '/poll') return this.poll(url, res);
-    if (req.method === 'POST' && (url.pathname === '/join' || url.pathname === '/answer' || url.pathname === '/next')) return this.body(req, res, d => url.pathname === '/join' ? this.join(d, res, req) : url.pathname === '/next' ? this.next(d, res) : this.answer(d, res));
+    if (req.method === 'POST' && (url.pathname === '/join' || url.pathname === '/answer' || url.pathname === '/next' || url.pathname === '/power')) return this.body(req, res, d => url.pathname === '/join' ? this.join(d, res, req) : url.pathname === '/next' ? this.next(d, res) : url.pathname === '/power' ? this.power(d, res) : this.answer(d, res));
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
   }
   body(req, res, fn) {
@@ -89,12 +93,14 @@ class LiveQuiz {
     const old = d.pid && this.players.get(String(d.pid));
     if (old) return json(res, 200, { pid: old.id, name: old.name });
     if (this.players.size >= MAX_PLAYERS) return json(res, 403, { error: 'The game is full.' });
-    let name = String(d.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    let name = String(d.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
     if (!name) return json(res, 400, { error: 'Type your name first.' });
+    if (String(name).split(' ').filter(w => w.replace(/[^\p{L}]/gu, '').length >= 2).length < 2) return json(res, 400, { error: 'Please write your full name — first name and last name.' });
     const taken = new Set([...this.players.values()].map(p => p.name.toLowerCase()));
     if (taken.has(name.toLowerCase())) { let i = 2; while (taken.has((name + ' ' + i).toLowerCase())) i++; name = name + ' ' + i; }
     const id = crypto.randomBytes(9).toString('base64url');
-    this.players.set(id, { id, name, score: 0, streak: 0, ans: {}, joined: Date.now(), ver: 0, view: null, waiters: [], waitSince: 0, seen: Date.now() });
+    this.players.set(id, { id, name, score: 0, streak: 0, ans: {}, joined: Date.now(), ver: 0, view: null, waiters: [], waitSince: 0, seen: Date.now(), team: this.smallestTeam(), pw: [], use: {} });
+    if (this.boss) this.boss.max += this.bossPer(), this.boss.hp += this.bossPer();
     this.send(this.players.get(id), this.viewFor(this.players.get(id)));
     this.update();
     json(res, 200, { pid: id, name });
@@ -117,25 +123,24 @@ class LiveQuiz {
     if (this.phase === 'self') return this.selfAnswer(pl, d, res);
     if (this.phase !== 'question' || d.qi !== this.qi) return json(res, 409, { error: 'Too late — that question has closed.' });
     if (pl.ans[this.qi]) return json(res, 200, { ok: true });
-    const q = this.qs[this.qi], c = Number(d.c);
-    if (!Number.isInteger(c) || c < 0 || c >= q.o.length) return json(res, 400, { error: 'Bad answer' });
-    pl.ans[this.qi] = { c, ms: Date.now() - this.t0 };
+    const q = this.qs[this.qi], c = this.choice(q, d.c);
+    if (c == null || c === -1) return json(res, 400, { error: 'Bad answer' });
+    pl.ans[this.qi] = { c, ms: Date.now() - this.t0, conf: this.confOf(d) };
     json(res, 200, { ok: true });
     this.update();
     if ([...this.players.values()].every(p => p.ans[this.qi])) { clearTimeout(this.timer); this.timer = setTimeout(() => this.reveal(), 600); }
   }
 
   /* ---------- student-paced: everyone works through the questions at their own speed, with feedback after each one ---------- */
-  selfStart(secs) { clearTimeout(this.timer); this.phase = 'self'; this.limit = Math.max(0, Math.min(600, secs | 0)); this.t0 = Date.now(); this.players.forEach(pl => { pl.qi = 0; pl.qt0 = Date.now(); pl.fb = null; }); this.broadcastViews(); this.update(); }
+  selfStart(secs) { clearTimeout(this.timer); this.bossStart(); this.phase = 'self'; this.limit = Math.max(0, Math.min(600, secs | 0)); this.t0 = Date.now(); this.players.forEach(pl => { pl.qi = 0; pl.qt0 = Date.now(); pl.fb = null; }); this.broadcastViews(); this.update(); }
   selfAnswer(pl, d, res) {
     if (pl.qi == null) { pl.qi = 0; pl.qt0 = Date.now(); }
     if (d.qi !== pl.qi || pl.qi >= this.qs.length || pl.ans[pl.qi]) return json(res, 200, { ok: true });
-    const q = this.qs[pl.qi], c = Number(d.c);
-    if (!Number.isInteger(c) || c < -1 || c >= q.o.length) return json(res, 400, { error: 'Bad answer' });
-    const ms = Date.now() - pl.qt0, lim = (this.limit || 30) * 1000, ok = c >= 0 && q.a >= 0 && c === q.a;
-    pl.streak = ok ? pl.streak + 1 : (q.a < 0 ? pl.streak : 0);
-    const pts = ok ? 500 + Math.round(500 * Math.max(0, 1 - ms / lim)) + Math.min(300, 100 * (pl.streak - 1)) : 0;
-    pl.score += pts; pl.ans[pl.qi] = { c, ms, ok: q.a < 0 ? null : ok, pts }; pl.fb = { ok: q.a < 0 ? null : ok, pts, streak: pl.streak };
+    const q = this.qs[pl.qi], c = this.choice(q, d.c);
+    if (c == null) return json(res, 400, { error: 'Bad answer' });
+    const a = pl.ans[pl.qi] = { c, ms: Date.now() - pl.qt0, conf: this.confOf(d) };
+    pl.fb = this.score(pl, q, pl.qi, a, (this.limit || 30) * 1000);
+    if (this.boss) this.bossHit(pl.fb.pts, false);
     this.rank(); json(res, 200, { ok: true }); this.send(pl, this.viewFor(pl)); this.update();
   }
   next(d, res) {
@@ -148,7 +153,7 @@ class LiveQuiz {
   question(qi, secs, pace) {
     if (!this.server || qi < 0 || qi >= this.qs.length) return;
     if (pace === 'student') return this.selfStart(secs);
-    clearTimeout(this.timer);
+    clearTimeout(this.timer); this.bossStart();
     this.qi = qi; this.phase = 'question'; this.limit = Math.max(0, Math.min(600, secs | 0)); this.t0 = Date.now();
     if (this.limit) this.timer = setTimeout(() => this.reveal(), this.limit * 1000 + 400);
     this.broadcastViews(); this.update();
@@ -156,37 +161,79 @@ class LiveQuiz {
   reveal() {
     if (this.phase !== 'question') return;
     clearTimeout(this.timer);
-    const q = this.qs[this.qi], lim = (this.limit || 20) * 1000;
+    const q = this.qs[this.qi], lim = (this.limit || 20) * 1000; let dmg = 0;
     this.players.forEach(pl => {
       const a = pl.ans[this.qi];
-      if (!a) { pl.streak = 0; pl.last = { pts: 0, ok: false, none: true }; return; }
-      if (q.a < 0) { pl.last = { pts: 0, ok: null }; return; }
-      const ok = a.c === q.a;
-      pl.streak = ok ? pl.streak + 1 : 0;
-      const pts = ok ? 500 + Math.round(500 * Math.max(0, 1 - a.ms / lim)) + Math.min(300, 100 * (pl.streak - 1)) : 0;
-      pl.score += pts; a.ok = ok; a.pts = pts; pl.last = { pts, ok, streak: pl.streak };
+      if (!a) { if (!(pl.use[this.qi] === 'shield')) pl.streak = 0; pl.last = { pts: 0, ok: false, none: true }; return; }
+      pl.last = this.score(pl, q, this.qi, a, lim); dmg += pl.last.pts;
     });
+    if (this.boss) this.bossHit(dmg, true);
     this.phase = 'reveal'; this.rank();
     this.broadcastViews(); this.update();
   }
   board() { if (this.phase === 'reveal') { this.phase = 'board'; this.broadcastViews(); this.update(); } }
   end() { clearTimeout(this.timer); this.phase = 'end'; this.rank(); this.broadcastViews(); this.update(); }
+  /* ---------- scoring shared by teacher-led and student-paced games ---------- */
+  scored(q) { return q.t === 'order' || q.a >= 0; }
+  /* an answer: an option number, or for "put in order" the list of original item numbers in the student's order */
+  choice(q, v) { if (q.t === 'order') { if (!Array.isArray(v) || v.length !== q.o.length) return null; const n = v.map(Number); return n.every(Number.isInteger) && new Set(n).size === n.length && n.every(k => k >= 0 && k < q.o.length) ? n : null; }
+    const c = Number(v); return Number.isInteger(c) && c >= -1 && c < q.o.length ? c : null; }
+  confOf(d) { return this.opts.conf && [0, 1, 2].includes(d.conf) ? d.conf : null; }
+  isRight(q, c) { return q.t === 'order' ? Array.isArray(c) && c.every((k, i) => k === i) : c >= 0 && c === q.a; }
+  score(pl, q, qi, a, lim) {
+    if (!this.scored(q)) { a.ok = null; a.pts = 0; return { pts: 0, ok: null }; }
+    const use = pl.use[qi], ok = a.c !== -1 && this.isRight(q, a.c);
+    pl.streak = ok ? pl.streak + 1 : use === 'shield' ? pl.streak : 0;
+    const ms = use === 'freeze' ? 0 : a.ms; let pts = ok ? 500 + Math.round(500 * Math.max(0, 1 - ms / lim)) + Math.min(300, 100 * (pl.streak - 1)) : 0;
+    /* confidence: sure and right earns more, a guess earns less; sure but wrong costs a little */
+    if (a.conf != null) pts = ok ? Math.round(pts * [0.75, 1, 1.25][a.conf]) : a.conf === 2 ? -150 : 0;
+    if (ok && use === 'double') pts *= 2;
+    pts = Math.max(-pl.score, pts); pl.score += pts; a.ok = ok; a.pts = pts;
+    /* power-ups: every second answer in a row earns one (up to three kept) */
+    let got = null; if (this.opts.power && ok && pl.streak % 2 === 0 && pl.pw.length < 3) { got = POWERS[Math.floor(Math.random() * POWERS.length)]; pl.pw.push(got); }
+    return { pts, ok, streak: pl.streak, conf: a.conf, use: use || null, got }; }
+  power(d, res) { const pl = this.players.get(String(d.pid || '')); if (!pl) return json(res, 403, { error: 'Join the game first.' });
+    const self = this.phase === 'self', qi = self ? pl.qi : this.qi, q = this.qs[qi], k = String(d.k || '');
+    if (!this.opts.power || !q || (!self && this.phase !== 'question') || d.qi !== qi || pl.ans[qi] || pl.use[qi]) return json(res, 409, { error: 'Not now.' });
+    const i = pl.pw.indexOf(k); if (i < 0) return json(res, 400, { error: 'You do not have that power-up.' });
+    let hide = null; if (k === 'fifty') { if (q.t === 'order' || q.a < 0 || q.o.length < 3) return json(res, 400, { error: '50/50 does not work on this question.' });
+      const wrong = q.o.map((_, j) => j).filter(j => j !== q.a); hide = shuffledArr(wrong).slice(0, Math.min(2, q.o.length - 2)); }
+    pl.pw.splice(i, 1); pl.use[qi] = k; if (hide) pl.hide = { qi, hide }; json(res, 200, { ok: true, hide }); this.send(pl, this.viewFor(pl)); this.update(); }
+
+  /* ---------- lobby options; teams; the class boss ---------- */
+  setOpts(o) { if (!o || this.phase !== 'lobby') return; const m = ['classic', 'teams', 'boss'].includes(o.mode) ? o.mode : this.opts.mode;
+    this.opts = { mode: m, teams: Math.max(2, Math.min(4, +o.teams || this.opts.teams)), power: 'power' in o ? !!o.power : this.opts.power, conf: 'conf' in o ? !!o.conf : this.opts.conf };
+    let i = 0; [...this.players.values()].sort((a, b) => a.joined - b.joined).forEach(pl => { pl.team = i++ % this.opts.teams; });
+    this.broadcastViews(); this.update(); }
+  smallestTeam() { const n = Array(this.opts ? this.opts.teams : 2).fill(0); this.players.forEach(p => { if (p.team < n.length) n[p.team]++; }); return n.indexOf(Math.min(...n)); }
+  teamScores() { if (this.opts.mode !== 'teams') return null; return TEAMS.slice(0, this.opts.teams).map((t, k) => { const P = [...this.players.values()].filter(p => p.team === k);
+    return { name: t.name, color: t.color, emoji: t.emoji, n: P.length, score: P.length ? Math.round(P.reduce((a, p) => a + p.score, 0) / P.length) : 0 }; }); }
+  bossPer() { return Math.round(this.qs.filter(q => this.scored(q)).length * 560); }
+  bossStart() { if (this.opts.mode !== 'boss' || this.boss) return; const max = Math.max(1000, this.bossPer() * Math.max(1, this.players.size)); this.boss = { max, hp: max, hit: 0, heal: 0, n: 0 }; }
+  /* the class damages the boss with every point it scores; a question most of the class missed lets it heal */
+  bossHit(dmg, teacherLed) { const b = this.boss; if (!b) return; b.n++; b.hit = Math.max(0, dmg); b.hp = Math.max(0, b.hp - b.hit); b.heal = 0;
+    if (teacherLed) { const q = this.qs[this.qi], A = [...this.players.values()].map(p => p.ans[this.qi]).filter(Boolean); if (this.scored(q) && this.players.size && A.filter(a => a.ok).length / this.players.size < 0.5 && b.hp > 0) { b.heal = Math.round(b.max * 0.08); b.hp = Math.min(b.max, b.hp + b.heal); } } }
   rank() { const L = [...this.players.values()].sort((a, b) => b.score - a.score); L.forEach((p, i) => { p.prevRank = p.rankNow; p.rankNow = i + 1; }); }
 
   viewFor(pl) {
-    const base = { title: this.title, name: pl.name, score: pl.score, total: this.qs.length };
+    const T = this.opts.mode === 'teams' ? TEAMS[pl.team] : null;
+    const base = { title: this.title, name: pl.name, score: pl.score, total: this.qs.length, team: T ? { name: T.name, color: T.color, emoji: T.emoji } : null, pw: this.opts.power ? pl.pw.slice() : null, conf: this.opts.conf, mode: this.opts.mode,
+      boss: this.boss ? { hp: this.boss.hp, max: this.boss.max } : null };
+    const qv = (q, qi) => ({ qi, q: q.q, o: q.t === 'order' ? q.sh.map(k => q.o[k]) : q.o, oi: q.t === 'order' ? q.sh : null, t: q.t || null, used: pl.use[qi] || null, hide: pl.hide && pl.hide.qi === qi ? pl.hide.hide : null });
+    const rv = (q, qi) => ({ a: q.a, order: q.t === 'order' ? q.o : null, mine: pl.ans[qi] ? pl.ans[qi].c : null });
     if (this.phase === 'lobby') return Object.assign(base, { v: 'lobby', players: this.players.size });
     if (this.phase === 'self') {
       if (pl.qi == null) { pl.qi = 0; pl.qt0 = Date.now(); }
       if (pl.qi >= this.qs.length) return Object.assign(base, { v: 'selfdone', rank: pl.rankNow, players: this.players.size, correct: Object.values(pl.ans).filter(a => a.ok).length });
       const q = this.qs[pl.qi];
-      if (pl.fb) return Object.assign(base, { v: 'selfres', qi: pl.qi, q: q.q, o: q.o, a: q.a, ex: q.ex, mine: pl.ans[pl.qi] ? pl.ans[pl.qi].c : null, last: pl.fb, rank: pl.rankNow, players: this.players.size, isLast: pl.qi === this.qs.length - 1 });
-      return Object.assign(base, { v: 'question', self: true, qi: pl.qi, q: q.q, o: q.o, limit: this.limit, left: this.limit ? Math.max(0, this.limit - (Date.now() - pl.qt0) / 1000) : 0, answered: null });
+      if (pl.fb) return Object.assign(base, qv(q, pl.qi), rv(q, pl.qi), { v: 'selfres', ex: q.ex, last: pl.fb, rank: pl.rankNow, players: this.players.size, isLast: pl.qi === this.qs.length - 1 });
+      return Object.assign(base, qv(q, pl.qi), { v: 'question', self: true, limit: this.limit, left: this.limit ? Math.max(0, this.limit - (Date.now() - pl.qt0) / 1000) : 0, answered: null });
     }
     const q = this.qs[this.qi];
-    if (this.phase === 'question') return Object.assign(base, { v: 'question', qi: this.qi, q: q.q, o: q.o, limit: this.limit, left: this.limit ? Math.max(0, this.limit - (Date.now() - this.t0) / 1000) : 0, answered: pl.ans[this.qi] ? pl.ans[this.qi].c : null });
-    if (this.phase === 'reveal' || this.phase === 'board') return Object.assign(base, { v: 'reveal', qi: this.qi, q: q.q, o: q.o, a: q.a, ex: q.ex, mine: pl.ans[this.qi] ? pl.ans[this.qi].c : null, last: pl.last || null, rank: pl.rankNow, players: this.players.size });
-    return Object.assign(base, { v: 'end', rank: pl.rankNow, players: this.players.size });
+    if (this.phase === 'question') return Object.assign(base, qv(q, this.qi), { v: 'question', limit: this.limit, left: this.limit ? Math.max(0, this.limit - (Date.now() - this.t0) / 1000) : 0, answered: pl.ans[this.qi] ? pl.ans[this.qi].c : null });
+    if (this.phase === 'reveal' || this.phase === 'board') return Object.assign(base, qv(q, this.qi), rv(q, this.qi), { v: 'reveal', ex: q.ex, last: pl.last || null, rank: pl.rankNow, players: this.players.size });
+    const ts = this.teamScores(), tr = ts && T ? ts.slice().sort((a, b) => b.score - a.score).findIndex(t => t.name === T.name) + 1 : 0;
+    return Object.assign(base, { v: 'end', rank: pl.rankNow, players: this.players.size, teamRank: tr, won: this.boss ? this.boss.hp <= 0 : null });
   }
   send(pl, data) { pl.ver++; pl.view = data; this.flush(pl); }
   flush(pl) { const w = pl.waiters; pl.waiters = []; w.forEach(res => { if (!res.writableEnded) json(res, 200, { ver: pl.ver, data: pl.view }); }); }
@@ -196,20 +243,29 @@ class LiveQuiz {
   /* what the teacher's board needs to draw */
   snapshot() {
     const q = this.qs[this.qi] || null, P = [...this.players.values()];
-    const counts = q ? q.o.map((_, k) => P.filter(p => p.ans[this.qi] && p.ans[this.qi].c === k).length) : [];
+    const counts = !q ? [] : q.t === 'order' ? [P.filter(p => p.ans[this.qi] && this.isRight(q, p.ans[this.qi].c)).length, P.filter(p => p.ans[this.qi] && !this.isRight(q, p.ans[this.qi].c)).length] : q.o.map((_, k) => P.filter(p => p.ans[this.qi] && p.ans[this.qi].c === k).length);
+    /* for "put in order": how many placed each item in its right position */
+    const place = q && q.t === 'order' ? q.o.map((_, k) => P.filter(p => p.ans[this.qi] && p.ans[this.qi].c[k] === k).length) : null;
+    const A = q ? P.map(p => [p, p.ans[this.qi]]).filter(x => x[1]) : [];
+    const conf = this.opts.conf && q ? { sure: A.filter(x => x[1].conf === 2).length, think: A.filter(x => x[1].conf === 1).length, guess: A.filter(x => x[1].conf === 0).length,
+      sureWrong: this.phase === 'question' ? [] : A.filter(x => x[1].conf === 2 && x[1].ok === false).map(x => x[0].name) } : null;
     return {
       phase: this.phase, qi: this.qi, limit: this.limit, t0: this.t0, total: this.qs.length,
       tunnel: this.tunnel,
-      players: P.map(p => ({ name: p.name, score: p.score, online: p.waiters.length > 0 || Date.now() - p.seen < 30000, answered: !!(q && p.ans[this.qi]), done: Object.keys(p.ans).length, correct: Object.values(p.ans).filter(a => a.ok).length, rank: p.rankNow || 0, prev: p.prevRank || 0, last: p.last || null })),
-      answered: q ? P.filter(p => p.ans[this.qi]).length : 0, counts,
+      players: P.map(p => ({ name: p.name, score: p.score, team: p.team, pw: p.pw.length, online: p.waiters.length > 0 || Date.now() - p.seen < 30000, answered: !!(q && p.ans[this.qi]), done: Object.keys(p.ans).length, correct: Object.values(p.ans).filter(a => a.ok).length, rank: p.rankNow || 0, prev: p.prevRank || 0, last: p.last || null })),
+      answered: q ? P.filter(p => p.ans[this.qi]).length : 0, counts, place, conf, order: q && q.t === 'order' ? q.sh : null, opts: this.opts, teams: this.teamScores(), boss: this.boss,
     };
   }
   results() {
-    return { title: this.title, questions: this.qs.map(q => ({ q: q.q, o: q.o, a: q.a })), players: [...this.players.values()].sort((a, b) => b.score - a.score).map(p => ({ name: p.name, score: p.score, ans: this.qs.map((_, i) => p.ans[i] ? { c: p.ans[i].c, ok: p.ans[i].ok, ms: p.ans[i].ms } : null) })) };
+    return { title: this.title, opts: this.opts, teams: this.teamScores(), boss: this.boss, questions: this.qs.map(q => ({ q: q.q, o: q.o, a: q.a, t: q.t || null })), players: [...this.players.values()].sort((a, b) => b.score - a.score).map(p => ({ name: p.name, score: p.score, team: this.opts.mode === 'teams' ? TEAMS[p.team].name : null, ans: this.qs.map((_, i) => p.ans[i] ? { c: p.ans[i].c, ok: p.ans[i].ok, ms: p.ans[i].ms, conf: p.ans[i].conf } : null) })) };
   }
   update() { clearTimeout(this.upT); this.upT = setTimeout(() => this.onUpdate && this.onUpdate(this.snapshot()), 80); }
 }
 
+const POWERS = ['double', 'fifty', 'freeze', 'shield'];
+const TEAMS = [{ name: 'Red Cells', color: '#FF5F7E', emoji: '🔴' }, { name: 'Blue Neurons', color: '#3BA7FF', emoji: '🔵' }, { name: 'Green Leaves', color: '#4ADE80', emoji: '🟢' }, { name: 'Gold Enzymes', color: '#FFC928', emoji: '🟡' }];
+function shuffledArr(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function shuffled(n) { const id = [...Array(n).keys()]; for (let t = 0; t < 6; t++) { const s = shuffledArr(id); if (n < 2 || s.some((k, i) => k !== i)) return s; } return id.slice().reverse(); }
 function clientIp(req) { return String(req.headers['cf-connecting-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0] || req.socket.remoteAddress || '').trim(); }
 function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }

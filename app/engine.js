@@ -293,7 +293,9 @@ function drawScale(g, o, dark) { const im = o.img && byId(o.img); const L = im ?
 /* ---------- master object painter ---------- */
 /* PowerPoint click animations: the slideshow decides which build steps are showing */
 let stepFilter = null; const setStepFilter = f => { stepFilter = f; };
-function drawObj(g, o, p, opt) { if (o.off) return; if (o.step && stepFilter && stepFilter(o)) return; if (p && p.deck && p.deck.inkOff && !o.deckBase && (o.layer == null ? 1 : o.layer) >= 1 && !(opt && opt.ink)) return; const dark = isDark(p);
+/* a second filter for audio-note replay: hides ink that had not been written yet at this point of the recording */
+let viewFilter = null; const setViewFilter = f => { viewFilter = f; dirty.all(); };
+function drawObj(g, o, p, opt) { if (o.off) return; if (o.step && stepFilter && stepFilter(o)) return; if (viewFilter && viewFilter(o)) return; if (p && p.deck && p.deck.inkOff && !o.deckBase && (o.layer == null ? 1 : o.layer) >= 1 && !(opt && opt.ink)) return; const dark = isDark(p);
   switch (o.t) {
     case 'stroke': drawStroke(g, o, p); break;
     case 'shape': drawShape(g, o); break;
@@ -305,7 +307,7 @@ function drawObj(g, o, p, opt) { if (o.off) return; if (o.step && stepFilter && 
     case 'img': case 'stamp': case 'wid': { g.save(); g.globalAlpha = (o.a == null ? 1 : o.a) * (o._fa == null ? 1 : o._fa); if (o.rot) { const cx = o.x + o.w / 2, cy = o.y + o.h / 2; g.translate(cx, cy); g.rotate(o.rot); g.translate(-cx, -cy); }
       let im = null; if (o.t === 'img') { const src = B.assets[o.asset]; if (src) im = imageFor(o.asset, src); } else if (o.t === 'wid') { if (o.src) im = imageFor('w:' + o.id + ':' + (o.v || 0), o.src); } else if (window.HBStamps) im = window.HBStamps.image(o.k, o.fill, o.stroke);
       if (o.t === 'wid' && o.frame) { g.fillStyle = dark ? 'rgba(255,255,255,.96)' : '#fff'; g.shadowColor = 'rgba(0,0,0,.18)'; g.shadowBlur = 14; g.shadowOffsetY = 4; g.fillRect(o.x - 8, o.y - 8, o.w + 16, o.h + 16); g.shadowColor = 'transparent'; }
-      drawBoxImage(g, o, im);
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; drawBoxImage(g, o, im);
       if (o.t === 'stamp' && o.label) { g.font = '600 20px Lexend, sans-serif'; g.textAlign = 'center'; g.fillStyle = dark ? '#F6ECF4' : '#1E1419'; g.fillText(o.name || (window.HBStamps && window.HBStamps.name(o.k)) || '', o.x + o.w / 2, o.y + o.h + 24); }
       g.restore(); break; } } }
 function renderPage(g, p, vr, s, opts) { opts = opts || {}; for (let L = 0; L < 3; L++) { if (p.layers && p.layers[L] && !p.layers[L].show && !opts.all) continue; for (const o of p.objs) { if ((o.layer == null ? 1 : o.layer) !== L) continue; if (opts.skip && opts.skip.has(o.id)) continue; const b = bbox(o); if (vr && b && !inter(b, vr)) continue; drawObj(g, o, p, opts.ink ? { ink: 1 } : undefined); } } }
@@ -328,6 +330,6 @@ function renderToCanvas(p, rect, scale, opt) { opt = opt || {}; const c = docume
 const pageRect = p => { p = p || page(); if (B.mode === 'scroll') { const cb = contentBox(p); const h = cb ? Math.min(p.H, Math.max(1080, cb[1] + cb[3] + 80)) : 1080; return [0, 0, B.width, h]; } const cb = contentBox(p); return cb ? [cb[0] - 60, cb[1] - 60, cb[2] + 120, cb[3] + 120] : [0, 0, 1920, 1080]; };
 
 new ResizeObserver(resize).observe(stage);
-window.HBE = { PEN, SENS, setStepFilter, bound, scrollTo, addHooks, pageDates, B, V, page, byId, newPage, add, del, mod, tx, undo, redo, reorder, push, changed, saveNow, serial, loadBoard, clean, invalidate, toB, toS, setView, zoomAt, fitWidth, fitPage, viewRect, contentBox, resize, THEMES, PALETTE, isDark, drawObj, drawBackground, renderPage, renderToCanvas, pageRect, bbox, inter, strokePath, textLayout, ptsOf, connPts, dirty, liveDrawers, imageFor, imgCache, quizReveal, get hidden() { return hidden; }, set hidden(h) { hidden = h; dirty.main = true; }, get SW() { return SW; }, get SH() { return SH; }, get DPR() { return DPR; }, cvLive, gLive, cvMain, drawFrame, grow, H, roughFor, shapePath, arrowHead, hexRgb, edgePoint, rnd };
+window.HBE = { PEN, SENS, setStepFilter, setViewFilter, bound, scrollTo, addHooks, pageDates, B, V, page, byId, newPage, add, del, mod, tx, undo, redo, reorder, push, changed, saveNow, serial, loadBoard, clean, invalidate, toB, toS, setView, zoomAt, fitWidth, fitPage, viewRect, contentBox, resize, THEMES, PALETTE, isDark, drawObj, drawBackground, renderPage, renderToCanvas, pageRect, bbox, inter, strokePath, textLayout, ptsOf, connPts, dirty, liveDrawers, imageFor, imgCache, quizReveal, get hidden() { return hidden; }, set hidden(h) { hidden = h; dirty.main = true; }, get SW() { return SW; }, get SH() { return SH; }, get DPR() { return DPR; }, cvLive, gLive, cvMain, drawFrame, grow, H, roughFor, shapePath, arrowHead, hexRgb, edgePoint, rnd };
 })();
 

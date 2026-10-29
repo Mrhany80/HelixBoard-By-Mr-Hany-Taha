@@ -57,13 +57,17 @@ class ClassLink {
   /* ---------- live activities ---------- */
   setActivity(a) {
     const type = ACT_TYPES.includes(a && a.type) ? a.type : null; if (!type) return null;
-    const options = type === 'poll' ? (Array.isArray(a.options) ? a.options : []).slice(0, 6).map(o => String(o || '').slice(0, 80)) : [];
-    if (type === 'poll' && options.length < 2) return null;
+    const options = type === 'poll' || type === 'order' ? (Array.isArray(a.options) ? a.options : []).slice(0, type === 'order' ? 8 : 6).map(o => String(o || '').slice(0, 80)).filter(o => type === 'poll' || o.trim()) : [];
+    if ((type === 'poll' || type === 'order') && options.length < 2) return null;
+    if (type === 'pin' && !a.bg) return null;
     const secs = Math.max(0, Math.min(3600, +a.secs || 0));
     /* once: each student submits one final answer, which then locks (Nearpod/ClassPoint style); otherwise answers are live and can change.
        auto: when time is up (or the teacher closes answers), phones hand in unsent work by themselves during a short grace period */
     this.act = { id: crypto.randomBytes(5).toString('hex'), type, prompt: String(a.prompt || '').slice(0, 300), options, bg: a.bg ? Buffer.from(a.bg) : null, ar: Math.max(0.3, Math.min(4, +a.ar || 4 / 3)),
       open: true, endsAt: secs ? Date.now() + secs * 1000 : 0, anon: !!a.anon, once: a.once !== false, auto: a.auto !== false, closedAt: 0, responses: new Map(), started: Date.now() };
+    /* put in order: the options arrive in the right order; every phone gets the same shuffle. tap the picture: an optional target circle */
+    if (type === 'order') this.act.sh = shuffleIdx(options.length);
+    if (type === 'pin') this.act.target = cleanTarget(a.target);
     this.shared = null; if (this.lock) this.setLock(false); this.players.forEach(pl => { pl.working = 0; }); this.armTimer();
     this.changed(); return this.act.id;
   }
@@ -75,7 +79,8 @@ class ClassLink {
     /* the teacher gives more time: from now if time had run out, otherwise on top of what is left */
     if ('extend' in o) { const s = Math.max(10, Math.min(1800, +o.extend || 60)) * 1000; a.endsAt = (a.open && a.endsAt ? Math.max(a.endsAt, Date.now()) : Date.now()) + s; a.open = true; a.closedAt = 0; this.armTimer(); }
     if ('anon' in o) a.anon = !!o.anon;
-    if ('reveal' in o) a.reveal = Number.isInteger(o.reveal) ? o.reveal : null;
+    if ('reveal' in o) a.reveal = Number.isInteger(o.reveal) ? o.reveal : o.reveal === true ? true : null;
+    if ('target' in o) a.target = cleanTarget(o.target);
     this.changed(); }
   endActivity() { clearTimeout(this.actTimer); this.act = null; this.shared = null; this.changed(); }
   /* the teacher shows one student's answer on every phone (or stops showing it) */
@@ -86,11 +91,12 @@ class ClassLink {
     if (this.shared && this.shared.actId === a.id) this.shared = null; const pl = this.players.get(pid); if (pl) this.flush(pl); this.changed(); }
   award(pid, n) { const pl = this.players.get(pid); if (!pl) return; pl.stars = Math.max(0, (pl.stars || 0) + (Number.isInteger(n) ? n : 1)); this.changed(); }
   /* "Eyes on board": phones pause and show the teacher's board (shared just for the pause if board sharing was off) */
+  setXp(m) { this.xp = m && typeof m === 'object' ? m : null; this.changed(); }
   setLock(v) { v = !!v; if (v && !this.lock) { this.lockBoard = !this.boardOn; this.boardOn = true; } else if (!v && this.lock && this.lockBoard) { this.boardOn = false; this.lockBoard = false; } this.lock = v; this.changed(); }
   lowerHand(pid) { if (pid) { const pl = this.players.get(pid); if (pl) pl.hand = 0; } else this.players.forEach(pl => { pl.hand = 0; }); this.changed(); }
   clearQuestions() { this.questions = []; this.emit('status'); }
   responses() { const a = this.act; if (!a) return null;
-    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, endsAt: a.endsAt, anon: a.anon, once: a.once, auto: a.auto, reveal: a.reveal == null ? null : a.reveal, ar: a.ar, hasBg: !!a.bg,
+    return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, endsAt: a.endsAt, anon: a.anon, once: a.once, auto: a.auto, reveal: a.reveal == null ? null : a.reveal, ar: a.ar, hasBg: !!a.bg, target: a.target || null,
       list: [...a.responses.entries()].map(([pid, r]) => { const pl = this.players.get(pid); return { pid, name: pl ? pl.name : '?', color: pl ? pl.color : '#888', value: r.value, at: r.at, n: r.n, late: !!r.late }; }) }; }
 
   /* ---------- HTTP ---------- */
@@ -132,8 +138,9 @@ class ClassLink {
     const old = d.pid && this.players.get(String(d.pid));
     if (old) return json(res, 200, { pid: old.id, name: old.name, color: old.color });
     if (this.players.size >= MAX_PLAYERS) return json(res, 403, { error: 'The class is full.' });
-    let name = String(d.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    let name = String(d.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
     if (!name) return json(res, 400, { error: 'Type your name first.' });
+    if (!fullName(name)) return json(res, 400, { error: 'Please write your full name — first name and last name.' });
     const taken = new Set([...this.players.values()].map(p => p.name.toLowerCase()));
     if (taken.has(name.toLowerCase())) { let i = 2; while (taken.has((name + ' ' + i).toLowerCase())) i++; name = name + ' ' + i; }
     const COLORS = ['#E03131', '#1971C2', '#2F9E44', '#E8590C', '#9C36B5', '#0C8599', '#C2255C', '#5F3DC4', '#66A80F', '#D9480F'];
@@ -147,11 +154,12 @@ class ClassLink {
       board: this.boardOn && this.board ? { ver: this.boardVer, ar: this.boardView ? this.boardView.ar : 1.6 } : null, draw: this.boardOn && this.drawOn,
       files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })),
       homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })),
-      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, hand: !!pl.hand, lock: this.lock, react: this.reactOn };
+      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn };
   }
   actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
     return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar, once: a.once, auto: a.auto, grace: !a.open && a.auto && a.closedAt ? Math.max(0, 6000 - (Date.now() - a.closedAt)) : 0,
-      reveal: a.type === 'poll' && a.reveal != null ? a.reveal : null, mine: r ? r.value : null }; }
+      reveal: a.type === 'poll' && a.reveal != null ? a.reveal : null, mine: r ? r.value : null,
+      order: a.type === 'order' ? { items: a.sh.map(k => a.options[k]), ids: a.sh, right: a.reveal ? a.options : null } : null, target: a.type === 'pin' && a.reveal && a.target ? a.target : null }; }
   /* a student's answer to the live activity — checked by type, then passed to the teacher's screen */
   answer(pl, d, res) {
     const a = this.act; if (!a || String(d.id || '') !== a.id) return json(res, 409, { error: 'That activity has finished.' });
@@ -228,15 +236,21 @@ class ClassLink {
 }
 
 /* ---------- answers are checked strictly: right shape, right size, nothing that could break the teacher's screen ---------- */
-const ACT_TYPES = ['draw', 'poll', 'word', 'text', 'image', 'notes'];
+const ACT_TYPES = ['draw', 'poll', 'word', 'text', 'image', 'notes', 'pin', 'order'];
 const REACTIONS = ['👍', '❤️', '😂', '😮', '🤔', '👏'];
 const HEX = /^#[0-9a-f]{6}$/i;
 const cleanText = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
+/* a full name: at least two words of two or more letters (any alphabet) */
+function fullName(n) { return String(n).split(' ').filter(w => w.replace(/[^\p{L}]/gu, '').length >= 2).length >= 2; }
+function shuffleIdx(n) { const id = [...Array(n).keys()]; for (let t = 0; t < 8; t++) { const s = id.slice(); for (let i = n - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [s[i], s[j]] = [s[j], s[i]]; } if (s.some((k, i) => k !== i)) return s; } return id.reverse(); }
+function cleanTarget(t) { if (!t) return null; const x = +t.x, y = +t.y, r = +t.r; return [x, y, r].every(Number.isFinite) && x >= 0 && x <= 1 && y >= 0 && y <= 1 && r > 0.005 && r < 0.8 ? { x, y, r } : null; }
 function cleanAnswer(a, v, old) {
   if (v === null) return null;
   switch (a.type) {
     case 'poll': return Number.isInteger(v) && v >= 0 && v < a.options.length ? v : undefined;
     case 'text': { const t = cleanText(v, 500); return t || null; }
+    case 'pin': return Array.isArray(v) && v.length === 2 && v.every(n => Number.isFinite(+n) && +n >= 0 && +n <= 1) ? v.map(n => Math.round(+n * 10000) / 10000) : undefined;
+    case 'order': { if (!Array.isArray(v) || v.length !== a.options.length) return undefined; const n = v.map(Number); return n.every(k => Number.isInteger(k) && k >= 0 && k < n.length) && new Set(n).size === n.length ? n : undefined; }
     case 'word': { const list = (Array.isArray(v) ? v : [v]).slice(0, 3).map(w => cleanText(w, 30).replace(/\s+/g, ' ')).filter(Boolean); return list.length ? list : null; }
     case 'image': return typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length < 2.8e6 ? v : undefined;
     case 'notes': { if (!Array.isArray(v)) return undefined; const list = v.slice(0, 6).map(n => ({ t: cleanText(n && n.t, 200), c: Math.max(0, Math.min(5, (n && n.c) | 0)) })).filter(n => n.t); return list.length ? list : null; }

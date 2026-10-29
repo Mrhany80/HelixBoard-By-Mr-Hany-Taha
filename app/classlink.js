@@ -10,13 +10,16 @@ const S = { on: false, info: null, snap: null, url: '', picked: false, dirty: tr
 function needApp(what) { modal.open('<h2>' + what + '</h2><p>Students scan one QR code and see your board live on their phones or tablets, write on it for group work, download lesson videos and do homework — from the same Wi-Fi or from any network.</p><p>This needs the <b>HelixBoard Windows app</b>, which runs the class link on this computer (no accounts or website needed).</p><div class="foot"><button class="btn primary" data-close>OK</button></div>'); }
 
 async function start(opts) { opts = opts || {}; if (!D()) return needApp('Class link'); if (S.on) return opts.quiet ? null : panel();
+  /* which class and lesson — the phones show it, Reports and Class XP keep it */
+  if (window.HBX && !(await HBX.ensureSession())) return;
   toast('Starting the class link…');
-  const r = await D().start({ title: (E.page().name || 'Our class'), lang: set.get('lang', 'en'), internet: set.get('phoneNet', true) });
+  const r = await D().start({ title: window.HBX ? HBX.title() : (E.page().name || 'Our class'), lang: set.get('lang', 'en'), internet: set.get('phoneNet', true) });
   if (!r || r.error) { toast('The class link could not start: ' + esc((r && r.error) || 'unknown error'), 6000); return; }
   S.on = true; S.info = r; S.picked = false; D().onEvent(onEvent); window.HBA && HBA.log('class_link', {});
   await D().cmd('options', { boardOn: set.get('clBoard', true), drawOn: false });
-  S.snap = await D().cmd('snapshot'); if (!opts.quiet) panel(); stream(); }
-async function stop() { if (!S.on) return; S.on = false; clearInterval(S.t); await D().cmd('stop'); window.HBLC && HBLC.closed(); const f = window.HB.floats.classlink; if (f) f.destroy(); toast('Class link closed.'); }
+  S.snap = await D().cmd('snapshot'); if (!opts.quiet) panel(); stream();
+  if (window.HBX) HBX.phoneLevels().then(m => D().cmd('xp', m)).catch(() => {}); }
+async function stop() { if (!S.on) return; S.on = false; window.HBX && HBX.reset(); clearInterval(S.t); await D().cmd('stop'); window.HBLC && HBLC.closed(); const f = window.HB.floats.classlink; if (f) f.destroy(); toast('Class link closed.'); }
 
 function onEvent(type, data, snap) { S.snap = snap; drawBig(); if (window.HBLC) HBLC.event(type, data, snap);
   if (type === 'response' || type === 'hand' || type === 'question' || type === 'reaction') return;

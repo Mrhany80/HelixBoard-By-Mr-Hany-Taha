@@ -14,6 +14,8 @@ const TYPES = {
   word:  { name: 'Word cloud', ic: 'cloud', tint: '#B197FC', desc: 'Each student sends up to 3 words. The most common answers grow the biggest.' },
   text:  { name: 'Short answer', ic: 'message-square-text', tint: '#4ADE80', desc: 'Everyone types an answer. Read the whole class at once and spotlight the best ones.' },
   image: { name: 'Photo', ic: 'camera', tint: '#FFC928', desc: 'Students photograph their book, model or experiment — every photo in one gallery.' },
+  pin:   { name: 'Tap the picture', ic: 'map-pin', tint: '#F06595', desc: 'Students tap a place on a picture — your board or any image. See every tap as a heat map; mark the right spot to score it.' },
+  order: { name: 'Put in order', ic: 'list-ordered', tint: '#20C997', desc: 'Students drag cards into the right order: stages, steps, a food chain. See how many got each position right.' },
   notes: { name: 'Collaborate board', ic: 'sticky-note', tint: '#FF9F5A', desc: 'A shared wall of sticky notes: ideas, questions, examples from the whole class.' },
 };
 const NOTE_C = ['#FFE066', '#FFA8C5', '#A5D8FF', '#B2F2BB', '#FFC078', '#D0BFFF'];
@@ -114,6 +116,7 @@ const css = document.createElement('style'); css.textContent = `
 body.deckshow #lcChip,body.deckfull #lcChip,body:has(#vlStage:not([hidden])) #lcChip,body:has(#rpStage:not([hidden])) #lcChip,body:has(#clBigQr) #lcChip,body:has(#lcSpot) #lcChip{display:none}
 @media (max-width:1000px){#lcStage{grid-template-columns:minmax(0,1fr)}#lcStage .lc-side{display:none}}
 body.ar #lcStage,body.ar #lcSpot,body.ar #lcChip,body.ar #lcPick{direction:rtl}
+body.deckshow #lcStage{z-index:75}body.deckshow #lcSpot{z-index:77}body.deckshow #lcPick{z-index:78}
 .lc-react{position:fixed;bottom:20px;z-index:80;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;opacity:0}
 .lc-react .e{font-size:44px;line-height:1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
 .lc-react small{font:700 11px var(--ui);color:#fff;background:rgba(0,0,0,.55);padding:1px 7px;border-radius:999px;white-space:nowrap}
@@ -144,9 +147,10 @@ async function open(type) {
 }
 function build() { if (L.el && L.el.isConnected) { L.el.hidden = false; hideChip(); return; }
   const el = document.createElement('div'); el.id = 'lcStage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Live class');
-  el.innerHTML = '<div class="lc-top"><div class="lc-brand"><span class="dot"></span>Live class</div><div id="lcTopBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div><div class="lc-join" id="lcJoin" title="Show the QR code big for the class"></div><button class="btn sm" id="lcHide">' + icon('presentation') + 'Back to board</button></div><div class="lc-main" id="lcMain"></div><div class="lc-side" id="lcSide"></div>';
+  el.innerHTML = '<div class="lc-top"><div class="lc-brand"><span class="dot"></span>Live class<button class="btn sm" id="lcName" title="Class and lesson name — shown on the phones" style="margin-inline-start:6px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></button></div><div id="lcTopBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div><div class="lc-join" id="lcJoin" title="Show the QR code big for the class"></div><button class="btn sm" id="lcHide">' + icon('presentation') + 'Back to board</button></div><div class="lc-main" id="lcMain"></div><div class="lc-side" id="lcSide"></div>';
   document.body.appendChild(el); L.el = el; hideChip();
-  el.querySelector('#lcHide').onclick = hide; el.querySelector('#lcJoin').onclick = () => HBCL.bigQr();
+  el.querySelector('#lcHide').onclick = hide; const nb = el.querySelector('#lcName'), showName = () => { nb.innerHTML = icon('pencil') + esc(window.HBX ? HBX.title() : ''); }; showName();
+  nb.onclick = () => window.HBX && HBX.rename().then(ok => { if (ok) { showName(); if (L.session) { L.session.title = HBX.title() + ' · ' + new Date().toLocaleDateString([], { day: 'numeric', month: 'short' }); L.session.cls = HBX.cur(); } toast('Renamed — the phones show the new name.'); } }); el.querySelector('#lcJoin').onclick = () => HBCL.bigQr();
   el.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#lcSpot')) { e.stopPropagation(); hide(); } });
   if (window.gsap && !REDUCE) gsap.from(el, { opacity: 0, y: 12, duration: 0.25, ease: 'power2.out' });
 }
@@ -218,7 +222,7 @@ function schedule(fresh, pid) { pending.add(pid); if (fresh) pendingFresh.add(fr
     if (L.act && (L.act.type === 'poll' || L.act.type === 'word' || L.act.type === 'notes' || fr.size && L.sort !== 'time')) renderBody(); else ids.forEach(id => upsertTile(id, fr.has(id)));
     renderHead(); renderSide(); }); }
 
-function load(r) { L.act = { id: r.id, type: r.type, prompt: r.prompt, options: r.options, open: r.open, endsAt: r.endsAt, anon: r.anon, once: r.once, auto: r.auto, reveal: r.reveal, ar: r.ar, hasBg: r.hasBg, correct: L.act && L.act.id === r.id ? L.act.correct : null };
+function load(r) { L.act = { id: r.id, type: r.type, prompt: r.prompt, options: r.options, open: r.open, endsAt: r.endsAt, anon: r.anon, once: r.once, auto: r.auto, reveal: r.reveal, ar: r.ar, hasBg: r.hasBg, target: r.target || null, correct: L.act && L.act.id === r.id ? L.act.correct : null };
   L.list.clear(); L.order = []; r.list.sort((a, b) => a.at - b.at).forEach(x => { L.list.set(x.pid, x); L.order.push(x.pid); }); }
 
 /* ---------- drawing a student's ink (0..1 coordinates, width in thousandths of the width) ---------- */
@@ -261,6 +265,8 @@ function clock() { clearTimeout(L.clock); const c = L.el && L.el.querySelector('
 function renderTools() { const b = L.el.querySelector('#lcTools'), a = L.act; if (!b) return; const grid = ['draw', 'image', 'text', 'notes'].includes(a.type);
   b.innerHTML = '<button class="btn sm' + (a.open ? '' : ' primary') + '" id="lcOpen">' + icon(a.open ? 'circle-stop' : 'play') + (a.open ? 'Close answers' : 'Reopen answers') + '</button>' +
     (a.type === 'poll' && a.correct != null ? '<button class="btn sm' + (a.reveal != null ? ' primary' : '') + '" id="lcReveal">' + icon('circle-check') + (a.reveal != null ? 'Hide answer' : 'Reveal answer') + '</button>' : '') +
+    (a.type === 'order' || (a.type === 'pin' && a.target) ? '<button class="btn sm' + (a.reveal ? ' primary' : '') + '" id="lcReveal2">' + icon('circle-check') + (a.reveal ? 'Hide answer' : a.type === 'order' ? 'Reveal the order' : 'Reveal the spot') + '</button>' : '') +
+    (a.type === 'pin' ? '<button class="btn sm' + (L.marking ? ' primary' : '') + '" id="lcMark" title="Click the picture where the right answer is">' + icon('target') + (a.target ? 'Move the right spot' : 'Mark the right spot') + '</button>' + (a.target ? '<span class="seg" title="Size of the right spot">' + [['s', 0.05], ['m', 0.08], ['l', 0.13]].map(([k, v]) => '<button data-tr="' + v + '" class="' + (Math.abs(a.target.r - v) < 0.001 ? 'on' : '') + '">' + k.toUpperCase() + '</button>').join('') + '</span>' : '') + '<span class="seg">' + [['dots', 'Dots'], ['heat', 'Heat map']].map(([k, l]) => '<button data-pv="' + k + '" class="' + ((L.pinView || 'heat') === k ? 'on' : '') + '">' + l + '</button>').join('') + '</span>' : '') +
     (a.type === 'poll' ? '<button class="btn sm" id="lcNames">' + icon(L.showNames ? 'eye-off' : 'eye') + (L.showNames ? 'Hide who voted' : 'Show who voted') + '</button>' : '') +
     '<button class="btn sm" id="lcAnon">' + icon(a.anon ? 'eye' : 'eye-off') + (a.anon ? 'Show names' : 'Hide names') + '</button>' +
     (grid ? '<span class="seg" title="How many answers side by side">' + [2, 3, 4, 5, 6].map(n => '<button data-c="' + n + '" class="' + (n === L.cols ? 'on' : '') + '">' + n + '</button>').join('') + '</span><span class="seg">' + [['time', 'First in'], ['name', 'A–Z']].map(([k, l]) => '<button data-s="' + k + '" class="' + (k === L.sort ? 'on' : '') + '">' + l + '</button>').join('') + '</span>' : '') +
@@ -269,6 +275,10 @@ function renderTools() { const b = L.el.querySelector('#lcTools'), a = L.act; if
   const q = id => b.querySelector(id);
   q('#lcOpen').onclick = () => D().cmd('actOptions', { open: !a.open }).then(r => { if (r) { a.open = r.open; a.endsAt = r.endsAt; } renderTools(); renderHead(); toast(a.open ? 'Answers are open again.' : 'Answers closed — phones show their final answer.'); });
   const rv = q('#lcReveal'); if (rv) rv.onclick = () => D().cmd('actOptions', { reveal: a.reveal != null ? null : a.correct }).then(r => { a.reveal = r ? r.reveal : null; renderTools(); renderBody(); if (a.reveal != null) snd('fanfare'); });
+  const rv2 = q('#lcReveal2'); if (rv2) rv2.onclick = () => D().cmd('actOptions', { reveal: a.reveal ? null : true }).then(r => { a.reveal = r ? r.reveal : null; renderTools(); renderBody(); if (a.reveal) snd('fanfare'); });
+  const mk = q('#lcMark'); if (mk) mk.onclick = () => { L.marking = !L.marking; renderTools(); renderBody(); if (L.marking) toast('Click the picture where the right answer is.'); };
+  $$('[data-tr]', b).forEach(x => x.onclick = () => setTarget(Object.assign({}, a.target, { r: +x.dataset.tr })));
+  $$('[data-pv]', b).forEach(x => x.onclick = () => { L.pinView = x.dataset.pv; renderTools(); renderBody(); });
   const nm = q('#lcNames'); if (nm) nm.onclick = () => { L.showNames = !L.showNames; renderTools(); renderBody(); };
   q('#lcAnon').onclick = () => D().cmd('actOptions', { anon: !a.anon }).then(r => { a.anon = r ? r.anon : !a.anon; renderMain(); });
   $$('[data-c]', b).forEach(x => x.onclick = () => { L.cols = +x.dataset.c; set.put('lcCols', L.cols); renderTools(); renderBody(); });
@@ -278,9 +288,12 @@ function renderTools() { const b = L.el.querySelector('#lcTools'), a = L.act; if
   q('#lcBoard').onclick = () => toBoard(); q('#lcCsv').onclick = csv; q('#lcEnd').onclick = () => endActivity(false); }
 function sorted() { const ids = L.order.filter(p => L.list.has(p)); if (L.sort === 'name') ids.sort((x, y) => nameOf(L.list.get(x)).localeCompare(nameOf(L.list.get(y)))); return ids.map(p => L.list.get(p)); }
 function renderBody() { const b = L.el && L.el.querySelector('#lcBody'); if (!b || !L.act) return; const a = L.act;
+  if (!L.list.size && a.type === 'pin') return pinView(b);
   if (!L.list.size) { b.innerHTML = '<div class="lc-empty">' + icon(TYPES[a.type].ic) + '<b>Waiting for answers…</b><span>Students see this activity on their phones now. Answers appear here the moment they are sent.</span></div>'; return; }
   if (a.type === 'poll') return pollView(b);
   if (a.type === 'word') return cloudView(b);
+  if (a.type === 'pin') return pinView(b);
+  if (a.type === 'order') return orderView(b);
   if (a.type === 'notes') { b.innerHTML = '<div class="lc-notes" style="--cols:' + L.cols + '">' + sorted().map(r => r.value.map((n, i) => '<div class="lc-note" data-p="' + esc(r.pid) + '" data-i="' + i + '" style="background:' + NOTE_C[n.c] + '">' + esc(n.t) + '<small>' + esc(nameOf(r)) + '</small></div>').join('')).join('') + '</div>';
     $$('.lc-note', b).forEach(x => x.onclick = () => spotlight(x.dataset.p)); return; }
   b.innerHTML = '<div class="lc-grid" style="--cols:' + L.cols + ';--ar:' + a.ar + '"></div>'; const g = b.firstChild; sorted().forEach(r => g.appendChild(tile(r))); requestAnimationFrame(() => $$('canvas[data-p]', g).forEach(cv => paintTile(cv, (L.list.get(cv.dataset.p) || {}).value))); }
@@ -300,6 +313,35 @@ function upsertTile(pid, fresh) { const g = L.el && L.el.querySelector('.lc-grid
 function pollView(b) { const a = L.act, counts = a.options.map(() => 0), who = a.options.map(() => []); L.list.forEach(r => { if (counts[r.value] != null) { counts[r.value]++; who[r.value].push(nameOf(r)); } });
   const tot = L.list.size || 1, max = Math.max(1, ...counts);
   b.innerHTML = '<div class="lc-poll">' + a.options.map((o, i) => '<div class="lc-opt' + (a.reveal === i ? ' right' : '') + '"><span class="lt" style="background:' + POLL_C[i] + '">' + 'ABCDEF'[i] + '</span><div class="tr"><i style="width:' + (counts[i] / max * 100) + '%;background:' + POLL_C[i] + '"></i><span>' + esc(o) + (a.reveal === i ? ' ✓' : '') + '</span></div><span class="n">' + counts[i] + ' · ' + Math.round(counts[i] / tot * 100) + '%</span>' + (L.showNames && !a.anon && who[i].length ? '<div class="who">' + who[i].map(esc).join(', ') + '</div>' : '') + '</div>').join('') + '</div>'; }
+
+/* ---------- tap the picture: every tap as a dot or a heat map; the right spot scores it ---------- */
+const inTarget = (a, v) => !!(a.target && Array.isArray(v) && Math.hypot(v[0] - a.target.x, (v[1] - a.target.y) / (a.ar || 4 / 3)) <= a.target.r);
+function setTarget(t) { const a = L.act; D().cmd('actOptions', { target: t }).then(r => { a.target = r && r.target || t; renderTools(); renderBody(); }); }
+function pinCanvas(W, heat, labels) { const a = L.act, H = Math.round(W / (a.ar || 4 / 3)), c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); if (L.bgImg) g.drawImage(L.bgImg, 0, 0, W, H);
+  const pts = sorted().filter(r => Array.isArray(r.value));
+  if (heat && pts.length) { const h = document.createElement('canvas'); h.width = W; h.height = H; const hg = h.getContext('2d'), R0 = W * 0.06;
+    pts.forEach(r => { const x = r.value[0] * W, y = r.value[1] * H, gr = hg.createRadialGradient(x, y, 0, x, y, R0); gr.addColorStop(0, 'rgba(0,0,0,' + Math.min(0.6, 2.4 / Math.sqrt(pts.length + 3)) + ')'); gr.addColorStop(1, 'rgba(0,0,0,0)'); hg.fillStyle = gr; hg.fillRect(x - R0, y - R0, R0 * 2, R0 * 2); });
+    const d = hg.getImageData(0, 0, W, H), px = d.data; let mx = 1; for (let i = 3; i < px.length; i += 4) mx = Math.max(mx, px[i]);
+    for (let i = 0; i < px.length; i += 4) { const v = px[i + 3] / mx; if (!v) continue; const t = Math.min(1, v); px[i] = 255 * Math.min(1, t * 2); px[i + 1] = 255 * Math.min(1, Math.max(0, t * 2 - 0.6) + (t < 0.5 ? t : 1 - t)); px[i + 2] = 255 * Math.max(0, 1 - t * 2.2); px[i + 3] = 200 * Math.min(1, t * 1.6); }
+    hg.putImageData(d, 0, 0); g.drawImage(h, 0, 0); }
+  if (a.target) { const t = a.target; g.lineWidth = Math.max(3, W / 300); g.strokeStyle = '#2F9E44'; g.setLineDash([W / 90, W / 140]); g.beginPath(); g.arc(t.x * W, t.y * H, t.r * W, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
+  const rr = Math.max(5, W / 160); pts.forEach(r => { const x = r.value[0] * W, y = r.value[1] * H; g.fillStyle = a.target ? (inTarget(a, r.value) ? '#2F9E44' : '#E03131') : r.color || '#FF5FA2'; g.strokeStyle = '#fff'; g.lineWidth = rr / 2.5; g.beginPath(); g.arc(x, y, heat ? rr * 0.6 : rr, 0, Math.PI * 2); g.fill(); g.stroke();
+    if (labels && !heat) { g.font = '700 ' + Math.round(rr * 2.2) + 'px "Segoe UI", sans-serif'; g.fillStyle = '#1E1419'; g.strokeStyle = '#fff'; g.lineWidth = rr / 1.5; const n = nameOf(r); g.strokeText(n, x + rr * 1.6, y + rr * 0.8); g.fillText(n, x + rr * 1.6, y + rr * 0.8); } });
+  return c; }
+function pinView(b) { const a = L.act, W = Math.max(600, Math.min(2000, (b.clientWidth || 1000) * devicePixelRatio)), heat = (L.pinView || 'heat') === 'heat';
+  const c = pinCanvas(W, heat, !a.anon && L.showNames); c.className = 'lc-cloud'; c.style.cssText = 'aspect-ratio:' + a.ar + ';cursor:' + (L.marking ? 'crosshair' : 'default');
+  c.onclick = e => { if (!L.marking) return; const r = c.getBoundingClientRect(); L.marking = false; setTarget({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, r: a.target ? a.target.r : 0.08 }); snd('pop'); };
+  const n = L.list.size, ok = a.target ? sorted().filter(r => inTarget(a, r.value)).length : null;
+  const info = document.createElement('div'); info.className = 'small muted'; info.style.marginTop = '10px'; info.innerHTML = (n ? n + ' tap' + (n === 1 ? '' : 's') : 'No taps yet') + (ok != null && n ? ' · <b style="color:var(--ok)">' + ok + ' on the right spot (' + Math.round(ok / n * 100) + '%)</b>' : '') + (L.marking ? ' · <b style="color:var(--gold)">Click the picture to mark the right spot</b>' : '');
+  b.replaceChildren(c, info); }
+/* ---------- put in order: the right order with how many placed each card there, and the most common order ---------- */
+function orderView(b) { const a = L.act, list = sorted().filter(r => Array.isArray(r.value)), n = list.length || 1, exact = list.filter(r => r.value.every((k, i) => k === i)).length;
+  const place = a.options.map((_, k) => list.filter(r => r.value[k] === k).length);
+  const freq = new Map(); list.forEach(r => { const key = r.value.join(','); freq.set(key, (freq.get(key) || 0) + 1); }); const top = [...freq.entries()].sort((x, y) => y[1] - x[1])[0];
+  b.innerHTML = '<div class="lc-poll"><div class="small muted" style="margin-bottom:6px">' + (a.reveal ? 'The right order' : 'Cards in the right order (only you can see this until you reveal it)') + ' · <b style="color:var(--ok)">' + exact + ' of ' + list.length + ' got the whole order right (' + Math.round(exact / n * 100) + '%)</b></div>' +
+    a.options.map((o, k) => '<div class="lc-opt"><span class="lt" style="background:#20C997">' + (k + 1) + '</span><div class="tr"><i style="width:' + (place[k] / n * 100) + '%;background:#20C997"></i><span>' + esc(o) + '</span></div><span class="n">' + Math.round(place[k] / n * 100) + '% here</span></div>').join('') + '</div>' +
+    (top && list.length > 1 ? '<div class="small muted" style="margin-top:12px">Most common order (' + top[1] + ' student' + (top[1] === 1 ? '' : 's') + '): ' + top[0].split(',').map(k => esc(a.options[+k])).join(' → ') + '</div>' : '') +
+    '<div class="small muted" style="margin-top:10px">' + list.map(r => '<b style="color:' + (r.value.every((k, i) => k === i) ? 'var(--ok)' : 'var(--bad)') + '">' + esc(nameOf(r)) + '</b>').join(' · ') + '</div>'; }
 
 /* word cloud: words placed on a spiral, biggest first, without overlapping */
 function cloudCanvas(W, H, dark) { const freq = new Map(), shown = new Map();
@@ -340,9 +382,10 @@ function smallImg(src) { return new Promise(ok => { const im = new Image(); im.o
 function sessionInfo() { const ps = players(); return Object.assign({}, L.session, { roster: ps.map(p => p.name), stars: Object.fromEntries(ps.filter(p => p.stars).map(p => [p.name, p.stars])) }); }
 async function record() { const a = L.act; if (!a || !window.HBRP || !L.session) return; if (!L.list.size && !players().length) return; const info = sessionInfo();
   const responses = []; for (const r of sorted()) { const x = { name: r.name, at: r.at, late: !!r.late };
+    if (a.type === 'order') { x.value = r.value; x.ok = Array.isArray(r.value) && r.value.every((k, i) => k === i); } else if (a.type === 'pin') { x.value = r.value; if (a.target) x.ok = inTarget(a, r.value); } else
     if (a.type === 'draw') { x.value = null; x.thumb = thumbOf(r); } else if (a.type === 'image') { x.value = null; x.thumb = await smallImg(r.value); } else if (a.type === 'notes') x.value = (r.value || []).map(n => n.t); else x.value = r.value;
     responses.push(x); }
-  L.session.had = true; try { await HBRP.addActivity(info, { id: a.id, type: a.type, prompt: a.prompt, options: a.options || [], correct: a.type === 'poll' && Number.isInteger(a.correct) ? a.correct : null, once: a.once !== false, secs: a.endsAt ? Math.round((a.endsAt - (a.started || Date.now())) / 1000) : 0, started: a.started || Date.now(), ended: Date.now(), responses }); } catch (e) { console.warn('report', e); } }
+  L.session.had = true; try { await HBRP.addActivity(info, { id: a.id, type: a.type, prompt: a.prompt, options: a.options || [], graded: a.type === 'order' || (a.type === 'pin' && !!a.target) || undefined, thumb: a.type === 'pin' && L.bgUrl ? await smallImg(L.bgUrl) : undefined, ar: a.ar, correct: a.type === 'poll' && Number.isInteger(a.correct) ? a.correct : null, once: a.once !== false, secs: a.endsAt ? Math.round((a.endsAt - (a.started || Date.now())) / 1000) : 0, started: a.started || Date.now(), ended: Date.now(), responses }); } catch (e) { console.warn('report', e); } }
 async function endActivity(thenNew, quiet) { if (!L.act) return; await record(); if (!quiet && L.cont) L.cont = null; if (L.list.size && !thenNew && !quiet && !confirm('End this activity? Put it on the board or export it first if you want to keep the answers.')) return;
   window.HBA && HBA.log('live_activity', { type: L.act.type, answers: L.list.size, students: players().length });
   await D().cmd('endActivity'); L.act = null; L.list.clear(); L.order = []; L.shared = null; if (L.bgUrl) { URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; } closeSpot(); if (!quiet) render(); }
@@ -351,17 +394,22 @@ async function run(cfg, cont) { await open(); if (!L.el) return false; if (L.act
 const connected = () => players().filter(p => p.online).length;
 
 /* ---------- starting an activity ---------- */
-function setup(type) { const t = TYPES[type]; const timeOpts = [[0, 'No time limit'], [30, '30 seconds'], [60, '1 minute'], [90, '1½ minutes'], [120, '2 minutes'], [180, '3 minutes'], [300, '5 minutes'], [600, '10 minutes'], [900, '15 minutes'], [1200, '20 minutes'], [1800, '30 minutes']];
+/* onCfg: instead of sending now, hand the finished question back (question buttons on slides); preset fills the form */
+function setup(type, onCfg, preset) { const t = TYPES[type]; preset = preset || {}; const timeOpts = [[0, 'No time limit'], [30, '30 seconds'], [60, '1 minute'], [90, '1½ minutes'], [120, '2 minutes'], [180, '3 minutes'], [300, '5 minutes'], [600, '10 minutes'], [900, '15 minutes'], [1200, '20 minutes'], [1800, '30 minutes']];
   const PRE = { abcd: ['A', 'B', 'C', 'D'], tf: ['True', 'False'], yn: ['Yes', 'No', 'Not sure'], agree: ['Strongly agree', 'Agree', 'Disagree', 'Strongly disagree'] };
-  const hint = { draw: 'e.g. Draw and label a plant cell.', poll: 'e.g. Which organelle releases energy?', word: 'e.g. One word that describes photosynthesis.', text: 'e.g. Explain why enzymes stop working at high temperatures.', image: 'e.g. Photograph your completed results table.', notes: 'e.g. Post one example of an adaptation.' }[type];
+  const hint = { draw: 'e.g. Draw and label a plant cell.', poll: 'e.g. Which organelle releases energy?', word: 'e.g. One word that describes photosynthesis.', text: 'e.g. Explain why enzymes stop working at high temperatures.', image: 'e.g. Photograph your completed results table.', notes: 'e.g. Post one example of an adaptation.', pin: 'e.g. Tap the mitochondrion.', order: 'e.g. Put the stages of mitosis in order.' }[type];
   modal.open('<h2>' + icon(t.ic) + ' ' + esc(t.name) + '</h2><p class="muted" style="margin-top:-4px">' + esc(t.desc) + '</p>' +
     '<label class="small">Question or instruction</label><textarea id="lcP" class="inp" style="width:100%;height:70px;padding:10px;resize:vertical" maxlength="300" placeholder="' + esc(hint) + '"></textarea>' +
     (type === 'poll' ? '<div class="row" style="gap:6px;margin:10px 0 6px;flex-wrap:wrap"><span class="small">Answers:</span>' + [['abcd', 'A B C D'], ['tf', 'True / False'], ['yn', 'Yes / No / Not sure'], ['agree', 'Agree scale'], ['custom', 'Type my own']].map(([k, l]) => '<button class="btn sm" data-pre="' + k + '">' + l + '</button>').join('') + '</div><div id="lcOpts"></div>' : '') +
+    (type === 'order' ? '<label class="small" style="display:block;margin-top:10px">Cards — one per line, <b>in the right order</b> (2 to 8). Phones get them mixed up.</label><textarea id="lcItems" class="inp" style="width:100%;height:120px;padding:10px;resize:vertical" placeholder="Prophase\nMetaphase\nAnaphase\nTelophase"></textarea>' : '') +
+    (type === 'pin' ? '<div class="small" style="margin:10px 0 4px">Picture</div><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm primary" data-pic="board">' + icon('presentation') + 'My board now</button><button class="btn sm" data-pic="file">' + icon('image') + 'Choose a picture…</button><span class="small muted" id="lcPicN"></span></div><div class="small muted" style="margin-top:4px">After sending, click the picture to mark the right spot (optional) — answers are then scored.</div>' : '') +
     (type === 'draw' ? '<div class="small" style="margin:10px 0 4px">Students draw on</div><div class="row" style="gap:6px;flex-wrap:wrap" id="lcBgs">' + [['blank', 'Blank page'], ['board', 'My board now'], ['grid', 'Grid paper'], ['lines', 'Lined paper'], ['axes', 'Graph axes']].map(([k, l], i) => '<button class="btn sm' + (i === 0 ? ' primary' : '') + '" data-bg="' + k + '">' + l + '</button>').join('') + '</div>' : '') +
     '<div class="small" style="margin:12px 0 4px">Answers</div><div class="lc-mode" id="lcMode"><button data-once="1"><b>' + icon('lock') + ' Submit once</b><span>Students press Submit; the answer then locks. Best for checking understanding.</span></button><button data-once="0"><b>' + icon('radio') + ' Live</b><span>Answers appear as students work and can change until time is up. Best for brainstorming.</span></button></div>' +
     '<div class="row" style="gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center"><label class="small">Time limit <select class="sel" id="lcT">' + timeOpts.map(([v, l]) => '<option value="' + v + '"' + (v === set.get('lcSecs', type === 'draw' ? 180 : type === 'poll' ? 60 : 120) ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label><label class="small"><input type="checkbox" id="lcAuto"' + (set.get('lcAuto', true) ? ' checked' : '') + '> Hand in unsent work when time is up</label><label class="small"><input type="checkbox" id="lcA"> Hide names on my screen</label></div>' +
     '<div class="foot"><button class="btn" data-close>Cancel</button><button class="btn primary" id="lcGo">' + icon('radio') + 'Send to phones</button></div>', sh => {
-    let bg = 'blank', opts = PRE.abcd.slice(), correct = null, once = set.get('lcOnce:' + type, type !== 'notes' && type !== 'word');
+    let bg = preset.bg || 'blank', opts = type === 'poll' && preset.options && preset.options.length ? preset.options.slice() : PRE.abcd.slice(), correct = Number.isInteger(preset.correct) ? preset.correct : null, once = 'once' in preset ? preset.once : set.get('lcOnce:' + type, type !== 'notes' && type !== 'word');
+    if (preset.prompt) sh.querySelector('#lcP').value = preset.prompt; if (type === 'order' && preset.options) sh.querySelector('#lcItems').value = preset.options.join('\n'); if (preset.secs != null) sh.querySelector('#lcT').value = String(preset.secs);
+    if (onCfg) sh.querySelector('#lcGo').innerHTML = icon('presentation') + (preset.prompt != null ? 'Save the question' : 'Add to this slide');
     const drawMode = () => $$('#lcMode button', sh).forEach(b => b.classList.toggle('on', (b.dataset.once === '1') === once)); drawMode();
     $$('#lcMode button', sh).forEach(b => b.onclick = () => { once = b.dataset.once === '1'; drawMode(); });
     const drawOpts = () => { const box = sh.querySelector('#lcOpts'); if (!box) return; box.innerHTML = opts.map((o, i) => '<div class="row" style="gap:6px;margin:4px 0"><span style="width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-weight:900;color:#1E1419;background:' + POLL_C[i] + '">' + 'ABCDEF'[i] + '</span><input class="inp" data-o="' + i + '" value="' + esc(o) + '" maxlength="80" style="flex:1;height:34px"><label class="small" title="Mark as the right answer"><input type="radio" name="lcC" data-c="' + i + '"' + (correct === i ? ' checked' : '') + '> right</label>' + (opts.length > 2 ? '<button class="ib" data-x="' + i + '" title="Remove">' + icon('x') + '</button>' : '') + '</div>').join('') + (opts.length < 6 ? '<button class="btn sm" id="lcAdd">' + icon('plus') + 'Add an answer</button>' : '') + '<div class="small muted" style="margin-top:4px">Tick “right” to reveal the answer later (optional).</div>';
@@ -372,11 +420,15 @@ function setup(type) { const t = TYPES[type]; const timeOpts = [[0, 'No time lim
     drawOpts();
     $$('[data-pre]', sh).forEach(b => b.onclick = () => { opts = b.dataset.pre === 'custom' ? ['', ''] : PRE[b.dataset.pre].slice(); correct = null; drawOpts(); const f = sh.querySelector('[data-o]'); if (b.dataset.pre === 'custom' && f) f.focus(); });
     $$('[data-bg]', sh).forEach(b => b.onclick = () => { bg = b.dataset.bg; $$('[data-bg]', sh).forEach(x => x.classList.toggle('primary', x === b)); });
+    let pic = null; $$('[data-pic]', sh).forEach(b => b.onclick = () => { $$('[data-pic]', sh).forEach(x => x.classList.toggle('primary', x === b));
+      if (b.dataset.pic === 'board') { pic = null; sh.querySelector('#lcPicN').textContent = ''; return; }
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = () => { const f = inp.files[0]; if (!f) return; const im = new Image(); im.onload = () => { const k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); pic = c; sh.querySelector('#lcPicN').textContent = '✓ ' + f.name; URL.revokeObjectURL(im.src); }; im.src = URL.createObjectURL(f); }; inp.click(); });
     const p = sh.querySelector('#lcP'); setTimeout(() => p.focus(), 50);
     sh.querySelector('#lcGo').onclick = async () => { const prompt = p.value.trim(); if (type === 'poll') { opts = opts.map(o => o.trim()); if (opts.some(o => !o)) { toast('Fill in every answer, or remove the empty ones.'); return; } }
       const secs = +sh.querySelector('#lcT').value, auto = sh.querySelector('#lcAuto').checked; set.put('lcSecs', secs); set.put('lcAuto', auto); set.put('lcOnce:' + type, once);
-      const cfg = { type, prompt, secs, once, auto, anon: sh.querySelector('#lcA').checked, options: type === 'poll' ? opts : [], correct, bg };
-      modal.close(); start(cfg); }; }); }
+      let items = []; if (type === 'order') { items = sh.querySelector('#lcItems').value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 8); if (items.length < 2) { toast('Write at least two cards, one per line, in the right order.'); return; } }
+      const cfg = { type, prompt, secs, once, auto, anon: sh.querySelector('#lcA').checked, options: type === 'poll' ? opts : items, correct, bg: type === 'pin' ? 'board' : bg, bgCanvas: type === 'pin' ? pic : null };
+      modal.close(); if (onCfg) { delete cfg.bgCanvas; onCfg(cfg); } else start(cfg); }; }); }
 /* backgrounds for Draw it: the teacher's board, or clean paper */
 function paperCanvas(kind) { const W = 1200, H = 900, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
   if (kind === 'grid') { g.strokeStyle = '#cfe0f5'; g.lineWidth = 1; for (let x = 0; x <= W; x += 30) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); g.stroke(); } for (let y = 0; y <= H; y += 30) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); } g.strokeStyle = '#a9c6ea'; for (let x = 0; x <= W; x += 150) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); g.stroke(); } for (let y = 0; y <= H; y += 150) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); } }
@@ -385,14 +437,14 @@ function paperCanvas(kind) { const W = 1200, H = 900, c = document.createElement
     g.strokeStyle = '#1E1419'; g.lineWidth = 3; g.beginPath(); g.moveTo(120, 40); g.lineTo(120, H - 120); g.lineTo(W - 40, H - 120); g.stroke(); g.fillStyle = '#1E1419'; g.beginPath(); g.moveTo(120, 30); g.lineTo(110, 52); g.lineTo(130, 52); g.fill(); g.beginPath(); g.moveTo(W - 30, H - 120); g.lineTo(W - 52, H - 130); g.lineTo(W - 52, H - 110); g.fill(); }
   return c; }
 async function start(cfg) {
-  let src = null; if (cfg.type === 'draw') src = cfg.bgCanvas || (cfg.bg === 'board' ? HBCL.boardCanvas(1400) : cfg.bg && cfg.bg !== 'blank' ? paperCanvas(cfg.bg) : null);
+ let src = null; if (cfg.type === 'draw' || cfg.type === 'pin') src = cfg.bgCanvas || (cfg.bg === 'board' ? HBCL.boardCanvas(1400) : cfg.bg && cfg.bg !== 'blank' ? paperCanvas(cfg.bg) : null);
   const ar = src ? src.width / src.height : 4 / 3; let bytes = null;
   if (src) { const blob = await new Promise(r => src.toBlob(r, 'image/jpeg', 0.85)); bytes = new Uint8Array(await blob.arrayBuffer()); if (L.bgUrl) URL.revokeObjectURL(L.bgUrl); L.bgUrl = URL.createObjectURL(blob); L.bgImg = await new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = L.bgUrl; }); }
   else { if (L.bgUrl) URL.revokeObjectURL(L.bgUrl); L.bgUrl = null; L.bgImg = null; }
-  const r = await D().cmd('activity', { type: cfg.type, prompt: cfg.prompt, options: cfg.options, secs: cfg.secs, anon: cfg.anon, once: cfg.once !== false, auto: cfg.auto !== false, bg: bytes, ar });
+  const r = await D().cmd('activity', { type: cfg.type, prompt: cfg.prompt, options: cfg.options, secs: cfg.secs, anon: cfg.anon, once: cfg.once !== false, auto: cfg.auto !== false, bg: bytes, ar, target: cfg.target || null });
   if (!r || r.error) { toast((r && r.error) || 'The activity could not start.'); return; }
-  load(r); L.act.correct = cfg.type === 'poll' ? cfg.correct : null; L.act.started = Date.now(); L.shared = null; snd('whoosh'); render();
-  if (!L.session) { const E = window.HBE, pg = E && E.page && E.page(); L.session = { id: 'l' + Date.now().toString(36), title: ((pg && pg.name && !/^Page \d+$/.test(pg.name)) ? pg.name : 'Live class') + ' · ' + new Date().toLocaleDateString([], { day: 'numeric', month: 'short' }), started: Date.now() }; }
+  load(r); L.act.correct = cfg.type === 'poll' ? cfg.correct : null; L.act.target = r.target || null; L.act.started = Date.now(); L.shared = null; snd('whoosh'); render();
+  if (!L.session) { const E = window.HBE, pg = E && E.page && E.page(); L.session = { id: 'l' + Date.now().toString(36), title: (window.HBX ? HBX.title() : (pg && pg.name && !/^Page \d+$/.test(pg.name)) ? pg.name : 'Live class') + ' · ' + new Date().toLocaleDateString([], { day: 'numeric', month: 'short' }), cls: window.HBX ? HBX.cur() : '', started: Date.now() }; }
   const n = players().length; toast(n ? 'Sent to ' + n + ' phone' + (n === 1 ? '' : 's') + ' — answers appear here live.' : 'Activity ready. Students who join now see it straight away.'); }
 
 /* ---------- spotlight: one answer, big ---------- */
@@ -419,6 +471,10 @@ const loadImg = src => new Promise(ok => { const im = new Image(); im.onload = (
 function wrapText(g, text, x, y, maxW, lh, maxLines) { const words = String(text).split(/\s+/); let line = '', n = 0; for (const w of words) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y + n * lh); n++; line = w; if (n >= maxLines) return; } else line = t; } if (line && n < maxLines) g.fillText(line, x, y + n * lh); }
 async function galleryCanvas(onlyPid) { const a = L.act, list = onlyPid ? [L.list.get(onlyPid)] : sorted(); if (!list.length || !list[0]) return null;
   if (a.type === 'word') return cloudCanvas(1600, 800, false);
+  if (a.type === 'pin') return pinCanvas(1600, (L.pinView || 'heat') === 'heat', !a.anon);
+  if (a.type === 'order') { const W = 1400, rowH = 84, H = 120 + a.options.length * rowH, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#1E1419'; g.font = '700 34px "Space Grotesk", sans-serif'; wrapText(g, a.prompt || 'Put in order', 40, 56, W - 80, 40, 1);
+    const list = sorted().filter(r => Array.isArray(r.value)), n = list.length || 1; a.options.forEach((o, k) => { const y = 96 + k * rowH, p = list.filter(r => r.value[k] === k).length / n; g.fillStyle = '#20C997'; g.fillRect(40, y, 56, 56); g.fillStyle = '#fff'; g.font = '900 30px sans-serif'; g.fillText(String(k + 1), 58, y + 39); g.fillStyle = '#eefaf5'; g.fillRect(116, y, W - 340, 56); g.fillStyle = '#9be3c8'; g.fillRect(116, y, (W - 340) * p, 56); g.fillStyle = '#1E1419'; g.font = '700 26px "Segoe UI", sans-serif'; wrapText(g, o, 132, y + 37, W - 380, 30, 1); g.font = '800 26px monospace'; g.fillText(Math.round(p * 100) + '% here', W - 200, y + 37); });
+    return c; }
   if (a.type === 'poll') { const W = 1400, rowH = 96, H = 120 + a.options.length * rowH, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#1E1419'; g.font = '700 34px "Space Grotesk", sans-serif'; wrapText(g, a.prompt || 'Poll', 40, 56, W - 80, 40, 1);
     const counts = a.options.map(() => 0); L.list.forEach(r => { if (counts[r.value] != null) counts[r.value]++; }); const max = Math.max(1, ...counts), tot = L.list.size || 1;
     a.options.forEach((o, i) => { const y = 100 + i * rowH; g.fillStyle = POLL_C[i]; g.fillRect(40, y, 56, 56); g.fillStyle = '#1E1419'; g.font = '900 30px sans-serif'; g.fillText('ABCDEF'[i], 58, y + 39); g.fillStyle = '#f3eef3'; g.fillRect(116, y, W - 340, 56); g.fillStyle = POLL_C[i]; g.fillRect(116, y, (W - 340) * counts[i] / max, 56); if (a.reveal === i) { g.strokeStyle = '#2F9E44'; g.lineWidth = 5; g.strokeRect(116, y, W - 340, 56); }
@@ -436,7 +492,7 @@ async function galleryCanvas(onlyPid) { const a = L.act, list = onlyPid ? [L.lis
 async function toBoard(pid) { const c = await galleryCanvas(pid); if (!c) { toast('There is nothing to put on the board yet.'); return; }
   const url = c.toDataURL(c.width * c.height > 6e6 ? 'image/jpeg' : 'image/png', 0.9); closeSpot(); hide(); window.HBI.insertImage(url); snd('pop'); toast('Added to the board — it is a picture you can move, resize and write on.'); }
 function csv() { const a = L.act; const rows = [['Name', 'Answer', 'Time', 'Stars']];
-  sorted().forEach(r => { let v = r.value; if (a.type === 'poll') v = 'ABCDEF'[v] + ') ' + a.options[v]; else if (a.type === 'word') v = v.join(', '); else if (a.type === 'notes') v = v.map(n => n.t).join(' | '); else if (a.type === 'draw') v = '(drawing — ' + v.length + ' lines)'; else if (a.type === 'image') v = '(photo)';
+  sorted().forEach(r => { let v = r.value; if (a.type === 'poll') v = 'ABCDEF'[v] + ') ' + a.options[v]; else if (a.type === 'word') v = v.join(', '); else if (a.type === 'notes') v = v.map(n => n.t).join(' | '); else if (a.type === 'draw') v = '(drawing — ' + v.length + ' lines)'; else if (a.type === 'image') v = '(photo)'; else if (a.type === 'order') v = v.map(k => a.options[k]).join(' → ') + (v.every((k, i) => k === i) ? ' ✓' : ' ✗'); else if (a.type === 'pin') v = Math.round(v[0] * 100) + '%, ' + Math.round(v[1] * 100) + '%' + (a.target ? (inTarget(a, v) ? ' ✓' : ' ✗') : '');
     rows.push([r.name, String(v), new Date(r.at).toLocaleTimeString(), starsOf(r.pid)]); });
   players().filter(p => !L.list.has(p.pid)).forEach(p => rows.push([p.name, '(no answer)', '', p.stars]));
   const text = '﻿' + rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\r\n'); const b = new Blob([text], { type: 'text/csv' }), aEl = document.createElement('a'); aEl.href = URL.createObjectURL(b); aEl.download = (TYPES[a.type].name + ' ' + new Date().toLocaleDateString()).replace(/[\\/:*?"<>|]+/g, '-') + '.csv'; aEl.click(); setTimeout(() => URL.revokeObjectURL(aEl.href), 4000); }
@@ -449,7 +505,9 @@ function leaderboard() { const ps = players().slice().sort((a, b) => b.stars - a
 
 /* the Live class button in the top bar (red dot while an activity is running) */
 { const top = document.getElementById('aUndo'); if (top) { const b = document.createElement('button'); b.id = 'aLive'; b.title = 'Live class: polls, drawings, word clouds and more on students’ phones'; b.innerHTML = icon('radio') + '<span class="lbl">Live class</span><span class="dot"></span>'; b.onclick = () => open(); const sep = document.createElement('span'); sep.className = 'sep'; top.parentNode.insertBefore(b, top.parentNode.firstChild); top.parentNode.insertBefore(sep, b.nextSibling); } }
-setInterval(() => { const b = document.getElementById('aLive'); if (b) b.classList.toggle('on', !!L.act); }, 1000);
+/* while a live session runs the button turns red and shows how many phones are connected */
+setInterval(() => { const b = document.getElementById('aLive'); if (!b) return; const on = !!(window.HBCL && HBCL.on), lb = b.querySelector('.lbl'); b.classList.toggle('on', on); b.classList.toggle('act', !!L.act);
+  const t = on ? 'Live · ' + connected() : 'Live class'; if (lb && lb.textContent !== t) lb.textContent = t; b.title = on ? 'Live session running' + (window.HBX ? ': ' + HBX.title() : '') + ' — click to open' : 'Live class: polls, drawings, word clouds and more on students’ phones'; }, 1000);
 addEventListener('beforeunload', () => { if (L.act) record(); });
-window.HBLC = { open, event, closed, hide, setup, run, endSession, pick: () => window.HBCL && HBCL.on ? pickName() : toast('Start Live class first — students join with the QR code.'), get active() { return !!L.act; }, get students() { return window.HBCL && HBCL.on ? connected() : 0; } };
+window.HBLC = { TYPES, open, event, closed, hide, setup, run, endSession, pick: () => window.HBCL && HBCL.on ? pickName() : toast('Start Live class first — students join with the QR code.'), get active() { return !!L.act; }, get students() { return window.HBCL && HBCL.on ? connected() : 0; } };
 })();

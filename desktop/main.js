@@ -178,6 +178,7 @@ ipcMain.handle('live:start', async (e, quiz) => {
 });
 ipcMain.handle('live:cmd', (e, cmd, arg) => {
   if (cmd === 'question') live.question(arg.qi, arg.secs, arg.pace);
+  else if (cmd === 'opts') live.setOpts(arg);
   else if (cmd === 'reveal') live.reveal();
   else if (cmd === 'board') live.board();
   else if (cmd === 'end') live.end();
@@ -212,6 +213,7 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   else if (cmd === 'removeResponse') cl.removeResponse(a && a.pid, a && a.idx);
   else if (cmd === 'award') cl.award(a && a.pid, a && a.n);
   else if (cmd === 'lock') cl.setLock(a);
+  else if (cmd === 'xp') cl.setXp(a);
   else if (cmd === 'lowerHand') cl.lowerHand(a || null);
   else if (cmd === 'clearQuestions') cl.clearQuestions();
   else if (cmd === 'link') openClLink();

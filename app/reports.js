@@ -7,7 +7,7 @@
 'use strict';
 const { $, $$, esc, icon, set, toast, modal, IDB, SND, REDUCE } = window.HB;
 const KEY = 'reports:index', RK = id => 'report:' + id;
-const TYPE = { draw: ['pen-tool', 'Draw it'], poll: ['chart-column-big', 'Poll'], word: ['cloud', 'Word cloud'], text: ['message-square-text', 'Short answer'], image: ['camera', 'Photo'], notes: ['sticky-note', 'Collaborate'], quiz: ['trophy', 'Quiz question'] };
+const TYPE = { draw: ['pen-tool', 'Draw it'], poll: ['chart-column-big', 'Poll'], order: ['list-ordered', 'Put in order'], pin: ['map-pin', 'Tap the picture'], word: ['cloud', 'Word cloud'], text: ['message-square-text', 'Short answer'], image: ['camera', 'Photo'], notes: ['sticky-note', 'Collaborate'], quiz: ['trophy', 'Quiz question'] };
 const POLL_C = ['#FF5FA2', '#22D3EE', '#FFC928', '#4ADE80', '#B197FC', '#FF9F5A'];
 const R = { el: null, index: [], cur: null, tab: set.get('rpTab', 'overview'), q: '', sort: ['name', 1], live: null };
 const pct = (a, b) => b ? Math.round(a / b * 100) : null;
@@ -26,8 +26,8 @@ async function deleteSession(id) { await IDB.put(RK(id), null); R.index = R.inde
 /* one Live class lesson = one report; activities are added as they finish */
 async function addActivity(sessionInfo, act) { if (!index.ready) await index();
   let s = R.live && R.live.id === sessionInfo.id ? R.live : await getSession(sessionInfo.id);
-  if (!s) s = { id: sessionInfo.id, kind: 'live', title: sessionInfo.title || 'Live class', started: sessionInfo.started || Date.now(), ended: Date.now(), roster: [], stars: {}, activities: [] };
-  s.ended = Date.now(); (sessionInfo.roster || []).forEach(n => { if (!s.roster.includes(n)) s.roster.push(n); }); Object.assign(s.stars, sessionInfo.stars || {});
+  if (!s) s = { id: sessionInfo.id, kind: 'live', cls: sessionInfo.cls || '', title: sessionInfo.title || 'Live class', started: sessionInfo.started || Date.now(), ended: Date.now(), roster: [], stars: {}, activities: [] };
+  s.ended = Date.now(); if (sessionInfo.cls) s.cls = sessionInfo.cls; if (sessionInfo.title) s.title = sessionInfo.title; (sessionInfo.roster || []).forEach(n => { if (!s.roster.includes(n)) s.roster.push(n); }); Object.assign(s.stars, sessionInfo.stars || {});
   const i = s.activities.findIndex(a => a.id === act.id); if (i >= 0) s.activities[i] = act; else s.activities.push(act);
   R.live = s; await saveSession(s); if (R.el && R.cur && R.cur.id === s.id) { R.cur = s; render(); } }
 async function updateLive(sessionInfo) { if (!R.live || R.live.id !== sessionInfo.id) return; Object.assign(R.live.stars, sessionInfo.stars || {}); (sessionInfo.roster || []).forEach(n => { if (!R.live.roster.includes(n)) R.live.roster.push(n); }); R.live.ended = Date.now(); await saveSession(R.live); }
@@ -35,22 +35,25 @@ async function updateLive(sessionInfo) { if (!R.live || R.live.id !== sessionInf
 async function addQuiz(title, res) { if (!res || !res.players) return; if (!index.ready) await index();
   const id = 'q' + Date.now().toString(36), s = { id, kind: 'quiz', title: title || 'Phone quiz', started: Date.now() - 60000, ended: Date.now(), roster: res.players.map(p => p.name), stars: {}, scores: {}, activities: [] };
   res.players.forEach(p => { s.scores[p.name] = p.score; });
-  res.questions.forEach((q, k) => s.activities.push({ id: id + '-' + k, type: 'poll', quiz: true, prompt: q.q, options: q.o, correct: q.a >= 0 ? q.a : null, once: true, started: s.started, ended: s.ended,
-    responses: res.players.filter(p => p.ans[k]).map(p => ({ name: p.name, value: p.ans[k].c, ms: p.ans[k].ms })) }));
+  if (window.HBX) s.cls = HBX.cur(); if (res.opts && res.opts.mode !== 'classic') s.mode = res.opts.mode; if (res.teams) s.teams = res.teams; if (res.boss) s.boss = { won: res.boss.hp <= 0, left: Math.round(res.boss.hp / res.boss.max * 100) };
+  res.questions.forEach((q, k) => s.activities.push({ id: id + '-' + k, type: q.t === 'order' ? 'order' : 'poll', quiz: true, prompt: q.q, options: q.o, correct: q.t !== 'order' && q.a >= 0 ? q.a : null, graded: q.t === 'order' || undefined, once: true, started: s.started, ended: s.ended,
+    responses: res.players.filter(p => p.ans[k] && p.ans[k].c !== -1).map(p => ({ name: p.name, value: p.ans[k].c, ms: p.ans[k].ms, ok: p.ans[k].ok, conf: p.ans[k].conf, team: p.team || undefined })) }));
   await saveSession(s); return s; }
 async function index() { await loadIndex(); index.ready = true; }
 
 /* ---------- analysis ---------- */
-const gradable = a => a.type === 'poll' && Number.isInteger(a.correct);
+/* graded: a poll with a right answer, or an activity that marks each answer itself (put in order, tap the picture with a target) */
+const gradable = a => (a.type === 'poll' && Number.isInteger(a.correct)) || !!a.graded;
+const isRight = (a, r) => a.graded ? !!r.ok : r.value === a.correct;
 function stats(s) {
   const names = new Set(s.roster || []); s.activities.forEach(a => a.responses.forEach(r => names.add(r.name)));
   const students = [...names].map(name => { let answered = 0, right = 0, graded = 0, late = 0; const cells = s.activities.map(a => { const r = a.responses.find(x => x.name === name); if (!r) return { st: 'miss' }; answered++; if (r.late) late++;
-      if (gradable(a)) { graded++; const ok = r.value === a.correct; if (ok) right++; return { st: ok ? 'ok' : 'bad', r }; } return { st: 'done', r }; });
+      if (gradable(a)) { graded++; const ok = isRight(a, r); if (ok) right++; return { st: ok ? 'ok' : 'bad', r }; } return { st: 'done', r }; });
     return { name, answered, right, graded, late, cells, participation: pct(answered, s.activities.length), accuracy: pct(right, graded), stars: (s.stars || {})[name] || 0, score: s.scores ? s.scores[name] || 0 : null }; });
-  const acts = s.activities.map(a => { const n = a.responses.length, right = gradable(a) ? a.responses.filter(r => r.value === a.correct).length : null;
+  const acts = s.activities.map(a => { const n = a.responses.length, right = gradable(a) ? a.responses.filter(r => isRight(a, r)).length : null;
     return { a, n, participation: pct(n, students.length), accuracy: gradable(a) ? pct(right, n) : null, late: a.responses.filter(r => r.late).length }; });
   const totalAnswers = acts.reduce((x, y) => x + y.n, 0), possible = students.length * s.activities.length;
-  const gr = acts.filter(x => x.accuracy != null && x.n), gRight = gr.reduce((x, y) => x + y.a.responses.filter(r => r.value === y.a.correct).length, 0), gN = gr.reduce((x, y) => x + y.n, 0);
+  const gr = acts.filter(x => x.accuracy != null && x.n), gRight = gr.reduce((x, y) => x + y.a.responses.filter(r => isRight(y.a, r)).length, 0), gN = gr.reduce((x, y) => x + y.n, 0);
   return { students, acts, participation: pct(totalAnswers, possible), accuracy: pct(gRight, gN), onTime: pct(totalAnswers - acts.reduce((x, y) => x + y.late, 0), totalAnswers), stars: Object.values(s.stars || {}).reduce((x, y) => x + y, 0) }; }
 
 /* ---------- styles ---------- */
@@ -211,11 +214,17 @@ function studentsHTML(s, st) { const [k, dir] = R.sort; const rows = st.students
     s.activities.map((a, i) => '<th class="q" title="' + esc(short(a, i)) + '">' + (i + 1) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map(x => '<tr><td><a href="#" data-stu="' + esc(x.name) + '" style="color:var(--ink);font-weight:700;text-decoration:none">' + esc(x.name) + '</a></td>' + (s.kind === 'quiz' ? '<td><b>' + x.score + '</b></td>' : '') + '<td>' + x.answered + '/' + s.activities.length + ' · ' + (x.participation == null ? '—' : x.participation + '%') + '</td><td>' + (x.accuracy == null ? '—' : '<span class="acc ' + accClass(x.accuracy) + '">' + x.accuracy + '%</span>') + '</td>' + (s.kind === 'quiz' ? '' : '<td>' + (x.stars ? '★ ' + x.stars : '') + '</td>') +
       x.cells.map((c, i) => '<td class="c"><span class="cell c-' + c.st + '" title="' + esc(short(s.activities[i], i)) + (c.r ? ' — ' + esc(answerText(s.activities[i], c.r)) : '') + '">' + sym[c.st] + (c.r && c.r.late ? '<small style="font-size:9px">⏰</small>' : '') + '</span></td>').join('') + '</tr>').join('') + '</tbody></table></div>'; }
-function answerText(a, r) { const v = r.value; if (a.type === 'poll') return v == null ? '' : 'ABCDEF'[v] + ') ' + (a.options[v] || ''); if (a.type === 'word') return (v || []).join(', '); if (a.type === 'notes') return (v || []).join(' | '); if (a.type === 'draw') return '(drawing)'; if (a.type === 'image') return '(photo)'; return String(v == null ? '' : v); }
+function answerText(a, r) { const v = r.value; const cf = r.conf != null ? ' (' + ['guessing', 'think so', 'sure'][r.conf] + ')' : '';
+  if (a.type === 'order') return (Array.isArray(v) ? v.map((k, i) => (i + 1) + '. ' + (a.options[k] || '?')).join('  ') : '') + cf;
+  if (a.type === 'pin') return Array.isArray(v) ? 'tapped at ' + Math.round(v[0] * 100) + '%, ' + Math.round(v[1] * 100) + '%' + (a.graded ? (r.ok ? ' (on target)' : ' (off target)') : '') : '';
+  if (a.type === 'poll' && cf) return v == null ? '' : 'ABCDEF'[v] + ') ' + (a.options[v] || '') + cf;
+  if (a.type === 'poll') return v == null ? '' : 'ABCDEF'[v] + ') ' + (a.options[v] || ''); if (a.type === 'word') return (v || []).join(', '); if (a.type === 'notes') return (v || []).join(' | '); if (a.type === 'draw') return '(drawing)'; if (a.type === 'image') return '(photo)'; return String(v == null ? '' : v); }
 /* per activity: what the class answered */
 function activitiesHTML(s, st) { return st.acts.map((x, i) => { const a = x.a, ty = TYPE[a.type] || TYPE.poll; let body = '';
     if (a.type === 'poll') { const counts = a.options.map((_, k) => a.responses.filter(r => r.value === k).length), mx = Math.max(1, ...counts); body = a.options.map((o, k) => bar(('ABCDEF'[k]) + ') ' + o + (a.correct === k ? ' ✓' : ''), Math.round(counts[k] / mx * 100), a.correct === k ? '#2F9E44' : POLL_C[k], counts[k] + ' · ' + (pct(counts[k], x.n) || 0) + '%')).join(''); }
     else if (a.type === 'word') { const f = new Map(); a.responses.forEach(r => (r.value || []).forEach(w => { const k = w.toLowerCase(); f.set(k, (f.get(k) || 0) + 1); })); const top = [...f.entries()].sort((p, q) => q[1] - p[1]).slice(0, 12), mx = top.length ? top[0][1] : 1; body = top.map(([w, n]) => bar(w, Math.round(n / mx * 100), '#B197FC', n)).join('') || '<div class="muted small">No words.</div>'; }
+    else if (a.type === 'order') { body = a.options.map((o, k) => { const n = a.responses.filter(r => Array.isArray(r.value) && r.value[k] === k).length; return bar((k + 1) + '. ' + o, pct(n, x.n) || 0, '#2F9E44', (pct(n, x.n) || 0) + '% placed it here'); }).join(''); }
+    else if (a.type === 'pin') body = (a.thumb ? '<div style="position:relative;max-width:520px"><img src="' + a.thumb + '" style="width:100%;border-radius:10px;display:block;background:#fff">' + a.responses.filter(r => Array.isArray(r.value)).map(r => '<span title="' + esc(r.name) + '" style="position:absolute;left:' + (r.value[0] * 100) + '%;top:' + (r.value[1] * 100) + '%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:' + (a.graded ? (r.ok ? '#2F9E44' : '#E03131') : '#FF5FA2') + ';border:2px solid #fff"></span>').join('') + '</div>' : '') + '<div class="answers">' + a.responses.map(r => '<div><b>' + esc(r.name) + '</b>' + esc(answerText(a, r)) + '</div>').join('') + '</div>';
     else if (a.type === 'draw' || a.type === 'image') body = '<div class="thumbs">' + a.responses.map(r => '<figure>' + (r.thumb ? '<img src="' + r.thumb + '" alt="">' : '<div style="aspect-ratio:4/3;display:grid;place-items:center;color:#888">—</div>') + '<figcaption>' + esc(r.name) + (r.late ? ' ⏰' : '') + '</figcaption></figure>').join('') + '</div>';
     else body = '<div class="answers">' + a.responses.map(r => '<div><b>' + esc(r.name) + (r.late ? ' ⏰' : '') + '</b>' + esc(answerText(a, r)) + '</div>').join('') + '</div>';
     if (!x.n) body = '<div class="muted small">No answers.</div>';
@@ -224,12 +233,12 @@ function activitiesHTML(s, st) { return st.acts.map((x, i) => { const a = x.a, t
       (missing.length ? '<div class="small muted" style="margin-top:10px">No answer: ' + missing.map(esc).join(', ') + '</div>' : '') + '</div>'; }).join('') || '<div class="muted">No activities in this report.</div>'; }
 function studentCard(s, st, name) { const x = st.students.find(y => y.name === name); if (!x) return;
   modal.open('<h2>' + icon('user') + ' ' + esc(name) + '</h2><div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><span class="st-tag">' + x.answered + '/' + s.activities.length + ' answered</span>' + (x.accuracy != null ? '<span class="st-tag">' + x.accuracy + '% right</span>' : '') + (x.stars ? '<span class="st-tag">★ ' + x.stars + '</span>' : '') + (s.kind === 'quiz' ? '<span class="st-tag">' + x.score + ' points</span>' : '') + '</div>' +
-    s.activities.map((a, i) => { const c = x.cells[i]; return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)"><span style="width:26px;font-weight:800;color:var(--muted)">' + (i + 1) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(a.prompt || TYPE[a.type][1]) + '</div><div style="margin-top:3px;color:' + (c.st === 'ok' ? 'var(--ok)' : c.st === 'bad' ? 'var(--bad)' : 'var(--muted)') + '">' + (c.r ? (c.st === 'ok' ? '✓ ' : c.st === 'bad' ? '✗ ' : '') + esc(answerText(a, c.r)) + (c.r.late ? ' ⏰' : '') : 'No answer') + (c.st === 'bad' ? ' <span class="muted">· right: ' + esc('ABCDEF'[a.correct] + ') ' + a.options[a.correct]) + '</span>' : '') + '</div>' + (c.r && c.r.thumb ? '<img src="' + c.r.thumb + '" style="max-width:220px;border-radius:8px;margin-top:6px;background:#fff">' : '') + '</div></div>'; }).join('') + '<div class="foot"><button class="btn primary" data-close>Close</button></div>'); }
+    s.activities.map((a, i) => { const c = x.cells[i]; return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)"><span style="width:26px;font-weight:800;color:var(--muted)">' + (i + 1) + '</span><div style="flex:1;min-width:0"><div style="font-weight:700">' + esc(a.prompt || TYPE[a.type][1]) + '</div><div style="margin-top:3px;color:' + (c.st === 'ok' ? 'var(--ok)' : c.st === 'bad' ? 'var(--bad)' : 'var(--muted)') + '">' + (c.r ? (c.st === 'ok' ? '✓ ' : c.st === 'bad' ? '✗ ' : '') + esc(answerText(a, c.r)) + (c.r.late ? ' ⏰' : '') : 'No answer') + (c.st === 'bad' && Number.isInteger(a.correct) ? ' <span class="muted">· right: ' + esc('ABCDEF'[a.correct] + ') ' + a.options[a.correct]) + '</span>' : '') + '</div>' + (c.r && c.r.thumb ? '<img src="' + c.r.thumb + '" style="max-width:220px;border-radius:8px;margin-top:6px;background:#fff">' : '') + '</div></div>'; }).join('') + '<div class="foot"><button class="btn primary" data-close>Close</button></div>'); }
 
 /* ---------- exports ---------- */
 function rows(s) { const st = stats(s), out = [];
   s.activities.forEach((a, i) => st.students.forEach(stu => { const r = a.responses.find(x => x.name === stu.name);
-    out.push({ Session: s.title, Date: new Date(s.started).toISOString().slice(0, 10), Kind: s.kind === 'quiz' ? 'Phone quiz' : 'Live class', 'Activity #': i + 1, 'Activity type': a.quiz ? 'Quiz question' : TYPE[a.type][1], Prompt: a.prompt || '', Student: stu.name, Answered: r ? 'Yes' : 'No', Answer: r ? answerText(a, r) : '', Correct: gradable(a) && r ? (r.value === a.correct ? 'Yes' : 'No') : '', 'Handed in at time-up': r && r.late ? 'Yes' : '', 'Answer time': r && r.at ? new Date(r.at).toLocaleTimeString() : (r && r.ms ? (r.ms / 1000).toFixed(1) + ' s' : '') }); }));
+    out.push({ Session: s.title, Date: new Date(s.started).toISOString().slice(0, 10), Kind: s.kind === 'quiz' ? 'Phone quiz' : 'Live class', 'Activity #': i + 1, 'Activity type': a.quiz ? 'Quiz question' : TYPE[a.type][1], Prompt: a.prompt || '', Student: stu.name, Answered: r ? 'Yes' : 'No', Answer: r ? answerText(a, r) : '', Correct: gradable(a) && r ? (isRight(a, r) ? 'Yes' : 'No') : '', Confidence: r && r.conf != null ? ['Guessing', 'Think so', 'Sure'][r.conf] : '', Team: r && r.team ? r.team : '', 'Handed in at time-up': r && r.late ? 'Yes' : '', 'Answer time': r && r.at ? new Date(r.at).toLocaleTimeString() : (r && r.ms ? (r.ms / 1000).toFixed(1) + ' s' : '') }); }));
   return out; }
 const fileBase = s => (s.title + ' ' + new Date(s.started).toISOString().slice(0, 10)).replace(/[\\/:*?"<>|]+/g, '-');
 function download(name, data, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
@@ -240,7 +249,7 @@ function exportCsv(s) { const rs = rows(s); if (!rs.length) { toast('Nothing to 
 function exportXlsx(s) { const st = stats(s);
   const summary = [['HelixBoard report', s.title], ['Kind', s.kind === 'quiz' ? 'Phone quiz' : 'Live class'], ['Date', fmtD(s.started)], ['Time', fmtT(s.started) + ' – ' + fmtT(s.ended)], ['Students', st.students.length], [s.kind === 'quiz' ? 'Questions' : 'Activities', s.activities.length], ['Participation %', st.participation == null ? '' : st.participation], ['Accuracy %', st.accuracy == null ? '' : st.accuracy], ['On time %', st.onTime == null ? '' : st.onTime], ['Stars awarded', st.stars]];
   const students = [['Student'].concat(s.kind === 'quiz' ? ['Score'] : [], ['Answered', 'Participation %', 'Accuracy %', 'Stars', 'Handed in at time-up'], s.activities.map((a, i) => 'A' + (i + 1)))].concat(st.students.map(x => [x.name].concat(s.kind === 'quiz' ? [x.score] : [], [x.answered, x.participation == null ? '' : x.participation, x.accuracy == null ? '' : x.accuracy, x.stars, x.late], x.cells.map((c, i) => c.r ? (c.st === 'ok' ? '✓ ' : c.st === 'bad' ? '✗ ' : '') + answerText(s.activities[i], c.r) : ''))));
-  const acts = [['#', 'Type', 'Prompt', 'Answered', 'Participation %', 'Accuracy %', 'Right answer', 'Handed in at time-up', 'Mode']].concat(st.acts.map((x, i) => [i + 1, x.a.quiz ? 'Quiz question' : TYPE[x.a.type][1], x.a.prompt || '', x.n, x.participation == null ? '' : x.participation, x.accuracy == null ? '' : x.accuracy, gradable(x.a) ? 'ABCDEF'[x.a.correct] + ') ' + x.a.options[x.a.correct] : '', x.late, x.a.once === false ? 'Live' : 'Submit once']));
+  const acts = [['#', 'Type', 'Prompt', 'Answered', 'Participation %', 'Accuracy %', 'Right answer', 'Handed in at time-up', 'Mode']].concat(st.acts.map((x, i) => [i + 1, x.a.quiz ? 'Quiz question' : TYPE[x.a.type][1], x.a.prompt || '', x.n, x.participation == null ? '' : x.participation, x.accuracy == null ? '' : x.accuracy, gradable(x.a) ? (x.a.type === 'order' ? x.a.options.join(' → ') : Number.isInteger(x.a.correct) ? 'ABCDEF'[x.a.correct] + ') ' + x.a.options[x.a.correct] : 'target area') : '', x.late, x.a.once === false ? 'Live' : 'Submit once']));
   const rs = rows(s), cols = rs.length ? Object.keys(rs[0]) : [], resp = [cols].concat(rs.map(r => cols.map(c => r[c])));
   download(fileBase(s) + '.xlsx', xlsx([['Summary', summary], ['Students', students], ['Activities', acts], ['Responses', resp]]));
   SND.done && SND.done(); toast('Saved an Excel workbook with 4 sheets: Summary, Students, Activities and Responses.'); }
@@ -278,5 +287,5 @@ function xlsx(sheets) { const x = v => String(v).replace(/[&<>"]/g, c => ({ '&':
   sheets.forEach(([, data], i) => files.push(['xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(data)]));
   return zip(files); }
 
-window.HBRP = { open, close, addActivity, updateLive, addQuiz, stats, _xlsx: xlsx, _printLayout: () => R.cur && printLayout(R.cur), _endPrint: () => { document.body.classList.remove('rp-print'); document.documentElement.classList.remove('rp-print'); renderMain(); }, get on() { return !!(R.el && !R.el.hidden); } };
+window.HBRP = { open, close, addActivity, updateLive, addQuiz, stats, remove: id => deleteSession(id), _xlsx: xlsx, _printLayout: () => R.cur && printLayout(R.cur), _endPrint: () => { document.body.classList.remove('rp-print'); document.documentElement.classList.remove('rp-print'); renderMain(); }, get on() { return !!(R.el && !R.el.hidden); } };
 })();

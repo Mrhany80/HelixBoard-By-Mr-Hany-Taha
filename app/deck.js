@@ -18,7 +18,8 @@ function structural(fn) { const p = P(); const a = JSON.stringify(p.deck), h0 = 
 
 /* ---------- creating a deck page (used by the PDF and PowerPoint importers) ---------- */
 function create(name, slides, opts) { opts = opts || {}; const W = pageW(), w = Math.min(W - 160, 1600), x0 = (W - w) / 2; const p = E.newPage('slate'); p.name = name.replace(/\.(pptx|pdf)$/i, '').slice(0, 40); p.deck = { w, x0, top: TOP, gap: GAP, slides: [], trans: 'fade', src: name, cur: 0 };
-  let y = TOP; slides.forEach(sl => { const h = Math.round(w * sl.h / sl.w); p.deck.slides.push({ h }); if (sl.asset) p.objs.push({ id: uid(), ts: Date.now(), t: 'img', asset: sl.asset, x: x0, y, w, h, layer: 0, deckBase: 1, pdf: name });
+  if (slides.some(sl => sl.tr && sl.tr.k !== 'none')) p.deck.trans = 'ppt';
+  let y = TOP; slides.forEach(sl => { const h = Math.round(w * sl.h / sl.w); p.deck.slides.push(sl.tr ? { h, tr: sl.tr } : { h }); if (sl.asset) p.objs.push({ id: uid(), ts: Date.now(), t: 'img', asset: sl.asset, x: x0, y, w, h, layer: 0, deckBase: 1, pdf: name });
     else p.objs.push({ id: uid(), ts: Date.now(), t: 'shape', k: 'rect', x: x0, y, w, h, c: '#CED4DA', sw: 2, fill: '#FFFFFF', layer: 0, deckBase: 1 });
     (sl.steps || []).forEach((a, k) => p.objs.push({ id: uid(), ts: Date.now(), t: 'img', asset: a, x: x0, y, w, h, layer: 0, deckBase: 1, step: k + 1, pdf: name }));
     (sl.texts || []).forEach(t => { const k = w / sl.w; const o = Object.assign({}, t, { id: uid(), ts: Date.now(), x: x0 + t.x * k, y: y + t.y * k, w: t.w ? t.w * k : 0, size: Math.max(10, Math.round(t.size * k)), layer: 1, deckBase: 1 }); p.objs.push(o); });
@@ -30,28 +31,47 @@ let cur = 0, show = false, railW = 0;
 let full = false; const barMin = () => document.body.classList.contains('deckbar-min');
 const area = () => show ? { x: 0, y: 0, w: E.SW, h: E.SH } : full ? { x: 8, y: barMin() ? 40 : 52, w: E.SW - 40, h: E.SH - (barMin() ? 40 : 52) - 86 } : { x: railW + 10, y: barMin() ? 40 : 58, w: E.SW - railW - 50, h: E.SH - (barMin() ? 40 : 58) - 96 };
 function fitTo(i) { const r = rects()[i]; if (!r) return null; const a = area(), pad = show ? 1 : 0.97; const s = Math.min(a.w * pad / r[2], a.h * pad / r[3]); return { s, x: a.x + (a.w - r[2] * s) / 2 - r[0] * s, y: a.y + (a.h - r[3] * s) / 2 - r[1] * s }; }
-function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; cur = i; P().deck.cur = i; how = how || (show ? P().deck.trans : 'push');
+function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; const back = i < prev; cur = i; P().deck.cur = i; let tr = null;
+  /* "As in PowerPoint": the transition stored with the slide being entered, with its own direction and speed */
+  if (!how && show && P().deck.trans === 'ppt') { tr = P().deck.slides[i].tr || { k: 'none' }; how = tr.k; } how = how || (show ? P().deck.trans : 'push'); autoAdv(i);
   const V = E.V, from = { s: V.s, x: V.x, y: V.y };
   if (!anim || REDUCE || !window.gsap || how === 'none') E.setView(t.s, t.x, t.y);
-  else if (how === 'fade' || how === 'zoom' || how === 'slide' || how === 'wipe') morph(how, t, i < prev ? -1 : 1)
+  else if (MORPHS.includes(how)) morph(how, t, back, tr)
   else { gsap.to(from, { s: t.s, x: t.x, y: t.y, duration: Math.abs(prev - i) > 3 ? 0.35 : 0.5, ease: 'power3.inOut', onUpdate: () => E.setView(from.s, from.x, from.y) }); }
   updUI(); }
 /* smooth transitions like PowerPoint: a picture of the old slide sits on top while the new one is drawn underneath, then it
    dissolves (Fade), pushes out sideways (Push), is wiped away (Wipe) or grows and fades as the new slide settles in (Zoom) — no dark flash */
-let trEl = null;
+let trEl = null, trExtra = [], advT = 0;
+const MORPHS = ['fade', 'fadeblack', 'zoom', 'slide', 'wipe', 'cover', 'uncover', 'split', 'circle'];
+/* PowerPoint "after" timing: the slide moves on by itself (clicks still work) */
+function autoAdv(i) { clearTimeout(advT); const s = show && isDeck() && P().deck.trans === 'ppt' && P().deck.slides[i] && P().deck.slides[i].tr; if (s && s.adv) advT = setTimeout(() => { if (show && cur === i) next(); }, s.adv); }
 function snapStage() { const cvs = ['#cvBg', '#cvMain', '#cvLive'].map(s => $(s)).filter(Boolean); if (!cvs.length) return null; const st = cvs[0].parentElement, r = st.getBoundingClientRect(), k = devicePixelRatio || 1;
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(r.width * k)); c.height = Math.max(1, Math.round(r.height * k)); const g = c.getContext('2d');
   g.fillStyle = getComputedStyle(st).backgroundColor || '#000'; if (g.fillStyle !== 'rgba(0, 0, 0, 0)') g.fillRect(0, 0, c.width, c.height);
   cvs.forEach(cv => { const q = cv.getBoundingClientRect(); if (!q.width) return; try { g.drawImage(cv, (q.left - r.left) * k, (q.top - r.top) * k, q.width * k, q.height * k); } catch (e) {} });
   c.id = 'dkTr'; c.style.cssText = 'position:absolute;left:0;top:0;width:' + r.width + 'px;height:' + r.height + 'px;pointer-events:none;will-change:transform,opacity,clip-path;transform-origin:50% 50%';
   cvs[cvs.length - 1].after(c); return c; }
-function morph(how, t, dir) { if (trEl) { gsap.killTweensOf(trEl); trEl.remove(); trEl = null; } const cvs = $$('#cvBg,#cvMain,#cvLive'); gsap.killTweensOf(cvs); gsap.set(cvs, { clearProps: 'transform,opacity' });
-  const o = snapStage(); E.setView(t.s, t.x, t.y); if (!o) return; trEl = o; const done = () => { o.remove(); if (trEl === o) trEl = null; gsap.set(cvs, { clearProps: 'transform,opacity' }); };
+/* the movement direction (PowerPoint's dir: l = towards the left, u = upwards); going back a slide reverses it */
+const VEC = { l: [-1, 0], r: [1, 0], u: [0, -1], d: [0, 1], lu: [-1, -1], ru: [1, -1], ld: [-1, 1], rd: [1, 1] };
+function morph(how, t, back, tr) { if (trEl) { gsap.killTweensOf(trEl); trEl.remove(); trEl = null; } trExtra.forEach(x => { gsap.killTweensOf(x); x.remove(); }); trExtra = [];
+  const cvs = $$('#cvBg,#cvMain,#cvLive'); gsap.killTweensOf(cvs); gsap.set(cvs, { clearProps: 'transform,opacity,filter' });
+  const o = snapStage(); E.setView(t.s, t.x, t.y); if (!o) return; trEl = o; const dur = tr && tr.dur ? tr.dur : how === 'fade' ? 0.55 : 0.6;
+  let v = VEC[(tr && tr.dir) || (how === 'slide' || how === 'cover' || how === 'uncover' ? 'l' : 'l')] || [-1, 0]; if (back) v = [-v[0], -v[1]];
+  const W = o.clientWidth, H = o.clientHeight, done = () => { o.remove(); if (trEl === o) trEl = null; trExtra.forEach(x => x.remove()); trExtra = []; gsap.set(cvs, { clearProps: 'transform,opacity,filter' }); };
   requestAnimationFrame(() => {
-    if (how === 'fade') gsap.to(o, { opacity: 0, duration: 0.55, ease: 'power1.inOut', onComplete: done });
-    else if (how === 'zoom') { gsap.to(o, { opacity: 0, scale: 1.12, duration: 0.5, ease: 'power2.in', onComplete: done }); gsap.fromTo(cvs, { scale: 0.94 }, { scale: 1, duration: 0.6, ease: 'power3.out', clearProps: 'transform' }); }
-    else if (how === 'slide') { const w = o.clientWidth; gsap.to(o, { x: -dir * w, duration: 0.6, ease: 'power3.inOut', onComplete: done }); gsap.fromTo(cvs, { x: dir * w }, { x: 0, duration: 0.6, ease: 'power3.inOut', clearProps: 'transform' }); }
-    else { const p = { v: 0 }; gsap.to(p, { v: 100, duration: 0.6, ease: 'power2.inOut', onUpdate: () => { o.style.clipPath = dir > 0 ? 'inset(0 0 0 ' + p.v + '%)' : 'inset(0 ' + p.v + '% 0 0)'; }, onComplete: done }); }
+    if (how === 'fade') gsap.to(o, { opacity: 0, duration: dur, ease: 'power1.inOut', onComplete: done });
+    else if (how === 'fadeblack') { const blk = document.createElement('div'); blk.style.cssText = 'position:absolute;inset:0;background:#000;pointer-events:none'; o.before(blk); trExtra.push(blk);
+      gsap.to(o, { opacity: 0, duration: dur / 2, ease: 'power1.in', onComplete: () => gsap.to(blk, { opacity: 0, duration: dur / 2, ease: 'power1.out', onComplete: done }) }); }
+    else if (how === 'zoom') { const out = tr && tr.dir === 'out'; gsap.to(o, { opacity: 0, scale: out ? 0.85 : 1.12, duration: dur * 0.85, ease: 'power2.in', onComplete: done }); gsap.fromTo(cvs, { scale: out ? 1.08 : 0.94 }, { scale: 1, duration: dur, ease: 'power3.out', clearProps: 'transform' }); }
+    else if (how === 'slide') { gsap.to(o, { x: v[0] * W, y: v[1] * H, duration: dur, ease: 'power3.inOut', onComplete: done }); gsap.fromTo(cvs, { x: -v[0] * W, y: -v[1] * H }, { x: 0, y: 0, duration: dur, ease: 'power3.inOut', clearProps: 'transform' }); }
+    else if (how === 'uncover') gsap.to(o, { x: v[0] * W, y: v[1] * H, duration: dur, ease: 'power2.inOut', onComplete: done });
+    else if (how === 'cover') { cvs[0].before(o); gsap.fromTo(cvs, { x: -v[0] * W, y: -v[1] * H }, { x: 0, y: 0, duration: dur, ease: 'power2.inOut', clearProps: 'transform', onComplete: done }); }
+    else if (how === 'split') { const vert = !tr || tr.dir !== 'horz' && !/^horz/.test(tr.dir || ''); const o2 = o.cloneNode(); o2.getContext('2d').drawImage(o, 0, 0); o.after(o2); trExtra.push(o2);
+      if (vert) { o.style.clipPath = 'inset(0 50% 0 0)'; o2.style.clipPath = 'inset(0 0 0 50%)'; gsap.to(o, { x: -W / 2, duration: dur, ease: 'power2.inOut', onComplete: done }); gsap.to(o2, { x: W / 2, duration: dur, ease: 'power2.inOut' }); }
+      else { o.style.clipPath = 'inset(0 0 50% 0)'; o2.style.clipPath = 'inset(50% 0 0 0)'; gsap.to(o, { y: -H / 2, duration: dur, ease: 'power2.inOut', onComplete: done }); gsap.to(o2, { y: H / 2, duration: dur, ease: 'power2.inOut' }); } }
+    else if (how === 'circle') { const p = { v: 75 }; gsap.to(p, { v: 0, duration: dur, ease: 'power2.in', onUpdate: () => { o.style.clipPath = 'circle(' + p.v + '% at 50% 50%)'; }, onComplete: done }); }
+    else { /* wipe: the old slide is wiped away in the movement direction */ const p = { v: 0 }, side = v[0] < 0 ? 'r' : v[0] > 0 ? 'l' : v[1] < 0 ? 'b' : 't';
+      gsap.to(p, { v: 100, duration: dur, ease: 'power2.inOut', onUpdate: () => { o.style.clipPath = side === 'l' ? 'inset(0 0 0 ' + p.v + '%)' : side === 'r' ? 'inset(0 ' + p.v + '% 0 0)' : side === 't' ? 'inset(' + p.v + '% 0 0 0)' : 'inset(0 0 ' + p.v + '% 0)'; }, onComplete: done }); }
   }); }
 /* PowerPoint click animations: each build step is a picture with a step number; in the slideshow they appear one click at a time */
 let step = 0, wantStep = null;
@@ -62,11 +82,15 @@ function reveal() { const objs = (buckets()[cur] || []).filter(o => o.step === s
 const next = () => { if (!isDeck()) return; if (show && step < stepsOf(cur)) { step++; reveal(); SND.tick && SND.tick(); updShow(); return; } const sl = P().deck.slides; let i = cur + 1; while (show && i < sl.length && sl[i].hid) i++; if (i >= sl.length) { if (show) endCard(); return; } goSlide(i, true); SND.tick && SND.tick(); };
 const prev = () => { if (!isDeck()) return; if (show && step > 0) { step--; E.dirty.all(); updShow(); return; } const sl = P().deck.slides; let i = cur - 1; while (show && i > 0 && sl[i].hid) i--; if (i < 0) return; wantStep = show ? stepsOf(i) : 0; goSlide(i, true); E.dirty.all(); };
 /* follow the view when the teacher scrolls by hand */
-bus.on('view', () => { if (!isDeck() || show) return; const vr = E.viewRect(), cy = vr[1] + vr[3] / 2, R = rects(); let best = cur, bd = 1e12; R.forEach((r, i) => { const d = Math.abs(r[1] + r[3] / 2 - cy); if (d < bd) { bd = d; best = i; } }); if (best !== cur) { cur = best; P().deck.cur = cur; updUI(); } });
+bus.on('view', () => { if (!isDeck() || show) return; const a = area(), cy = (a.y + a.h / 2 - E.V.y) / E.V.s, R = rects(); let best = cur, bd = 1e12; R.forEach((r, i) => { const d = Math.abs(r[1] + r[3] / 2 - cy); if (d < bd) { bd = d; best = i; } }); if (best !== cur) { cur = best; P().deck.cur = cur; updUI(); } });
 
 /* ---------- slide panel, top bar ---------- */
 let rail = null, bar = null, thumbs = [];
 function css() { if ($('#deckCss')) return; const s = document.createElement('style'); s.id = 'deckCss'; s.textContent = `
+#deckRail .th .qb{position:absolute;right:4px;top:4px;z-index:2;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font:900 12px var(--ui);display:grid;place-items:center}
+#dkAsk{position:fixed;right:28px;bottom:96px;z-index:40;display:flex;align-items:center;gap:8px;height:46px;padding:0 18px 0 14px;border:0;border-radius:999px;background:var(--grad);color:#fff;font:800 15px var(--ui);box-shadow:0 10px 30px -8px rgba(255,95,162,.7);cursor:pointer;animation:dkAskIn .35s ease-out}
+#dkAsk svg{width:20px;height:20px}#dkAsk.live{background:linear-gradient(135deg,#12A150,#0CA678)}body.deckshow #dkAsk{bottom:84px;right:24px;opacity:.92;z-index:71}body.deckshow #dkAsk:hover{opacity:1}
+@keyframes dkAskIn{from{transform:translateY(10px) scale(.9);opacity:0}}
 #deckRail{position:absolute;left:0;top:0;bottom:64px;border-bottom-right-radius:14px;width:184px;z-index:7;background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 96%,transparent),color-mix(in srgb,var(--panel) 90%,#000));border-right:1px solid var(--line);display:flex;flex-direction:column;box-shadow:6px 0 24px rgba(0,0,0,.18)}
 #deckRail .dh{display:flex;align-items:center;gap:6px;padding:10px 10px 6px;font:800 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 #deckRail .dh b{flex:1;color:var(--ink);text-transform:none;letter-spacing:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -121,7 +145,7 @@ function mount() { css(); const st = $('#stage'); if (!rail) { rail = document.c
   if (!bar) { bar = document.createElement('div'); bar.id = 'deckBar'; st.appendChild(bar); ['pointerdown', 'dblclick'].forEach(ev => bar.addEventListener(ev, e => e.stopPropagation())); } }
 function rebuild() { mount(); const on = isDeck() && !show; document.body.classList.toggle('deckon', on); rail.hidden = bar.hidden = !on; railW = on && !full && !document.body.classList.contains('deckrail-off') ? 184 : 0; if (!on) return; const d = P().deck, n = d.slides.length; cur = clamp(d.cur || 0, 0, n - 1);
   rail.innerHTML = '<div class="dh">' + icon('presentation') + '<b title="' + esc(d.src || '') + '">' + esc(P().name || 'Deck') + '</b>' + n + '<button class="ib" id="dkClose" title="Hide the slide panel" style="width:26px;height:26px;min-width:0;padding:0">' + icon('panel-left') + '</button></div><div class="dl"></div><div class="df"><button class="btn sm" id="dkAdd">' + icon('plus') + 'Blank</button><button class="btn sm" id="dkSort">' + icon('layout-grid') + 'Sorter</button></div>';
-  const L = $('.dl', rail); thumbs = d.slides.map((s, i) => { const t = document.createElement('div'); t.className = 'th' + (i === cur ? ' on' : '') + (s.hid ? ' hid' : ''); t.draggable = true; t.dataset.i = i; t.innerHTML = '<span class="no">' + (i + 1) + '</span><canvas></canvas><div class="tools"></div>';
+  const L = $('.dl', rail); thumbs = d.slides.map((s, i) => { const t = document.createElement('div'); t.className = 'th' + (i === cur ? ' on' : '') + (s.hid ? ' hid' : ''); t.draggable = true; t.dataset.i = i; t.innerHTML = '<span class="no">' + (i + 1) + '</span>' + (s.q ? '<span class="qb" title="This slide has a live question">?</span>' : '') + '<canvas></canvas><div class="tools"></div>';
     const tl = $('.tools', t); tl.append(bt('arrow-up', '', () => move(i, i - 1), 'Move up'), bt('arrow-down', '', () => move(i, i + 1), 'Move down'), bt('copy', '', () => dup(i), 'Duplicate'), bt(s.hid ? 'eye' : 'eye-off', '', () => hide(i), s.hid ? 'Show in slideshow' : 'Hide in slideshow'), bt('trash-2', '', () => del(i), 'Delete slide'));
     t.onclick = e => { if (e.target.closest('.tools')) return; goSlide(i, true); };
     t.ondragstart = e => { e.dataTransfer.setData('text/hb-slide', String(i)); e.dataTransfer.effectAllowed = 'move'; }; t.ondragover = e => { e.preventDefault(); t.classList.add('drop'); }; t.ondragleave = () => t.classList.remove('drop');
@@ -131,12 +155,27 @@ function rebuild() { mount(); const on = isDeck() && !show; document.body.classL
 function buildBar() { bar.innerHTML = ''; const d = P().deck, n = d.slides.length;
   const inp = document.createElement('input'); inp.id = 'dkNo'; inp.value = cur + 1; inp.title = 'Type a slide number and press Enter'; inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { goSlide((parseInt(inp.value, 10) || 1) - 1, true); inp.blur(); } };
   const of = document.createElement('span'); of.className = 'of'; of.id = 'dkOf'; of.textContent = '/ ' + n;
-  const tr = document.createElement('select'); tr.title = 'Transition between slides in the slideshow'; [['fade', 'Fade'], ['slide', 'Push'], ['wipe', 'Wipe'], ['zoom', 'Zoom'], ['push', 'Glide'], ['none', 'None']].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; tr.appendChild(o); }); tr.value = d.trans || 'fade'; tr.onchange = () => { d.trans = tr.value; E.changed(); };
+  const tr = document.createElement('select'); tr.title = 'Transition between slides in the slideshow'; [['ppt', 'As in PowerPoint'], ['fade', 'Fade'], ['fadeblack', 'Fade through black'], ['slide', 'Push'], ['cover', 'Cover'], ['uncover', 'Uncover'], ['wipe', 'Wipe'], ['split', 'Split'], ['circle', 'Circle'], ['zoom', 'Zoom'], ['push', 'Glide'], ['none', 'None']].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; tr.appendChild(o); }); tr.value = d.trans || 'fade'; tr.onchange = () => { d.trans = tr.value; E.changed(); };
   bar.append(bt('panel-left', '', togglePanel, 'Show / hide the slide panel'), bt('folder-open', 'Open', () => window.HBIO && HBIO.openDocument(), 'Open another PDF, PowerPoint or Word file'), sep(), bt('chevron-left', '', prev, 'Previous slide (←, PageUp)'), inp, of, bt('chevron-right', '', next, 'Next slide (→, PageDown)'), sep(),
     bt('play', 'Slideshow', () => startShow(0), 'Start from the beginning (F5)', 'go'), bt('monitor-play', 'From here', () => startShow(cur), 'Start from this slide (Shift+F5)'), sep(),
     full ? bt('minimize-2', 'Exit full screen', exitFull, 'Leave full screen (Esc)', 'on') : bt('maximize', 'Full screen', enterFull, 'Full screen — keep writing, typing and editing on the slides'), bt('focus', '', () => goSlide(cur, true), 'Fit this slide to the screen'), bt(d.inkOff ? 'eye-off' : 'eye', '', toggleInk, d.inkOff ? 'Your writing is hidden — click to show it' : 'Hide your writing (clean slides)', d.inkOff ? 'on' : ''), bt('eraser', '', () => clearInk(cur), 'Clear your writing from this slide'), sep(),
-    bt('file-plus', '', () => addBlank(cur), 'Insert a blank whiteboard slide after this one'), bt('copy', '', () => dup(cur), 'Duplicate this slide'), bt('layout-grid', '', sorter, 'Slide sorter — see all slides, drag to reorder'), tr, bt('file-down', 'Export', exportDeck, 'Save the deck with your writing as a PDF'), bt('chevrons-up', '', () => barToggle(true), 'Hide this bar (a small tab stays to bring it back)')); }
-function updUI() { updPill(); if (!rail || !isDeck() || show) { updShow(); return; } thumbs.forEach((t, i) => t.classList.toggle('on', i === cur)); const t = thumbs[cur]; if (t) { const L = t.parentElement, r = t.offsetTop; if (r < L.scrollTop || r > L.scrollTop + L.clientHeight - 90) L.scrollTop = r - 40; } const inp = $('#dkNo'); if (inp && document.activeElement !== inp) inp.value = cur + 1; }
+    bt('circle-help', 'Question', () => askEdit(cur), 'Add a live question to this slide — a button on the slide sends it to the phones (like ClassPoint)'), bt('file-plus', '', () => addBlank(cur), 'Insert a blank whiteboard slide after this one'), bt('copy', '', () => dup(cur), 'Duplicate this slide'), bt('layout-grid', '', sorter, 'Slide sorter — see all slides, drag to reorder'), tr, bt('file-down', 'Export', exportDeck, 'Save the deck with your writing as a PDF'), bt('chevrons-up', '', () => barToggle(true), 'Hide this bar (a small tab stays to bring it back)')); }
+/* ---------- question buttons on slides (ClassPoint style): a poll, drawing, word cloud… kept with the slide; one click sends it to the phones ---------- */
+function askEdit(i) { if (!isDeck() || !window.HBLC) return; const sl = P().deck.slides[i], q = sl.q, T = HBLC.TYPES;
+  const save = cfg => { sl.q = cfg; E.changed(); updUI(); rebuild(); toast('Question added — in the slideshow, click the ❓ button on the slide to send it to the phones.'); };
+  modal.open('<h2>' + icon('circle-help') + ' Question for slide ' + (i + 1) + '</h2>' + (q ? '<div class="st-row" style="padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px"><b>' + esc(T[q.type].name) + ':</b> ' + esc(q.prompt || '') + '</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px"><button class="btn sm primary" id="dqAsk">' + icon('radio') + 'Ask now</button><button class="btn sm" id="dqEdit">' + icon('pencil') + 'Edit</button><button class="btn sm" id="dqDel">' + icon('trash-2') + 'Remove</button></div><div class="small muted">Or replace it with another kind:</div>' : '<p class="muted" style="margin-top:-4px">Choose the kind of question. In the slideshow a ❓ button appears on this slide — one click sends it to every phone, and “Back to slides” returns here.</p>') +
+    '<div class="lc-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px">' + Object.entries(T).map(([k, t]) => '<button class="btn" data-qt="' + k + '" style="height:auto;padding:10px;flex-direction:column;align-items:flex-start;gap:4px;text-align:left"><b>' + icon(t.ic) + ' ' + esc(t.name) + '</b></button>').join('') + '</div><div class="foot"><button class="btn" data-close>Close</button></div>', s => {
+    $$('[data-qt]', s).forEach(b => b.onclick = () => { modal.close(); setTimeout(() => HBLC.setup(b.dataset.qt, save), 30); });
+    const a = $('#dqAsk', s); if (a) { a.onclick = () => { modal.close(); ask(i); }; $('#dqEdit', s).onclick = () => { modal.close(); setTimeout(() => HBLC.setup(q.type, save, q), 30); }; $('#dqDel', s).onclick = () => { delete sl.q; E.changed(); modal.close(); updUI(); rebuild(); toast('Question removed from the slide.'); }; } }); }
+function ask(i) { const sl = isDeck() && P().deck.slides[i]; if (!sl || !sl.q || !window.HBLC) return; SND.whoosh && SND.whoosh();
+  HBLC.run(Object.assign({}, sl.q), { label: 'Back to slides', onContinue: () => { goSlide(cur, false); updUI(); } }); }
+let askB = null;
+function updAsk() { const sl = isDeck() && P().deck.slides[cur], q = sl && sl.q;
+  if (!q || (!show && !full && !document.body.classList.contains('deckon'))) { if (askB) askB.hidden = true; return; }
+  if (!askB) { askB = document.createElement('button'); askB.id = 'dkAsk'; ['pointerdown', 'dblclick'].forEach(ev => askB.addEventListener(ev, e => e.stopPropagation())); askB.onclick = () => window.HBLC && HBLC.active ? HBLC.open() : ask(cur); document.body.appendChild(askB); }
+  const live = window.HBLC && HBLC.active; askB.hidden = false; askB.classList.toggle('live', !!live); askB.innerHTML = icon(live ? 'chart-column-big' : 'circle-help') + '<span>' + (live ? 'Show answers' : esc(window.HBLC ? HBLC.TYPES[q.type].name : 'Ask')) + '</span>'; askB.title = live ? 'Open the live answers' : 'Send this question to the phones: ' + (q.prompt || ''); }
+setInterval(() => { if (askB && !askB.hidden) updAsk(); }, 1500);
+function updUI() { updPill(); updAsk(); if (!rail || !isDeck() || show) { updShow(); return; } thumbs.forEach((t, i) => t.classList.toggle('on', i === cur)); const t = thumbs[cur]; if (t) { const L = t.parentElement, r = t.offsetTop; if (r < L.scrollTop || r > L.scrollTop + L.clientHeight - 90) L.scrollTop = r - 40; } const inp = $('#dkNo'); if (inp && document.activeElement !== inp) inp.value = cur + 1; }
 /* thumbnails show the slide with your ink on it */
 let thT = 0, dirtyAll = true;
 function drawThumbs(all) { if (!isDeck() || !thumbs.length) return; const p = P(), R = rects(p); const list = all ? R.map((_, i) => i) : [cur]; list.forEach(i => { const t = thumbs[i]; if (!t) return; const c = $('canvas', t), r = R[i], sc = 136 * 1.5 / r[2]; try { const img = E.renderToCanvas(p, r, sc, { bg: false, ink: true }); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); } catch (e) {} }); }
@@ -199,7 +238,7 @@ function startShow(i) { if (!isDeck()) return; show = true; step = 0; css(); con
   ['pointerdown', 'pointerup', 'click', 'wheel'].forEach(ev => ctl.addEventListener(ev, e => e.stopPropagation()));
   tool('laser'); t0 = Date.now(); clockIv = setInterval(updClock, 1000); updClock(); poke();
   Promise.resolve(fs).then(() => setTimeout(() => { E.resize && E.resize(); goSlide(i, false); E.dirty.all(); }, 160)); SND.whoosh && SND.whoosh(); }
-function endShow() { if (!show) return; show = false; const p = P(); if (savedTheme) p.theme = savedTheme; document.body.classList.remove('deckshow'); [ctl, pbar, blank, $('#showEnd')].forEach(x => x && x.remove()); ctl = pbar = blank = null; clearInterval(clockIv); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); if (savedTool) I.setTool(savedTool[0], savedTool[1]); setTimeout(() => { E.resize && E.resize(); E.dirty.all(); rebuild(); goSlide(cur, false); }, 160); }
+function endShow() { if (!show) return; show = false; clearTimeout(advT); const p = P(); if (savedTheme) p.theme = savedTheme; document.body.classList.remove('deckshow'); [ctl, pbar, blank, $('#showEnd')].forEach(x => x && x.remove()); ctl = pbar = blank = null; clearInterval(clockIv); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); if (savedTool) I.setTool(savedTool[0], savedTool[1]); setTimeout(() => { E.resize && E.resize(); E.dirty.all(); rebuild(); goSlide(cur, false); }, 160); }
 function tool(t, pen) { I.setTool(t, pen); updShowBtns(); poke(); }
 function updShowBtns() { if (!ctl) return; const bs = ctl.querySelectorAll('button'); const T = I.T; [[2, T.tool === 'laser'], [3, T.tool === 'draw' && T.pen !== 'hi'], [4, T.tool === 'draw' && T.pen === 'hi'], [5, T.tool === 'erase'], [7, isDeck() && P().deck.inkOff]].forEach(([k, on]) => bs[k] && bs[k].classList.toggle('on', !!on)); }
 function updShow() { if (!show || !ctl || !isDeck()) return; const n = P().deck.slides.length; const c = $('#shCnt'), ns = stepsOf(cur); if (c) c.textContent = (cur + 1) + ' / ' + n + (ns ? ' · ✦ ' + step + '/' + ns : ''); if (pbar) pbar.style.width = ((cur + 1) / n * 100) + '%'; updShowBtns(); }
@@ -210,8 +249,8 @@ function endCard() { if ($('#showEnd')) return; const e = document.createElement
 document.addEventListener('pointermove', () => show && poke(), { passive: true });
 /* click to go forward with the laser, like a presentation; right-click goes back */
 let downAt = null;
-document.addEventListener('pointerdown', e => { if (!show || e.target.closest('#showCtl')) return; downAt = [e.clientX, e.clientY, Date.now(), e.button]; }, true);
-document.addEventListener('pointerup', e => { if (!show || !downAt || e.target.closest('#showCtl,#showEnd,#showBlank')) { downAt = null; return; } const [x, y, t, b] = downAt; downAt = null; if (I.T.tool !== 'laser' || Math.hypot(e.clientX - x, e.clientY - y) > 8 || Date.now() - t > 500) return; if (b === 2) prev(); else if (b === 0) next(); }, true);
+document.addEventListener('pointerdown', e => { if (!show || e.target.closest('#showCtl,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } downAt = [e.clientX, e.clientY, Date.now(), e.button]; }, true);
+document.addEventListener('pointerup', e => { if (!show || !downAt || e.target.closest('#showCtl,#showEnd,#showBlank,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } const [x, y, t, b] = downAt; downAt = null; if (I.T.tool !== 'laser' || Math.hypot(e.clientX - x, e.clientY - y) > 8 || Date.now() - t > 500) return; if (b === 2) prev(); else if (b === 0) next(); }, true);
 document.addEventListener('contextmenu', e => { if (show) e.preventDefault(); }, true);
 document.addEventListener('fullscreenchange', () => { if (show && !document.fullscreenElement) setTimeout(() => { if (show) { E.resize && E.resize(); goSlide(cur, false); } }, 120); });
 /* keyboard: PowerPoint keys in the slideshow; PageUp/PageDown, arrows and F5 on a deck tab */
@@ -226,6 +265,6 @@ document.addEventListener('keydown', e => { const tg = e.target.tagName; if (tg 
   if (map[k]) { e.preventDefault(); map[k](); } }, true);
 
 setTimeout(() => { rebuild(); if (isDeck()) goSlide(P().deck.cur || 0, false); }, 400); bus.on('board-loaded', () => setTimeout(rebuild, 50));
-window.HBD = { enterFull, exitFull, get full() { return full; }, create, goSlide, next, prev, startShow, endShow, rects, buckets, move, dup, del, hide, addBlank, clearInk, toggleInk, sorter, exportDeck, get cur() { return cur; }, get show() { return show; }, isDeck };
+window.HBD = { enterFull, exitFull, get cur() { return cur; }, get full() { return full; }, create, goSlide, next, prev, startShow, endShow, rects, buckets, move, dup, del, hide, addBlank, clearInk, toggleInk, sorter, exportDeck, get cur() { return cur; }, get show() { return show; }, isDeck };
 })();
 
