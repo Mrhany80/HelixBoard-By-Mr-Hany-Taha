@@ -178,7 +178,7 @@ register('image', { render(d) { const c = document.createElement('canvas'); retu
 /* ---------- label-it quiz ---------- */
 let quizOn = false;
 function quizToggle() { const pins = E.page().objs.filter(o => o.t === 'pin'); if (!pins.length) { toast('Add label pins first (Label pin tool), then turn on Quiz mode.'); return; } quizOn = !pins.every(p => p.quiz); E.mod(pins, p => p.quiz = quizOn); E.quizReveal.clear(); toast(quizOn ? 'Quiz mode: labels are hidden. With Select (V), tap a label to reveal it.' : 'Labels shown'); window.HBUI && HBUI.refresh(); }
-function revealAll() { E.page().objs.filter(o => o.t === 'pin').forEach(p => E.quizReveal.add(p.id)); E.dirty.main = true; SND.chime(); }
+function revealAll() { const pins = E.page().objs.filter(o => o.t === 'pin' && o.quiz); if (!pins.length) { window.HB.toast('No hidden labels on this page — Label-it quiz labels show “?” until revealed.'); return; } E.page().objs.filter(o => o.t === 'pin').forEach(p => E.quizReveal.add(p.id)); E.dirty.main = true; SND.chime(); }
 
 /* ---------- microscopy: magnification calculator and scale bars ---------- */
 const UNIT = { m: 1e6, mm: 1000, 'µm': 1, nm: 0.001 };

@@ -91,6 +91,7 @@ class ClassLink {
     if (this.shared && this.shared.actId === a.id) this.shared = null; const pl = this.players.get(pid); if (pl) this.flush(pl); this.changed(); }
   award(pid, n) { const pl = this.players.get(pid); if (!pl) return; pl.stars = Math.max(0, (pl.stars || 0) + (Number.isInteger(n) ? n : 1)); this.changed(); }
   /* "Eyes on board": phones pause and show the teacher's board (shared just for the pause if board sharing was off) */
+  setQuiz(q) { this.quiz = q || null; this.changed(); }
   setXp(m) { this.xp = m && typeof m === 'object' ? m : null; this.changed(); }
   setLock(v) { v = !!v; if (v && !this.lock) { this.lockBoard = !this.boardOn; this.boardOn = true; } else if (!v && this.lock && this.lockBoard) { this.boardOn = false; this.lockBoard = false; } this.lock = v; this.changed(); }
   lowerHand(pid) { if (pid) { const pl = this.players.get(pid); if (pl) pl.hand = 0; } else this.players.forEach(pl => { pl.hand = 0; }); this.changed(); }
@@ -102,6 +103,9 @@ class ClassLink {
   /* ---------- HTTP ---------- */
   async handle(req, res) {
     const url = new URL(req.url, 'http://x');
+    /* the phone quiz, when it runs inside the class link */
+    if (url.pathname === '/quiz') { res.writeHead(302, { Location: '/quiz/' + url.search }); return res.end(); }
+    if (url.pathname.startsWith('/quiz/')) { if (!this.quiz || !this.quiz.on) { res.writeHead(302, { Location: '/' + url.search.replace(/[?&]?(name|auto|back|lang)=[^&]*/g, '') }); return res.end(); } req.url = req.url.slice(5); return this.quiz.handle(req, res); }
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff');
     /* health check for the internet link (the app checks the whole path before showing the QR code) */
     if (req.method === 'GET' && url.pathname === '/hb-ping') { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); return res.end(JSON.stringify({ app: 'helixboard', pin: this.pin.length })); }
@@ -154,7 +158,7 @@ class ClassLink {
       board: this.boardOn && this.board ? { ver: this.boardVer, ar: this.boardView ? this.boardView.ar : 1.6 } : null, draw: this.boardOn && this.drawOn,
       files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })),
       homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })),
-      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn };
+      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn, quiz: this.quiz && this.quiz.on ? { pin: this.quiz.pin, title: this.quiz.title } : null };
   }
   actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
     return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar, once: a.once, auto: a.auto, grace: !a.open && a.auto && a.closedAt ? Math.max(0, 6000 - (Date.now() - a.closedAt)) : 0,

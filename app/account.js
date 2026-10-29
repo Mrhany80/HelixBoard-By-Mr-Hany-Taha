@@ -22,7 +22,7 @@ async function boot() { const sb = client(); if (!sb) return;
   sb.auth.onAuthStateChange((ev, session) => { S.user = session ? session.user : null; if (ev === 'SIGNED_OUT') { S.profile = null; chip(); } });
   let session = null; try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
   if (session) { S.user = session.user; await loadProfile(); chip(); started(); return; }
-  chip(); if (!set.get('accSkip', false)) whenIntroDone(() => welcome()); }
+  chip(); if (!set.get('accSkip', false) && !new URLSearchParams(location.search).has('accskip')) whenIntroDone(() => welcome()); }
 function whenIntroDone(fn) { const i = document.getElementById('intro'); if (!i || i.hidden) return setTimeout(fn, 300); const t = setInterval(() => { if (i.hidden) { clearInterval(t); setTimeout(fn, 300); } }, 300); }
 async function loadProfile() { try { const { data } = await client().from('profiles').select('*').eq('id', S.user.id).maybeSingle(); S.profile = data || null; } catch (e) {} return S.profile; }
 function started() { log('open', { platform: platform(), standalone: !!standalone() }); touch(); flush(); }
@@ -162,6 +162,6 @@ async function admin() { if (!S.profile || S.profile.role !== 'admin') { toast('
         '<div style="flex:1;min-width:220px"><b>Recent activity</b>' + (A.length ? '<div style="max-height:300px;overflow:auto">' + A.map(a => '<div class="small" style="padding:4px 0;border-bottom:1px solid var(--line)">' + esc(FEATURE[a.kind] || a.kind) + ' <span class="muted">· ' + ago(a.created_at) + '</span></div>').join('') + '</div>' : '<div class="small muted">None yet.</div>') + '</div></div>'; }); }
   draw(); }
 
-window.HBA = { boot, welcome, menu, admin, log, result, flush, get user() { return S.user; }, get profile() { return S.profile; }, get signedIn() { return !!S.user; }, get isAdmin() { return !!(S.profile && S.profile.role === 'admin'); } };
+window.HBA = { get version() { return CFG.version; }, boot, welcome, menu, admin, log, result, flush, get user() { return S.user; }, get profile() { return S.profile; }, get signedIn() { return !!S.user; }, get isAdmin() { return !!(S.profile && S.profile.role === 'admin'); } };
 setTimeout(boot, 0);
 })();

@@ -219,8 +219,20 @@ const inter = (a, b) => a && b && a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[
 
 /* ---------- images (assets, stamps, widgets) ---------- */
 const imgCache = new Map();
-function imageFor(key, src) { let im = imgCache.get(key); if (!im) { im = new Image(); im.decoding = 'async'; im.onload = () => { dirty.main = true; bus.emit('img-loaded'); }; im.src = src; imgCache.set(key, im); } return im; }
-function drawBoxImage(g, o, im) { if (im && im.complete && im.naturalWidth) g.drawImage(im, o.x, o.y, o.w, o.h); else { g.save(); g.strokeStyle = '#999'; g.setLineDash([6, 6]); g.strokeRect(o.x, o.y, o.w, o.h); g.restore(); } }
+function imageFor(key, src) { let im = imgCache.get(key); if (!im) { im = new Image(); im.decoding = 'async'; im.onload = () => { if (im.naturalWidth * im.naturalHeight > BIG && window.createImageBitmap) shrink(key, im, src); dirty.main = true; bus.emit('img-loaded'); }; im.src = src; imgCache.set(key, im); } return im; }
+/* very large pictures (4K slides): a screen-sized copy is what is drawn; the full picture is decoded again only when zoomed in past
+   that copy, and at most three full pictures stay in memory — a 60-slide 4K deck needs about a quarter of the memory */
+const BIG = 4.2e6; let fullLRU = [];
+const screenPx = () => Math.ceil(Math.max(screen.width || 1920, screen.height || 1080) * (devicePixelRatio || 1));
+function shrink(key, im, src) { const k = Math.min(1, screenPx() / Math.max(im.naturalWidth, im.naturalHeight)); if (k >= 0.95) return;
+  createImageBitmap(im, { resizeWidth: Math.round(im.naturalWidth * k), resizeHeight: Math.round(im.naturalHeight * k), resizeQuality: 'high' }).then(bm => {
+    imgCache.set(key, { hb: 1, low: bm, src, full: null, used: 0, complete: true, naturalWidth: im.naturalWidth, naturalHeight: im.naturalHeight }); im.src = ''; dirty.main = true; }).catch(() => {}); }
+function loadFull(e) { const f = new Image(); f.decoding = 'async'; f.onload = () => { dirty.main = true; }; f.src = e.src; e.full = f; e.used = Date.now();
+  fullLRU = fullLRU.filter(x => x !== e).concat(e); while (fullLRU.length > 3) { const old = fullLRU.shift(); if (old.full) { old.full.src = ''; old.full = null; } } }
+function drawBoxImage(g, o, im) { if (im && im.hb) { const px = Math.abs(g.getTransform().a) * o.w; let src = im.low;
+    if (px > im.low.width * 1.15) { if (im.full && im.full.complete && im.full.naturalWidth) src = im.full; else if (!im.full) loadFull(im); }
+    g.drawImage(src, o.x, o.y, o.w, o.h); return; }
+  if (im && im.complete && im.naturalWidth) g.drawImage(im, o.x, o.y, o.w, o.h); else { g.save(); g.strokeStyle = '#999'; g.setLineDash([6, 6]); g.strokeRect(o.x, o.y, o.w, o.h); g.restore(); } }
 
 /* ---------- shapes ---------- */
 const roughCanvases = new WeakMap();
@@ -317,12 +329,26 @@ function renderPage(g, p, vr, s, opts) { opts = opts || {}; for (let L = 0; L < 
 
 /* ---------- frame loop with dirty flags ---------- */
 const dirty = { bg: true, main: true, live: true, all() { this.bg = this.main = this.live = true; } };
+let mainSnap = null, fullT = 0;
 const liveDrawers = []; let hidden = new Set();
 function drawFrame() { const p = page(), vr = viewRect();
   if (dirty.bg || (p.theme === 'deepsea' && animBg())) { dirty.bg = false; const g = gBg; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = B.mode === 'scroll' ? THEMES[p.theme].bg : '#0d0710'; g.fillRect(0, 0, cvBg.width, cvBg.height); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y);
     if (B.mode === 'scroll' && B.width * V.s < SW - 2) { g.save(); g.fillStyle = 'rgba(0,0,0,.05)'; g.fillRect(-4000, -4000, 4000, p.H + 8000); g.fillRect(B.width, -4000, 4000, p.H + 8000); g.restore(); }
     drawBackground(g, p, vr, V.s); g.setTransform(DPR, 0, 0, DPR, 0, 0); drawScreenOverlayBg(g, p); }
-  if (dirty.main) { dirty.main = false; const g = gMain; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvMain.width, cvMain.height); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); if (B.mode === 'scroll') { g.save(); g.beginPath(); g.rect(0, 0, B.width, p.H); g.clip(); } renderPage(g, p, vr, V.s, { skip: hidden }); if (B.mode === 'scroll') g.restore(); drawDates(g, p, false); }
+  if (dirty.main) { dirty.main = false; const g = gMain, W = cvMain.width, H = cvMain.height, sn = mainSnap;
+    /* panning: move the picture already drawn and draw only the strips that came into view; one full redraw follows when the
+       movement stops (so a board with thousands of strokes still pans smoothly) */
+    const dx = sn ? Math.round((V.x - sn.x) * DPR) : 0, dy = sn ? Math.round((V.y - sn.y) * DPR) : 0;
+    if (sn && sn.s === V.s && sn.p === p && sn.c.width === W && sn.c.height === H && (dx || dy) && Math.abs(dx) < W * 0.6 && Math.abs(dy) < H * 0.6 && !hidden.size) {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.drawImage(sn.c, dx, dy);
+      const strips = []; if (dx > 0) strips.push([0, 0, dx, H]); if (dx < 0) strips.push([W + dx, 0, -dx, H]); if (dy > 0) strips.push([0, 0, W, dy]); if (dy < 0) strips.push([0, H + dy, W, -dy]);
+      strips.forEach(([x, y, w, h]) => { g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); if (B.mode === 'scroll') { g.beginPath(); g.rect(0, 0, B.width, p.H); g.clip(); }
+        const wr = [(x / DPR - V.x) / V.s, (y / DPR - V.y) / V.s, w / DPR / V.s, h / DPR / V.s]; renderPage(g, p, wr, V.s, { skip: hidden }); drawDates(g, p, false); g.restore(); });
+      sn.x += dx / DPR; sn.y += dy / DPR; const sg = sn.c.getContext('2d'); sg.clearRect(0, 0, W, H); sg.drawImage(cvMain, 0, 0);
+      clearTimeout(fullT); fullT = setTimeout(() => { mainSnap = null; dirty.main = true; }, 140); }
+    else { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); if (B.mode === 'scroll') { g.save(); g.beginPath(); g.rect(0, 0, B.width, p.H); g.clip(); } renderPage(g, p, vr, V.s, { skip: hidden }); if (B.mode === 'scroll') g.restore(); drawDates(g, p, false);
+      /* keep a copy for the next pan (only on big boards, where it pays off) */
+      if (p.objs.length > 150) { const c = sn && sn.c.width === W && sn.c.height === H ? sn.c : Object.assign(document.createElement('canvas'), { width: W, height: H }); const sg = c.getContext('2d'); sg.clearRect(0, 0, W, H); sg.drawImage(cvMain, 0, 0); mainSnap = { c, s: V.s, x: V.x, y: V.y, p }; } else mainSnap = null; } }
   if (dirty.live || liveDrawers.some(d => d.active && d.active())) { dirty.live = false; const g = gLive; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvLive.width, cvLive.height); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); liveDrawers.forEach(d => { g.save(); try { d.draw(g, V); } catch (e) { console.error(e); } g.restore(); }); }
   requestAnimationFrame(drawFrame); }
 

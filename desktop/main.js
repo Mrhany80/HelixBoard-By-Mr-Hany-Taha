@@ -22,6 +22,8 @@ app.on('second-instance', (e, argv) => {
 });
 
 /* ---------- window position and size are remembered between sessions ---------- */
+/* automated tests run each check in a fresh, empty profile */
+if (process.env.HB_USER_DATA) app.setPath('userData', process.env.HB_USER_DATA);
 const stateFile = () => path.join(app.getPath('userData'), 'window.json');
 function loadState() {
   try {
@@ -82,7 +84,7 @@ function createWindow() {
   /* camera (document camera, photo → text) and microphone (noise meter, recording) are allowed; nothing else */
   win.webContents.session.setPermissionRequestHandler((wc, perm, cb) => cb(['media', 'fullscreen', 'clipboard-sanitized-write', 'clipboard-read', 'notifications'].includes(perm)));
 
-  win.loadFile(path.join(__dirname, 'app', 'index.html'));
+  win.loadFile(path.join(__dirname, 'app', 'index.html'), process.env.HB_USER_DATA ? { query: { nointro: '1', accskip: '1' } } : undefined);
 }
 
 /* ---------- files opened from Explorer (double-click, "Open with", drag onto the icon) ---------- */
@@ -173,7 +175,8 @@ function linkKeeper(srv, getTunnel) {
 let tunnel = null;
 const openLink = linkKeeper(live, () => (tunnel = tunnel || new Tunnel(app.getPath('userData'), (url, o) => net.fetch(url, o))));
 ipcMain.handle('live:start', async (e, quiz) => {
-  try { const info = await live.start(quiz); if (quiz.internet !== false) openLink(); return info; }
+  try { if (quiz.attached && cl.server) { const info = await live.start(quiz, { attached: true, port: cl.port }); cl.setQuiz(live); return info; }
+    const info = await live.start(quiz); if (quiz.internet !== false) openLink(); return info; }
   catch (er) { return { error: er.code === 'EADDRINUSE' ? 'The quiz port is busy — close other quiz windows and try again.' : er.message }; }
 });
 ipcMain.handle('live:cmd', (e, cmd, arg) => {
@@ -183,9 +186,9 @@ ipcMain.handle('live:cmd', (e, cmd, arg) => {
   else if (cmd === 'board') live.board();
   else if (cmd === 'end') live.end();
   else if (cmd === 'results') return live.results();
-  else if (cmd === 'link') { openLink(); }
-  else if (cmd === 'stop') return live.stop().then(() => { if (tunnel) tunnel.close(); return true; });
-  return live.server ? live.snapshot() : null;
+  else if (cmd === 'link') { if (live.attached) openClLink(); else openLink(); }
+  else if (cmd === 'stop') { const att = live.attached; return live.stop().then(() => { if (att) cl.setQuiz(null); else if (tunnel) tunnel.close(); return true; }); }
+  return live.on ? live.snapshot() : null;
 });
 /* ---------- Class link: live board, student pens, shared files and homework for phones ---------- */
 const cl = new ClassLink((type, data, snap) => { if (win && !win.isDestroyed()) win.webContents.send('cl:event', type, data, snap); });
@@ -217,7 +220,7 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   else if (cmd === 'lowerHand') cl.lowerHand(a || null);
   else if (cmd === 'clearQuestions') cl.clearQuestions();
   else if (cmd === 'link') openClLink();
-  else if (cmd === 'stop') { await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
+  else if (cmd === 'stop') { if (live.attached && live.on) await live.stop(); cl.setQuiz(null); await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
   return cl.snapshot();
 });
 /* Reports → PDF: the page switches to its print layout, Chromium prints it, the teacher picks where to save */

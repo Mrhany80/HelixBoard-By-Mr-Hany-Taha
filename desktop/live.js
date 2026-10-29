@@ -25,9 +25,11 @@ function lanAddresses() {
 }
 
 class LiveQuiz {
-  constructor(onUpdate) { this.onUpdate = onUpdate; this.server = null; }
+  constructor(onUpdate) { this.onUpdate = onUpdate; this.server = null; this.on = false; this.attached = false; }
 
-  async start(quiz) {
+  /* attached: the quiz runs inside the class link (one QR code for the whole lesson); its pages live under /quiz/ there */
+  async start(quiz, opts) {
+    opts = opts || {};
     await this.stop();
     if (!quiz || !Array.isArray(quiz.questions) || !quiz.questions.length) throw new Error('This set has no questions.');
     this.title = String(quiz.title || 'Quiz').slice(0, 80);
@@ -40,14 +42,16 @@ class LiveQuiz {
     this.badPins = new Map(); this.tunnel = { state: 'off' };
     this.players = new Map();
     this.phase = 'lobby'; this.qi = -1; this.limit = 0; this.t0 = 0; this.last = null;
-    this.html = fs.readFileSync(PAGE, 'utf8');
+    this.html = fs.readFileSync(PAGE, 'utf8'); this.lang = quiz.lang === 'ar' ? 'ar' : 'en';
+    if (opts.attached) { this.attached = true; this.on = true; this.port = opts.port; this.ping = setInterval(() => this.players.forEach(pl => { if (pl.waiters.length && Date.now() - pl.waitSince > 20000) this.flush(pl); }), 5000); return { port: opts.port, pin: this.pin, attached: true, urls: [], local: '' }; }
+    this.attached = false;
     this.server = http.createServer((req, res) => this.handle(req, res));
     this.server.on('clientError', (e, sock) => { try { sock.end('HTTP/1.1 400 Bad Request\r\n\r\n'); } catch (er) {} });
     let port = 0;
     for (const p of [8320, 8321, 8322, 8323, 8324, 0]) {
       try { await new Promise((ok, bad) => { this.server.once('error', bad); this.server.listen(p, '0.0.0.0', () => { this.server.off('error', bad); ok(); }); }); port = this.server.address().port; break; } catch (e) { if (p === 0) throw e; }
     }
-    this.port = port;
+    this.port = port; this.on = true;
     /* a waiting phone gets an empty answer every 20 s, so proxies and tunnels never drop the request */
     this.ping = setInterval(() => this.players.forEach(pl => { if (pl.waiters.length && Date.now() - pl.waitSince > 20000) this.flush(pl); }), 5000);
     const addrs = lanAddresses();
@@ -55,12 +59,13 @@ class LiveQuiz {
   }
 
   async stop() {
-    if (!this.server) return;
+    if (!this.on) return; this.on = false;
     clearInterval(this.ping); clearTimeout(this.timer);
     this.broadcast({ v: 'closed' });
     /* give phones that are between two requests a moment to collect the 'finished' message */
     if (this.players.size) await new Promise(r => setTimeout(r, 1500));
     this.players.forEach(pl => this.flush(pl));
+    if (this.attached || !this.server) { this.attached = false; return; }
     const s = this.server; this.server = null;
     await new Promise(r => { s.close(() => r()); s.closeAllConnections && s.closeAllConnections(); setTimeout(r, 500); });
   }
@@ -74,7 +79,7 @@ class LiveQuiz {
     if (req.method === 'GET' && url.pathname === '/hb-ping') { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); return res.end(JSON.stringify({ app: 'helixboard', pin: this.pin.length })); }
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:" });
-      return res.end(this.html.split('__TITLE__').join(escapeHtml(this.title)));
+      return res.end(this.html.split('__TITLE__').join(escapeHtml(this.title)).split('__LANG__').join(this.lang || 'en'));
     }
     if (req.method === 'GET' && url.pathname === '/poll') return this.poll(url, res);
     if (req.method === 'POST' && (url.pathname === '/join' || url.pathname === '/answer' || url.pathname === '/next' || url.pathname === '/power')) return this.body(req, res, d => url.pathname === '/join' ? this.join(d, res, req) : url.pathname === '/next' ? this.next(d, res) : url.pathname === '/power' ? this.power(d, res) : this.answer(d, res));
@@ -151,7 +156,7 @@ class LiveQuiz {
 
   /* ---------- game flow (driven by the teacher) ---------- */
   question(qi, secs, pace) {
-    if (!this.server || qi < 0 || qi >= this.qs.length) return;
+    if (!this.on || qi < 0 || qi >= this.qs.length) return;
     if (pace === 'student') return this.selfStart(secs);
     clearTimeout(this.timer); this.bossStart();
     this.qi = qi; this.phase = 'question'; this.limit = Math.max(0, Math.min(600, secs | 0)); this.t0 = Date.now();

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="__LANG__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -51,8 +51,12 @@
 <script>
 (() => {
   const C = ['#FF5FA2', '#22D3EE', '#FFC928', '#4ADE80', '#B197FC', '#FF9F5A'], L = 'ABCDEF';
+  /* Arabic when the teacher's app is in Arabic */
+  const LANG = document.documentElement.lang === 'ar' ? 'ar' : 'en', AR = {"Join the quiz": "انضم إلى الاختبار", "Write your first and last name so your teacher knows who you are.": "اكتب اسمك الأول واسم عائلتك ليعرفك معلمك.", "Your full name": "اسمك الكامل", "Game PIN": "رمز اللعبة", "Join": "انضمام", "Cannot reach the board — are you on the school Wi-Fi?": "تعذّر الوصول إلى السبورة — هل أنت على شبكة المدرسة؟", "Could not join.": "تعذّر الانضمام.", "Please join again.": "يرجى الانضمام مرة أخرى.", "Reconnecting…": "جارٍ إعادة الاتصال…", "Connection lost — still trying. If this lasts, scan the QR code on the board again.": "انقطع الاتصال — ما زلنا نحاول. إذا استمر ذلك، امسح رمز QR على السبورة مرة أخرى.", "The quiz has finished": "انتهى الاختبار", "Thanks for playing!": "شكراً لمشاركتك!", "Back to class": "العودة إلى الصف", "Joining the quiz…": "جارٍ الانضمام إلى الاختبار…", "You’re in,": "أنت معنا،", "Your team:": "فريقك:", "🦠 Boss battle — every right answer damages the boss. Beat it together!": "🦠 معركة الزعيم — كل إجابة صحيحة تُضعف الزعيم. اهزموه معاً!", "⚡ Get 2 in a row to earn power-ups.": "⚡ أجب إجابتين صحيحتين متتاليتين لتربح قوة خاصة.", "Look at the board — the quiz starts soon.": "انظر إلى السبورة — سيبدأ الاختبار قريباً.", "Question": "السؤال", "of": "من", "Answer locked in — wait for the reveal.": "تم تثبيت إجابتك — انتظر إظهار الإجابة.", "No answer": "لا توجد إجابة", "Thanks for voting!": "شكراً لتصويتك!", "No answer this time": "لم تُجب هذه المرة", "You are": "أنت", "Thanks!": "شكراً!", "Time’s up": "انتهى الوقت", "Next question": "السؤال التالي", "See my result": "عرض نتيجتي", "All done!": "انتهيت!", "correct": "صحيحة", "points": "نقطة", "so far — wait for the final results on the board.": "حتى الآن — انتظر النتائج النهائية على السبورة.", "The class defeated the boss!": "هزم الصف الزعيم!", "The boss escaped — next time!": "هرب الزعيم — في المرة القادمة!", "team": "فريق", "place": "المركز", "Well done,": "أحسنت،", "You chose": "اخترت", "your order": "ترتيبك", "How sure are you?": "ما مدى ثقتك؟", "Guessing": "أخمّن", "Think so": "أظن ذلك", "Sure": "متأكد", "Sure and right = more points. Sure and wrong = lose a few.": "متأكد ومصيب = نقاط أكثر. متأكد ومخطئ = تخسر قليلاً.", "Change my answer": "غيّر إجابتي", "Boss": "الزعيم", "Double points": "نقاط مضاعفة", "50/50": "50/50", "Time freeze": "إيقاف الوقت", "Streak shield": "درع السلسلة", "on": "مفعّل", "Correct!": "صحيح!", "in a row": "متتالية", "double points!": "نقاط مضاعفة!", "New power-up:": "قوة خاصة جديدة:", "Not this time": "ليس هذه المرة", "You were sure — check the answer below carefully.": "كنت متأكداً — راجع الإجابة أدناه جيداً.", "Your streak is safe": "سلسلتك محفوظة", "The right order": "الترتيب الصحيح", "The answer": "الإجابة", "Submit my order": "أرسل ترتيبي", "pts": "نقطة", "Waiting…": "انتظار…"};
+  const t = k => LANG === 'ar' && AR[k] || k; if (LANG === 'ar') document.documentElement.dir = 'rtl';
   const m = document.getElementById('m'), q = new URLSearchParams(location.search);
-  const pin = q.get('pin') || '';
+  const pin = q.get('pin') || '', autoName = q.get('auto') ? (q.get('name') || '').slice(0, 40) : '', backQ = q.get('back') || '', back = /^\/(?!\/)/.test(backQ) ? backQ : '';
+  const goBack = () => { try { sessionStorage.setItem('hbq-left', pin); } catch (e) {} location.href = back; };
   const key = 'hbq:' + pin;
   let pid = null, timer = 0, view = null;
   try { pid = localStorage.getItem(key); } catch (e) {}
@@ -61,13 +65,13 @@
   const post = (p, d) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).then(r => r.json().then(j => ({ ok: r.ok, j })));
 
   function joinScreen(msg) {
-    const name = el('input', { maxlength: '40', placeholder: 'Your full name', autocomplete: 'off', autocapitalize: 'words' });
-    const pinIn = el('input', { inputmode: 'numeric', maxlength: '6', placeholder: 'Game PIN' }); pinIn.value = pin;
+    const name = el('input', { maxlength: '40', placeholder: t('Your full name'), autocomplete: 'off', autocapitalize: 'words' }); if (autoName) name.value = autoName;
+    const pinIn = el('input', { inputmode: 'numeric', maxlength: '6', placeholder: t('Game PIN') }); pinIn.value = pin;
     const err = el('div', { class: 'err' }, msg || '');
-    const go = el('button', { class: 'go' }, 'Join');
-    const submit = async () => { go.disabled = true; err.textContent = ''; try { const r = await post('/join', { pin: pinIn.value.trim(), name: name.value }); if (!r.ok) { err.textContent = r.j.error || 'Could not join.'; go.disabled = false; return; } pid = r.j.pid; try { localStorage.setItem('hbq:' + pinIn.value.trim(), pid); } catch (e) {} connect(); } catch (e) { err.textContent = 'Cannot reach the board — are you on the school Wi-Fi?'; go.disabled = false; } };
+    const go = el('button', { class: 'go' }, t('Join'));
+    const submit = async () => { go.disabled = true; err.textContent = ''; try { const r = await post('join', { pin: pinIn.value.trim(), name: name.value }); if (!r.ok) { err.textContent = t(r.j.error || 'Could not join.'); go.disabled = false; return; } pid = r.j.pid; try { localStorage.setItem('hbq:' + pinIn.value.trim(), pid); } catch (e) {} connect(); } catch (e) { err.textContent = t('Cannot reach the board — are you on the school Wi-Fi?'); go.disabled = false; } };
     go.onclick = submit; name.onkeydown = e => { if (e.key === 'Enter') submit(); };
-    set(el('div', { class: 'center' }, el('h1', {}, 'Join the quiz'), el('p', { class: 'muted' }, 'Write your first and last name so your teacher knows who you are.'), pin ? '' : pinIn, name, go, err));
+    set(el('div', { class: 'center' }, el('h1', {}, t('Join the quiz')), el('p', { class: 'muted' }, t('Write your first and last name so your teacher knows who you are.')), pin ? '' : pinIn, name, go, err));
     setTimeout(() => name.focus(), 50);
   }
 
@@ -78,49 +82,49 @@
     (async () => { let fails = 0;
       while (me === loopId && pid) {
         try {
-          const r = await fetch('/poll?pid=' + encodeURIComponent(pid) + '&v=' + ver, { cache: 'no-store' });
-          if (r.status === 403) { try { localStorage.removeItem(key); } catch (e) {} pid = null; joinScreen('Please join again.'); return; }
+          const r = await fetch('poll?pid=' + encodeURIComponent(pid) + '&v=' + ver, { cache: 'no-store' });
+          if (r.status === 403) { try { localStorage.removeItem(key); } catch (e) {} pid = null; joinScreen(t('Please join again.')); return; }
           const j = await r.json(); fails = 0; hideOffline();
           if (j.data && j.ver > ver) { ver = j.ver; render(j.data); if (j.data.v === 'closed') { pid = null; return; } }
         } catch (e) { fails++; /* the board stopped the game after the final results */ if (view && view.v === 'end' && fails > 2) { hideOffline(); render({ v: 'closed' }); return; } if (fails > 2) showOffline(fails > 10); await new Promise(r => setTimeout(r, Math.min(5000, 800 * fails))); }
       } })();
   }
-  const off = el('div', { style: 'position:fixed;left:12px;right:12px;bottom:12px;padding:10px 14px;border-radius:12px;background:#5A1E28;color:#fff;text-align:center;font-weight:600;display:none' }, 'Reconnecting…'); document.body.append(off);
-  const showOffline = long => { off.textContent = long ? 'Connection lost — still trying. If this lasts, scan the QR code on the board again.' : 'Reconnecting…'; off.style.display = 'block'; }, hideOffline = () => off.style.display = 'none';
+  const off = el('div', { style: 'position:fixed;left:12px;right:12px;bottom:12px;padding:10px 14px;border-radius:12px;background:#5A1E28;color:#fff;text-align:center;font-weight:600;display:none' }, t('Reconnecting…')); document.body.append(off);
+  const showOffline = long => { off.textContent = long ? t('Connection lost — still trying. If this lasts, scan the QR code on the board again.') : t('Reconnecting…'); off.style.display = 'block'; }, hideOffline = () => off.style.display = 'none';
 
   function render(d) {
     clearInterval(timer); view = d;
-    if (d.v === 'closed') { try { localStorage.removeItem(key); } catch (e) {} set(el('div', { class: 'center' }, el('h1', {}, 'The quiz has finished'), el('p', { class: 'muted' }, 'Thanks for playing!'))); return; }
-    document.getElementById('sc').textContent = d.score != null ? d.score + ' pts' : '';
+    if (d.v === 'closed') { try { localStorage.removeItem(key); } catch (e) {} set(el('div', { class: 'center' }, el('h1', {}, t('The quiz has finished')), el('p', { class: 'muted' }, t('Thanks for playing!')), back ? el('button', { class: 'go', onclick: goBack }, t('Back to class')) : '')); if (back) setTimeout(goBack, 2500); return; }
+    document.getElementById('sc').textContent = d.score != null ? d.score + ' ' + t('pts') : '';
     const tm = document.getElementById('tm'); tm.replaceChildren(d.team ? el('span', { class: 'tm', style: 'background:' + d.team.color }, d.team.emoji + ' ' + d.team.name) : '');
-    if (d.v === 'lobby') return set(el('div', { class: 'center' }, el('h1', {}, 'You’re in, ' + d.name + '!'), d.team ? el('p', {}, el('span', { class: 'tm', style: 'background:' + d.team.color + ';font-size:16px;padding:6px 14px' }, 'Your team: ' + d.team.emoji + ' ' + d.team.name)) : '', d.mode === 'boss' ? el('p', {}, '🦠 Boss battle — every right answer damages the boss. Beat it together!') : '', d.pw ? el('p', { class: 'muted' }, '⚡ Get 2 in a row to earn power-ups.') : '', el('p', { class: 'muted' }, 'Look at the board — the quiz starts soon.'), el('div', { class: 'dots' }, el('i'), el('i'), el('i'))));
+    if (d.v === 'lobby') return set(el('div', { class: 'center' }, el('h1', {}, t('You’re in,') + ' ' + d.name + '!'), d.team ? el('p', {}, el('span', { class: 'tm', style: 'background:' + d.team.color + ';font-size:16px;padding:6px 14px' }, t('Your team:') + ' ' + d.team.emoji + ' ' + d.team.name)) : '', d.mode === 'boss' ? el('p', {}, t('🦠 Boss battle — every right answer damages the boss. Beat it together!')) : '', d.pw ? el('p', { class: 'muted' }, t('⚡ Get 2 in a row to earn power-ups.')) : '', el('p', { class: 'muted' }, t('Look at the board — the quiz starts soon.')), el('div', { class: 'dots' }, el('i'), el('i'), el('i'))));
     if (d.v === 'question') {
       const bar = el('i', { style: 'width:100%' });
-      const head = el('div', {}, el('div', { class: 'muted' }, 'Question ' + (d.qi + 1) + ' of ' + d.total), el('h2', {}, d.q));
+      const head = el('div', {}, el('div', { class: 'muted' }, t('Question') + ' ' + (d.qi + 1) + ' ' + t('of') + ' ' + d.total), el('h2', {}, d.q));
       const done = d.answered != null, hide = d.hide || [];
       let opts;
       if (pending != null && pending.qi === d.qi && !done) opts = confBox(d);
       else if (d.t === 'order') opts = orderList(d, done);
       else opts = el('div', { class: 'opts' + (d.o.length > 4 || d.o.some(o => o.length > 40) ? ' many' : '') }, d.o.map((o, k) => el('button', { class: 'opt' + (done ? (k === d.answered ? ' mine' : ' dim') : hide.includes(k) ? ' dim' : ''), style: 'background:' + C[k] + (hide.includes(k) ? ';visibility:hidden' : ''), onclick: () => pick(k) }, el('span', { class: 'lt' }, L[k]), o)));
-      set(head, d.boss ? bossBar(d.boss) : '', d.limit ? el('div', { class: 'bar' }, bar) : '', powers(d, done), opts, done ? el('p', { class: 'muted center', style: 'margin:0' }, 'Answer locked in — wait for the reveal.') : '');
+      set(head, d.boss ? bossBar(d.boss) : '', d.limit ? el('div', { class: 'bar' }, bar) : '', powers(d, done), opts, done ? el('p', { class: 'muted center', style: 'margin:0' }, t('Answer locked in — wait for the reveal.')) : '');
       if (d.limit) { const end = Date.now() + d.left * 1000; const tick = () => { const left = Math.max(0, end - Date.now()); bar.style.width = (left / (d.limit * 1000) * 100) + '%'; if (!left) { clearInterval(timer); if (pending && pending.qi === d.qi) { sendAnswer(pending.c, 1); return; } /* student-paced: time is up, move on */ if (d.self && view === d && d.answered == null) pick(-1); } }; tick(); timer = setInterval(tick, 200); }
       return;
     }
     if (d.v === 'reveal' || d.v === 'selfres') pending = null;
     if (d.v === 'reveal') {
       const r = d.last || {}; const poll = d.a < 0 && !d.order;
-      const box = poll ? el('div', { class: 'res poll' }, el('h2', {}, d.mine == null ? 'No answer' : 'Thanks for voting!')) : d.mine == null ? el('div', { class: 'res no' }, el('div', { class: 'big' }, '⏱'), el('h2', {}, 'No answer this time')) : resBox(r);
-      return set(d.boss ? bossBar(d.boss) : '', box, poll ? '' : rightCard(d), d.rank ? el('p', { class: 'center muted', style: 'margin:0' }, 'You are ' + ordinal(d.rank) + ' of ' + d.players) : '');
+      const box = poll ? el('div', { class: 'res poll' }, el('h2', {}, d.mine == null ? t('No answer') : t('Thanks for voting!'))) : d.mine == null ? el('div', { class: 'res no' }, el('div', { class: 'big' }, '⏱'), el('h2', {}, t('No answer this time'))) : resBox(r);
+      return set(d.boss ? bossBar(d.boss) : '', box, poll ? '' : rightCard(d), d.rank ? el('p', { class: 'center muted', style: 'margin:0' }, t('You are') + ' ' + ordinal(d.rank) + ' ' + t('of') + ' ' + d.players) : '');
     }
     if (d.v === 'selfres') {
       const r = d.last || {}, poll = d.a < 0 && !d.order;
-      const box = poll ? el('div', { class: 'res poll' }, el('h2', {}, 'Thanks!')) : d.mine == null || d.mine === -1 ? el('div', { class: 'res no' }, el('div', { class: 'big' }, '⏱'), el('h2', {}, 'Time’s up')) : resBox(r);
+      const box = poll ? el('div', { class: 'res poll' }, el('h2', {}, t('Thanks!'))) : d.mine == null || d.mine === -1 ? el('div', { class: 'res no' }, el('div', { class: 'big' }, '⏱'), el('h2', {}, t('Time’s up'))) : resBox(r);
       const right = poll ? '' : rightCard(d);
-      const nx = el('button', { class: 'go', onclick: () => { nx.disabled = true; post('/next', { pid }); } }, d.isLast ? 'See my result' : 'Next question');
-      return set(el('div', { class: 'muted' }, 'Question ' + (d.qi + 1) + ' of ' + d.total), box, right, nx, d.rank ? el('p', { class: 'center muted', style: 'margin:0' }, 'You are ' + ordinal(d.rank) + ' of ' + d.players) : '');
+      const nx = el('button', { class: 'go', onclick: () => { nx.disabled = true; post('next', { pid }); } }, d.isLast ? t('See my result') : t('Next question'));
+      return set(el('div', { class: 'muted' }, t('Question') + ' ' + (d.qi + 1) + ' ' + t('of') + ' ' + d.total), box, right, nx, d.rank ? el('p', { class: 'center muted', style: 'margin:0' }, t('You are') + ' ' + ordinal(d.rank) + ' ' + t('of') + ' ' + d.players) : '');
     }
-    if (d.v === 'selfdone') return set(el('div', { class: 'center' }, el('div', { class: 'big' }, '🏁'), el('h1', {}, 'All done!'), el('p', {}, d.correct + ' of ' + d.total + ' correct · ' + d.score + ' points'), d.rank ? el('p', { class: 'muted' }, 'You are ' + ordinal(d.rank) + ' of ' + d.players + ' so far — wait for the final results on the board.') : ''));
-    if (d.v === 'end') return set(el('div', { class: 'center' }, d.won != null ? el('div', { class: 'card', style: 'margin-bottom:14px' }, el('div', { class: 'big' }, d.won ? '🏆' : '🦠'), el('h2', {}, d.won ? 'The class defeated the boss!' : 'The boss escaped — next time!')) : '', d.team && d.teamRank ? el('p', {}, el('span', { class: 'tm', style: 'background:' + d.team.color + ';font-size:16px;padding:6px 14px' }, d.team.emoji + ' ' + d.team.name + ' — ' + ordinal(d.teamRank) + ' team')) : '', el('div', { class: 'big' }, d.rank === 1 ? '🏆' : d.rank <= 3 ? '🎉' : '⭐'), el('h1', {}, ordinal(d.rank) + ' place'), el('p', {}, d.score + ' points'), el('p', { class: 'muted' }, 'Well done, ' + d.name + '!')));
+    if (d.v === 'selfdone') return set(el('div', { class: 'center' }, el('div', { class: 'big' }, '🏁'), el('h1', {}, t('All done!')), el('p', {}, d.correct + ' ' + t('of') + ' ' + d.total + ' ' + t('correct') + ' · ' + d.score + ' ' + t('points')), d.rank ? el('p', { class: 'muted' }, t('You are') + ' ' + ordinal(d.rank) + ' ' + t('of') + ' ' + d.players + ' ' + t('so far — wait for the final results on the board.')) : ''));
+    if (d.v === 'end') return set(el('div', { class: 'center' }, d.won != null ? el('div', { class: 'card', style: 'margin-bottom:14px' }, el('div', { class: 'big' }, d.won ? '🏆' : '🦠'), el('h2', {}, d.won ? t('The class defeated the boss!') : t('The boss escaped — next time!'))) : '', d.team && d.teamRank ? el('p', {}, el('span', { class: 'tm', style: 'background:' + d.team.color + ';font-size:16px;padding:6px 14px' }, d.team.emoji + ' ' + d.team.name + ' — ' + ordinal(d.teamRank) + ' ' + t('team'))) : '', el('div', { class: 'big' }, d.rank === 1 ? '🏆' : d.rank <= 3 ? '🎉' : '⭐'), el('h1', {}, LANG === 'ar' ? t('place') + ' ' + d.rank : ordinal(d.rank) + ' place'), el('p', {}, d.score + ' ' + t('points')), el('p', { class: 'muted' }, t('Well done,') + ' ' + d.name + '!'), back ? el('button', { class: 'go', onclick: goBack }, t('Back to class')) : ''));
   }
   /* with "How sure are you?" on, the answer waits for the confidence choice */
   let pending = null;
@@ -132,22 +136,22 @@
   async function sendAnswer(c, conf) {
     if (!view || view.v !== 'question' || view.answered != null) return;
     pending = null; view.answered = c; if (c !== -1) render(view);
-    try { const r = await post('/answer', { pid, qi: view.qi, c, conf }); if (!r.ok && r.j.error) { const p = el('p', { class: 'err center' }, r.j.error); m.append(p); } } catch (e) {}
+    try { const r = await post('answer', { pid, qi: view.qi, c, conf }); if (!r.ok && r.j.error) { const p = el('p', { class: 'err center' }, r.j.error); m.append(p); } } catch (e) {}
   }
-  function confBox(d) { const k = pending.c, chosen = d.t === 'order' ? 'your order' : L[k] + ') ' + d.o[k];
-    return el('div', { class: 'card' }, el('div', { class: 'muted' }, 'You chose'), el('b', {}, chosen), el('h2', { style: 'margin:14px 0 10px' }, 'How sure are you?'),
-      el('div', { class: 'conf' }, [['🤷', 'Guessing', 0], ['🤔', 'Think so', 1], ['💪', 'Sure', 2]].map(([e, t, v]) => el('button', { onclick: () => sendAnswer(k, v) }, e, el('br'), t))),
-      el('p', { class: 'muted', style: 'font-size:13px;margin:10px 0 0' }, 'Sure and right = more points. Sure and wrong = lose a few.'),
-      el('button', { class: 'go', style: 'background:var(--panel2);color:var(--ink)', onclick: () => { pending = null; render(view); } }, 'Change my answer')); }
-  function bossBar(b) { return el('div', { class: 'card', style: 'padding:10px 14px' }, el('div', { style: 'display:flex;justify-content:space-between;font-weight:800' }, el('span', {}, '🦠 Boss'), el('span', {}, Math.max(0, Math.round(b.hp / b.max * 100)) + '%')), el('div', { class: 'hp' }, el('i', { style: 'width:' + (b.hp / b.max * 100) + '%' }))); }
-  const PW = { double: ['✖2', 'Double points'], fifty: ['½', '50/50'], freeze: ['⏸', 'Time freeze'], shield: ['🛡', 'Streak shield'] };
+  function confBox(d) { const k = pending.c, chosen = d.t === 'order' ? t('your order') : L[k] + ') ' + d.o[k];
+    return el('div', { class: 'card' }, el('div', { class: 'muted' }, t('You chose')), el('b', {}, chosen), el('h2', { style: 'margin:14px 0 10px' }, t('How sure are you?')),
+      el('div', { class: 'conf' }, [['🤷', 'Guessing', 0], ['🤔', 'Think so', 1], ['💪', 'Sure', 2]].map(([e, lab, v]) => el('button', { onclick: () => sendAnswer(k, v) }, e, el('br'), t(lab)))),
+      el('p', { class: 'muted', style: 'font-size:13px;margin:10px 0 0' }, t('Sure and right = more points. Sure and wrong = lose a few.')),
+      el('button', { class: 'go', style: 'background:var(--panel2);color:var(--ink)', onclick: () => { pending = null; render(view); } }, t('Change my answer'))); }
+  function bossBar(b) { return el('div', { class: 'card', style: 'padding:10px 14px' }, el('div', { style: 'display:flex;justify-content:space-between;font-weight:800' }, el('span', {}, '🦠 ' + t('Boss')), el('span', {}, Math.max(0, Math.round(b.hp / b.max * 100)) + '%')), el('div', { class: 'hp' }, el('i', { style: 'width:' + (b.hp / b.max * 100) + '%' }))); }
+  const PW = { double: ['✖2', t('Double points')], fifty: ['½', '50/50'], freeze: ['⏸', t('Time freeze')], shield: ['🛡', t('Streak shield')] };
   function powers(d, done) { if (!d.pw || (!d.pw.length && !d.used)) return '';
-    if (d.used) return el('div', { class: 'pws' }, el('button', { class: 'pw used', disabled: '' }, PW[d.used][0] + ' ' + PW[d.used][1] + ' on'));
-    return el('div', { class: 'pws' }, d.pw.map(k => el('button', { class: 'pw', disabled: done ? '' : null, onclick: async () => { const r = await post('/power', { pid, qi: d.qi, k }).catch(() => null); if (r && !r.ok) { m.append(el('p', { class: 'err center' }, r.j.error)); } } }, PW[k][0] + ' ' + PW[k][1]))); }
-  function resBox(r) { return r.ok ? el('div', { class: 'res ok' }, el('div', { class: 'big' }, '✓'), el('h2', {}, 'Correct! +' + r.pts), r.streak > 1 ? el('div', {}, '🔥 ' + r.streak + ' in a row') : '', r.use === 'double' ? el('div', {}, '✖2 double points!') : '', r.got ? el('div', { style: 'margin-top:6px;font-weight:800;color:#FFC928' }, '⚡ New power-up: ' + PW[r.got][1]) : '')
-      : el('div', { class: 'res no' }, el('div', { class: 'big' }, '✗'), el('h2', {}, 'Not this time' + (r.pts < 0 ? ' (' + r.pts + ')' : '')), r.conf === 2 ? el('div', {}, 'You were sure — check the answer below carefully.') : '', r.use === 'shield' ? el('div', {}, '🛡 Your streak is safe') : ''); }
-  function rightCard(d) { if (d.order) return el('div', { class: 'card' }, el('div', { class: 'muted' }, 'The right order'), el('div', { class: 'ord', style: 'margin-top:8px' }, d.order.map((o, i) => el('div', { class: 'it' + (Array.isArray(d.mine) ? (d.mine[i] === i ? ' ok' : ' no') : '') }, el('span', { class: 'n' }, i + 1), el('span', { class: 'tx' }, o)))), d.ex ? el('div', { class: 'muted', style: 'margin-top:6px' }, d.ex) : '');
-    return el('div', { class: 'card' }, el('div', { class: 'muted' }, 'The answer'), el('b', {}, L[d.a] + ') ' + d.o[d.a]), d.ex ? el('div', { class: 'muted', style: 'margin-top:6px' }, d.ex) : ''); }
+    if (d.used) return el('div', { class: 'pws' }, el('button', { class: 'pw used', disabled: '' }, PW[d.used][0] + ' ' + PW[d.used][1] + ' ' + t('on')));
+    return el('div', { class: 'pws' }, d.pw.map(k => el('button', { class: 'pw', disabled: done ? '' : null, onclick: async () => { const r = await post('power', { pid, qi: d.qi, k }).catch(() => null); if (r && !r.ok) { m.append(el('p', { class: 'err center' }, r.j.error)); } } }, PW[k][0] + ' ' + PW[k][1]))); }
+  function resBox(r) { return r.ok ? el('div', { class: 'res ok' }, el('div', { class: 'big' }, '✓'), el('h2', {}, t('Correct!') + ' +' + r.pts), r.streak > 1 ? el('div', {}, '🔥 ' + r.streak + ' ' + t('in a row')) : '', r.use === 'double' ? el('div', {}, '✖2 ' + t('double points!')) : '', r.got ? el('div', { style: 'margin-top:6px;font-weight:800;color:#FFC928' }, '⚡ ' + t('New power-up:') + ' ' + PW[r.got][1]) : '')
+      : el('div', { class: 'res no' }, el('div', { class: 'big' }, '✗'), el('h2', {}, t('Not this time') + (r.pts < 0 ? ' (' + r.pts + ')' : '')), r.conf === 2 ? el('div', {}, t('You were sure — check the answer below carefully.')) : '', r.use === 'shield' ? el('div', {}, '🛡 ' + t('Your streak is safe')) : ''); }
+  function rightCard(d) { if (d.order) return el('div', { class: 'card' }, el('div', { class: 'muted' }, t('The right order')), el('div', { class: 'ord', style: 'margin-top:8px' }, d.order.map((o, i) => el('div', { class: 'it' + (Array.isArray(d.mine) ? (d.mine[i] === i ? ' ok' : ' no') : '') }, el('span', { class: 'n' }, i + 1), el('span', { class: 'tx' }, o)))), d.ex ? el('div', { class: 'muted', style: 'margin-top:6px' }, d.ex) : '');
+    return el('div', { class: 'card' }, el('div', { class: 'muted' }, t('The answer')), el('b', {}, L[d.a] + ') ' + d.o[d.a]), d.ex ? el('div', { class: 'muted', style: 'margin-top:6px' }, d.ex) : ''); }
   /* "put in order": drag the cards (or use the arrows), then Submit */
   let ordState = null;
   function orderList(d, done) {
@@ -160,9 +164,12 @@
         row.onpointerup = row.onpointercancel = () => { row.onpointermove = row.onpointerup = row.onpointercancel = null; const [x] = L2.splice(i, 1); L2.splice(cur, 0, x); draw(); }; };
       return row; }));
     draw(); if (done) return box;
-    return el('div', {}, box, el('button', { class: 'go', onclick: () => { const c = L2.map(x => x.k); if (view.conf) { pending = { qi: d.qi, c }; render(view); } else sendAnswer(c, null); } }, 'Submit my order')); }
-  const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
-  if (pid) connect(); else joinScreen();
+    return el('div', {}, box, el('button', { class: 'go', onclick: () => { const c = L2.map(x => x.k); if (view.conf) { pending = { qi: d.qi, c }; render(view); } else sendAnswer(c, null); } }, t('Submit my order'))); }
+  const ordinal = n => LANG === 'ar' ? String(n) : n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+  /* arriving from the class link: join with the same name, without typing; afterwards go back to the class */
+  async function autoJoin() { set(el('div', { class: 'center' }, el('h1', {}, t('Joining the quiz…')), el('div', { class: 'dots' }, el('i'), el('i'), el('i'))));
+    try { const r = await post('join', { pin, name: autoName }); if (r.ok) { pid = r.j.pid; try { localStorage.setItem(key, pid); } catch (e) {} connect(); return; } joinScreen(t(r.j.error || 'Could not join.')); } catch (e) { joinScreen(t('Cannot reach the board — are you on the school Wi-Fi?')); } }
+  if (pid) connect(); else if (autoName) autoJoin(); else joinScreen();
 })();
 </script>
 </body>

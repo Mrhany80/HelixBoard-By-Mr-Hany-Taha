@@ -138,7 +138,11 @@
   }
   function closed() { document.getElementById('lockv').style.display = 'none'; handB.hidden = askB.hidden = reactB.hidden = true; tray.classList.remove('on'); pid = null; try { localStorage.removeItem(key); } catch (e) {} nav.hidden = true; off.style.display = 'none'; set(el('div', { class: 'center' }, el('h1', {}, t('The live session has ended')), el('p', { class: 'muted' }, t('Thanks for joining!')))); }
 
+  /* the teacher started the phone quiz inside the class: go there with this name (no new code, no typing) */
+  function toQuiz() { const z = st && st.quiz; if (!z || !me) return false; let left = ''; try { left = sessionStorage.getItem('hbq-left') || ''; } catch (e) {} if (left === z.pin) return false;
+    location.href = 'quiz/?pin=' + encodeURIComponent(z.pin) + '&name=' + encodeURIComponent(me.name) + '&auto=1&lang=' + (LANG || 'en') + '&back=' + encodeURIComponent(location.pathname + location.search); return true; }
   function render(prev) {
+    if (toQuiz()) return;
     nav.hidden = false; chrome();
     /* a new activity (or a shared answer) opens the Activity tab by itself, like Nearpod */
     if (st.act && (!prev || !prev.act || prev.act.id !== st.act.id)) { tab = 'act'; hwRun = null; }

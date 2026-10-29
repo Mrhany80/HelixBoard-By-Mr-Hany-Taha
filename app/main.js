@@ -27,6 +27,18 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !wind
 if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d) => D.prompt(String(m == null ? '' : m), String(d == null ? '' : d));
   D.onOpenFile(({ name, data }) => { const f = new File([data], name), ext = (name.split('.').pop() || '').toLowerCase();
     if (ext === 'helix') window.HBIO.readHelix(f); else if (ext === 'hbset') window.HBL.importFiles([f]); else if (ext === 'hbhw') window.HBL.importHomework([f]); else if (ext === 'hbres') window.HBL.importResults([f]); else window.HBIO.openDoc(f); }); if (D.onInsertImage) D.onInsertImage(url => { window.HBI.insertImage(url); toast('Screen picture added to the board.'); }); D.ready(); }
+/* after an update: a short "What's new" card, once (not on a first install) */
+{ const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
+  const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
+    const items = [['brain-circuit', 'Concept maps that just work', 'Notes → Concept map. Round + handles add branches and sub-branches; pen taps select, drags move a branch.', () => window.HBMM && HBMM.open()],
+      ['radio', 'One join for the whole lesson', 'Students scan once: the phone quiz now runs inside the class, and phones move into it by themselves.', () => window.HBLC && HBLC.open()],
+      ['trophy', 'Quiz games', 'Teams, boss battle, power-ups, “How sure?” and a ghost race — in the phone quiz lobby.', () => window.HBL && HBL.phoneQuiz()],
+      ['scan-line', 'Paper answer cards', 'No phones? Students hold up printed cards and your webcam reads the room.', () => window.HBPC && HBPC.menu()],
+      ['presentation', 'PowerPoint like Office', 'Each slide’s own transition, 4K slides that stay light on memory, and live questions on slides.', null],
+      ['mic', 'Expert notes', 'Record the lesson with your ink, find anything on any page (Ctrl+F), export to Word.', () => window.HBNX && HBNX.finder('find')]];
+    modal.open('<h2>' + icon('sparkles') + ' What’s new in HelixBoard ' + ver + '</h2><div style="display:grid;gap:8px">' + items.map((it, i) => '<button class="btn" data-wn="' + i + '" style="height:auto;justify-content:flex-start;text-align:left;padding:10px 12px;gap:12px">' + icon(it[0]) + '<span><b>' + it[1] + '</b><br><span class="small muted">' + it[2] + '</span></span></button>').join('') + '</div><div class="foot"><button class="btn primary" data-close>Start teaching</button></div>', sh => {
+      sh.querySelectorAll('[data-wn]').forEach(b => b.onclick = () => { const f = items[+b.dataset.wn][3]; modal.close(); if (f) setTimeout(f, 60); }); }); };
+  setTimeout(show, 1500); } } }
 if (window.__hbErr && window.__hbErr.length) setTimeout(() => toast('Part of HelixBoard could not start (' + window.__hbErr.join('; ') + '). Everything else works — please send a screenshot of this message.'), 800);
 })();
 
