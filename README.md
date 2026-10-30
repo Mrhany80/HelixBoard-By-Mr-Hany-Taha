@@ -239,6 +239,13 @@ pasted text**. No AI and no internet are needed (photos need Tesseract once).
   every answer, the teacher's own marks for written answers (sent back to the phones), Excel export. Results are saved with
   the test (IndexedDB) for every time it is given.
 
+### Planned for the next update
+
+- **Optional answer-key upload (AK):** on the review screen, an "Upload answer key" button to read the key from a separate
+  file (PDF, Word, photo or pasted text — e.g. the teacher's guide) and apply it to the questions already imported, with the
+  same key formats as an in-file key ("1-B 2-C 3-True", by section, Arabic too).
+- Gamification lesson plan (deferred by Mr. Hany).
+
 ## Concept map details
 
 Notes → **Concept map**. Round **+** handles on the selected idea add a **sub-branch** (on the side its branches grow) or a
