@@ -87,7 +87,7 @@ function findFigures(cv, boxes, pxPerPt, lineOf) {
     const inside = txtBoxes.filter(b => { const cx = (b.box[0] + b.box[2]) / 2, cy = (b.box[1] + b.box[3]) / 2; return cx > box[0] && cx < box[2] && cy > box[1] && cy < box[3]; });
     /* small drawings on a line of text — an equation, a formula or a symbol drawn as shapes — stay inline, exactly where they are */
     const beside = txtBoxes.some(b => b.box[3] > box[1] && b.box[1] < box[3] && (b.box[2] < box[0] || b.box[0] > box[2]));
-    if (bw < 22 || bh < 16 || (bh <= 40 && bw <= 320 && beside && !inside.length)) { if (n >= 6) out.push({ box, n, inline: true }); continue; }
+    if (bw < 22 || bh < 16 || (bh <= 40 && bw <= 320 && beside && !inside.length)) { if (n >= 6) out.push({ box, n, inline: true, beside }); continue; }
     if (n < 25) continue;
     /* a frame drawn round some text (a box round a question or a word bank) is not a figure */
     let inner = 0; cells.forEach(k => { const x = k % gw, y = (k / gw) | 0; if (x > x0 + 3 && x < x1 - 3 && y > y0 + 3 && y < y1 - 3) inner++; });
@@ -98,14 +98,19 @@ function findFigures(cv, boxes, pxPerPt, lineOf) {
     if (onGrid > n * 0.85 && n < cw * ch * 0.3 && (inside.length || cw > gw * 0.5)) continue;
     if (lineOf && inside.length) { const ls = lineOf(inside); if (ls.filter(t => /^\s*(?:[\(\[]?\d{1,3}\s*[.)\]\-:–]\s*\S|[\(\[]?[a-hA-Hأبجد]\s*[\)\].\-]\s*\S)/.test(t)).length >= 2) continue; }
     if (bw > 0.94 * W / pxPerPt && bh > 0.9 * H / pxPerPt) continue;
-    out.push({ box, n });
+    out.push({ box, n, top: box[1] });
   }
-  /* labels and axis titles next to a figure belong to it */
-  out.forEach(f => { if (f.inline) return; const m = 9 * pxPerPt; for (let pass = 0; pass < 2; pass++) boxes.forEach(b => { if (b.s.trim().length > 30) return; const hit = b.box[2] > f.box[0] - m && b.box[0] < f.box[2] + m && b.box[3] > f.box[1] - m && b.box[1] < f.box[3] + m;
+  /* a small drawing that is not on a line of text belongs to the figure next to it (a label outside the picture), or is dropped */
+  for (let i = out.length - 1; i >= 0; i--) { const f = out[i]; if (!f.inline || f.beside) continue; const m = 40 * pxPerPt;
+    const fig = out.find(g => !g.inline && f.box[2] > g.box[0] - m && f.box[0] < g.box[2] + m && f.box[3] > g.box[1] - m && f.box[1] < g.box[3] + m);
+    if (fig) { fig.box[0] = Math.min(fig.box[0], f.box[0]); fig.box[1] = Math.min(fig.box[1], f.box[1]); fig.box[2] = Math.max(fig.box[2], f.box[2]); fig.box[3] = Math.max(fig.box[3], f.box[3]); } out.splice(i, 1); }
+  /* labels and axis titles next to a figure belong to it — never a question number or the words on its line */
+  const qRows = boxes.filter(b => /^\s*\d{1,3}\s*[.)]\s*$/.test(b.s)).map(b => [b.box[1], b.box[3]]), onQRow = b => { const cy = (b.box[1] + b.box[3]) / 2; return qRows.some(([y0, y1]) => cy > y0 && cy < y1); };
+  out.forEach(f => { if (f.inline) return; const m = 9 * pxPerPt; for (let pass = 0; pass < 2; pass++) boxes.forEach(b => { if (b.s.trim().length > 30 || onQRow(b)) return; const hit = b.box[2] > f.box[0] - m && b.box[0] < f.box[2] + m && b.box[3] > f.box[1] - m && b.box[1] < f.box[3] + m;
     if (hit && !/^\s*(?:\d{1,3}\s*[.)\-:–]\s*\S{2,}|[a-hA-H]\s*[).]\s+\S{2,})/.test(b.s)) { f.box[0] = Math.min(f.box[0], b.box[0]); f.box[1] = Math.min(f.box[1], b.box[1]); f.box[2] = Math.max(f.box[2], b.box[2]); f.box[3] = Math.max(f.box[3], b.box[3]); } }); });
   /* overlapping finds become one */
   for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) { if (out[i].inline !== out[j].inline) continue; const a = out[i].box, b = out[j].box; if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) { a[0] = Math.min(a[0], b[0]); a[1] = Math.min(a[1], b[1]); a[2] = Math.max(a[2], b[2]); a[3] = Math.max(a[3], b[3]); out.splice(j, 1); j = i; } }
-  return out.map(f => { const p = f.inline ? 2 : 6, x0 = Math.max(0, f.box[0] - p), y0 = Math.max(0, f.box[1] - p), x1 = Math.min(W, f.box[2] + p), y1 = Math.min(H, f.box[3] + p); return { box: [x0, y0, x1, y1], inline: !!f.inline, img: crop(cv, x0, y0, x1 - x0, y1 - y0) }; });
+  return out.map(f => { const p = f.inline ? 2 : 6, x0 = Math.max(0, f.box[0] - p), y0 = Math.max(0, f.box[1] - p), x1 = Math.min(W, f.box[2] + p), y1 = Math.min(H, f.box[3] + p); return { box: [x0, y0, x1, y1], top: f.top != null ? f.top : y0, inline: !!f.inline, img: crop(cv, x0, y0, x1 - x0, y1 - y0) }; });
 }
 function crop(cv, x, y, w, h, maxW) { maxW = maxW || 1100; const s = Math.min(1, maxW / w), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
   const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingQuality = 'high'; g.drawImage(cv, x, y, w, h, 0, 0, c.width, c.height);
@@ -114,29 +119,55 @@ const pagePic = cv => crop(cv, 0, 0, cv.width, cv.height, 1400);
 const isAr = s => (s.match(/[؀-ۿ]/g) || []).length > (s.match(/[A-Za-z]/g) || []).length;
 
 /* text pieces with boxes → lines (top to bottom), with wide gaps kept as table cells */
+const SUP = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻', '−': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', 'n': 'ⁿ' };
+const SUB = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉', '+': '₊', '-': '₋', '−': '₋', '=': '₌', '(': '₍', ')': '₎' };
+/* pieces of one line → cells (wide gaps), in reading order */
+function cellsOf(items, rtl) { const its = items.slice().sort((a, b) => rtl ? b.box[2] - a.box[2] : a.box[0] - b.box[0]), out = []; let cur = null, prev = null;
+  its.forEach(it => { const fs = prev ? Math.max(6, Math.min(prev.h, it.h)) : 0, gap = prev ? (rtl ? prev.box[0] - it.box[2] : it.box[0] - prev.box[2]) : 0;
+    if (!cur || gap > fs * 1.4) { cur = { x0: it.box[0], x1: it.box[2], parts: [] }; out.push(cur); }
+    else if (gap > fs * 0.18 && !it.conv && !/\s$/.test(prev.s) && !/^\s/.test(it.s)) cur.parts.push(' ');
+    cur.parts.push(it.s); cur.x0 = Math.min(cur.x0, it.box[0]); cur.x1 = Math.max(cur.x1, it.box[2]); prev = it; });
+  return out.map(c => Object.assign(c, { t: c.parts.join('').replace(/\s+/g, ' ').trim() })).filter(c => c.t); }
 function toLines(items, cv, pxPerPt) {
   const its = items.filter(it => it.s && it.s.trim()).map(it => Object.assign({}, it, { cy: (it.box[1] + it.box[3]) / 2, h: it.box[3] - it.box[1] })).sort((a, b) => a.cy - b.cy);
-  const rows = []; its.forEach(it => { const r = rows.find(r => Math.abs(r.cy - it.cy) < Math.min(r.h, it.h) * 0.5); if (r) { r.items.push(it); r.cy = (r.cy * (r.items.length - 1) + it.cy) / r.items.length; } else rows.push({ cy: it.cy, h: it.h, items: [it] }); });
-  rows.sort((a, b) => a.cy - b.cy);
-  /* a line with an equation (math fonts, raised or lowered characters, √ ∑ ∫ …) is kept as an exact picture, after its number or letter */
-  if (cv) { rows.forEach(r => { const tx = r.items.filter(i => !i.tok); if (!tx.length) return; const H = Math.max(...tx.map(i => i.h)), big = tx.find(i => i.h === H), mid = (big.box[1] + big.box[3]) / 2;
-      r.math = tx.some(i => i.math || (i.s.trim() && i.h < H * 0.88 && Math.abs((i.box[1] + i.box[3]) / 2 - mid) > H * 0.14)) || /[√∑∫∏∞∂≠≤≥≈∓∝]/.test(r.items.map(i => i.s).join('')); });
-    for (let i = 0; i + 1 < rows.length; i++) { const a = rows[i], b = rows[i + 1], aB = Math.max(...a.items.map(x => x.box[3])), bT = Math.min(...b.items.map(x => x.box[1]));
-      /* the top or bottom of a fraction: a short, smaller line inside the width of the line next to it */
+  if (!its.length) return [];
+  /* lines: normal-size text first; small raised or lowered characters then join the line they overlap most */
+  const hs = its.map(i => i.h).sort((a, b) => a - b), med = hs[hs.length >> 1], rows = [];
+  const ov = (r, it) => Math.min(r.y1, it.box[3]) - Math.max(r.y0, it.box[1]);
+  its.filter(i => i.tok || i.h >= med * 0.9).forEach(it => { const r = rows.find(r => ov(r, it) >= 0.3 * Math.min(it.h, r.y1 - r.y0)); if (r) { r.items.push(it); r.y0 = Math.min(r.y0, it.box[1]); r.y1 = Math.max(r.y1, it.box[3]); } else rows.push({ y0: it.box[1], y1: it.box[3], items: [it] }); });
+  its.filter(i => !i.tok && i.h < med * 0.9).forEach(it => { let best = null, bo = 0; rows.forEach(r => { const o = ov(r, it); if (o > bo) { bo = o; best = r; } }); if (best && bo >= 0.3 * it.h) best.items.push(it); else rows.push({ y0: it.box[1], y1: it.box[3], items: [it] }); });
+  rows.forEach(r => { r.cy = (r.y0 + r.y1) / 2; r.h = r.y1 - r.y0; }); rows.sort((a, b) => a.cy - b.cy);
+  /* H₂O, NAD⁺, x²: small raised or lowered digits and signs become real sub/superscript characters (the line stays text) */
+  rows.forEach(r => { const tx = r.items.filter(i => !i.tok); if (!tx.length) return; const H = Math.max(...tx.map(i => i.h)), core = tx.filter(i => i.h >= H * 0.88), mid = core.length ? core.reduce((s, i) => s + i.cy, 0) / core.length : r.cy;
+    const small = tx.filter(i => i.h < H * 0.88 && Math.abs(i.cy - mid) > H * 0.14), stacked = i => small.some(j => j !== i && (j.cy < mid) !== (i.cy < mid) && Math.min(i.box[2], j.box[2]) - Math.max(i.box[0], j.box[0]) > Math.min(i.box[2] - i.box[0], j.box[2] - j.box[0]) * 0.4);
+    tx.forEach(i => { if (i.h < H * 0.88 && Math.abs(i.cy - mid) > H * 0.14) { const t = i.s.trim(); /* one number right above another is a fraction, kept as a picture */ if (stacked(i)) { i.script = true; return; } if (/^[0-9+\-−=()n]{1,4}$/.test(t)) { const M = i.cy < mid ? SUP : SUB; if ([...t].every(c => M[c])) { i.s = [...t].map(c => M[c]).join(''); i.conv = true; return; } } i.script = true; } }); });
+  /* a table row whose text wraps: the lines just above and below that sit only in its empty columns belong to it */
+  for (let i = 0; i < rows.length; i++) { const R = rows[i], rtl = isAr(R.items.map(x => x.s).join('')), segs = cellsOf(R.items, rtl); if (segs.length < 2) continue;
+    const fits = N => N && !N.taken && N.items.every(it => segs.every(sg => it.box[2] <= sg.x0 + 2 || it.box[0] >= sg.x1 - 2)) && Math.min(...N.items.map(x => x.box[0])) > Math.min(...segs.map(s => s.x1));
+    const A = rows[i - 1], B = rows[i + 1];
+    if (fits(A) && R.y0 - A.y1 < med * 0.8) { A.items.forEach(x => { x.band = 0; }); R.wrap = (R.wrap || []).concat(A.items); A.taken = true; }
+    if (fits(B) && B.y0 - R.y1 < med * 0.8) { B.items.forEach(x => { x.band = 2; }); R.wrap = (R.wrap || []).concat(B.items); B.taken = true; } }
+  const live = rows.filter(r => !r.taken);
+  /* a line with an equation (math fonts, raised or lowered letters, √ ∑ ∫ …) is kept as an exact picture, after its number or letter */
+  if (cv) { live.forEach(r => { if (r.wrap) return; r.math = r.items.some(i => !i.tok && (i.math || i.script)) || /[√∑∫∏∞∂≠≤≥≈∓∝]/.test(r.items.map(i => i.s).join('')); });
+    for (let i = 0; i + 1 < live.length; i++) { const a = live[i], b = live[i + 1], c = live[i + 2], aB = Math.max(...a.items.map(x => x.box[3])), bT = Math.min(...b.items.map(x => x.box[1]));
+      if (a.wrap || b.wrap) continue;
+      /* the top or bottom of a fraction: a short, smaller line inside the width of the line next to it (the nearer one) */
       const short = r => r.items.every(x => x.s.trim().length <= 3) && r.items.map(x => x.s.trim()).join('').length <= 6, xr = r => [Math.min(...r.items.map(x => x.box[0])), Math.max(...r.items.map(x => x.box[2]))];
       const part = (p, o) => { const [p0, p1] = xr(p), [o0, o1] = xr(o); return short(p) && p0 > o0 + 4 && p1 < o1 + 2 && Math.max(...p.items.map(x => x.h)) < Math.max(...o.items.map(x => x.h)) * 0.92; };
-      if ((((a.math || b.math) && (a.items.some(x => x.math) || b.items.some(x => x.math))) || part(a, b) || part(b, a)) && bT - aB < Math.min(a.h, b.h) * 0.45) { a.items.push(...b.items); a.math = true; a.h = Math.max(a.h, b.h); rows.splice(i + 1, 1); i--; } } }
-  return rows.map(r => { if (r.math && cv) return mathLine(r, cv, pxPerPt); const rtl = isAr(r.items.map(i => i.s).join('')); r.items.sort((a, b) => rtl ? b.box[2] - a.box[2] : a.box[0] - b.box[0]);
-    const cells = [[]]; let prev = null;
-    r.items.forEach(it => { if (prev) { const gap = rtl ? prev.box[0] - it.box[2] : it.box[0] - prev.box[2], fs = Math.max(6, Math.min(prev.h, it.h));
-      if (gap > fs * 1.4) cells.push([]); else if (gap > fs * 0.18 && !/\s$/.test(prev.s) && !/^\s/.test(it.s)) cells[cells.length - 1].push(' '); }
-      cells[cells.length - 1].push(it.s); prev = it; });
-    const cs = cells.map(c => c.join('').replace(/\s+/g, ' ').trim()).filter(Boolean);
-    return { t: cs.join('   '), cells: cs.length >= 2 ? cs : null, b: r.items.every(i => i.bold || !i.s.trim()), y: r.items[0].box[1], y1: Math.max(...r.items.map(i => i.box[3])) }; });
+      const nearerBelow = c && part(b, c) && (Math.min(...c.items.map(x => x.box[1])) - Math.max(...b.items.map(x => x.box[3]))) < bT - aB;
+      if (!nearerBelow && ((((a.math || b.math) && (a.items.some(x => x.math) || b.items.some(x => x.math))) || part(a, b) || part(b, a)) && bT - aB < Math.min(a.h, b.h) * 0.45)) { a.items.push(...b.items); a.math = true; a.h = Math.max(a.h, b.h); live.splice(i + 1, 1); i--; } } }
+  return live.map(r => { if (r.math && cv) return mathLine(r, cv, pxPerPt); const rtl = isAr(r.items.map(i => i.s).join(''));
+    let cells = cellsOf(r.items, rtl).map(c => Object.assign(c, { band: 1 }));
+    if (r.wrap) { [0, 2].forEach(bd => cellsOf(r.wrap.filter(x => x.band === bd), rtl).forEach(c => cells.push(Object.assign(c, { band: bd }))));
+      const groups = []; cells.sort((a, b) => a.x0 - b.x0).forEach(c => { const g = groups.find(g => c.x0 < g.x1 - 2 && c.x1 > g.x0 + 2); if (g) { g.list.push(c); g.x0 = Math.min(g.x0, c.x0); g.x1 = Math.max(g.x1, c.x1); } else groups.push({ x0: c.x0, x1: c.x1, list: [c] }); });
+      cells = groups.sort((a, b) => rtl ? b.x1 - a.x1 : a.x0 - b.x0).map(g => ({ t: g.list.sort((a, b) => a.band - b.band).map(c => c.t).join(' ') })); }
+    const cs = cells.map(c => c.t).filter(Boolean), all = r.items.concat(r.wrap || []);
+    return { t: cs.join('   '), cells: cs.length >= 2 ? cs : null, b: r.items.every(i => i.bold || !i.s.trim()), y: Math.min(...all.map(i => i.box[1])), y1: Math.max(...all.map(i => i.box[3])) }; });
 }
 
 function mathLine(r, cv, pxPerPt) { const rtl = isAr(r.items.map(i => i.s).join('')); const its = r.items.slice().sort((a, b) => rtl ? b.box[2] - a.box[2] : a.box[0] - b.box[0]);
-  let lead = '', from = 0; const first = its[0], mk = first && first.s.match(/^\s*(?:(?:Q|Question|س)\s*)?(?:\d{1,3}\s*[.)\-:–]|[\(\[]?(?:[a-hA-H]|هـ|أ|ب|ج|د)\s*[\)\].\-])\s*/);
+  let lead = '', from = 0; const first = its[0], mk = first && first.s.match(/^\s*(?:(?:Q|Question|س)\s*)?(?:\d{1,3}\s*[.)\-:–]|[\(\[]?(?:[a-hA-H]|هـ|أ|ب|ج|د)\s*[\)\].\-]|[A-H](?=\s))\s*/);
   if (mk && !first.math) { lead = mk[0].trim() + ' '; const frac = mk[0].length / Math.max(1, first.s.length); if (frac >= 0.95) from = 1; else { const w = first.box[2] - first.box[0]; let cut = rtl ? first.box[2] - w * frac : first.box[0] + w * frac;
     /* cut in the white gap after the number or letter, never through a character */
     const y0 = Math.max(0, Math.floor(first.box[1])), hh = Math.max(1, Math.ceil(first.box[3] - first.box[1])), x0 = Math.max(0, Math.floor(first.box[0])), ww = Math.max(1, Math.ceil(w)), D = cv.getContext('2d', { willReadFrequently: true }).getImageData(x0, y0, ww, hh).data;
@@ -163,7 +194,7 @@ async function fromPdf(file, prog) {
       const M = vp.transform, pt = (x, y) => [M[0] * x + M[2] * y + M[4], M[1] * x + M[3] * y + M[5]], la = Math.hypot(a, b) || 1, lu = Math.hypot(c, d) || 1, ux = a / la, uy = b / la, vx = c / lu, vy = d / lu, w = it.width || fs * it.str.length * 0.5;
       /* the four corners of the text along its own baseline (rotated axis labels too) */
       const cs = [[0, -0.22], [w, -0.22], [w, 0.85], [0, 0.85]].map(([s2, h2]) => pt(e + ux * s2 + vx * h2 * fs, f + uy * s2 + vy * h2 * fs)), xs = cs.map(q => q[0]), ys = cs.map(q => q[1]), r = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-      let bold = false, math = false; try { const fo = pg.commonObjs.has(it.fontName) && pg.commonObjs.get(it.fontName); bold = !!fo && (/bold|black|heavy|semibold|demi/i.test(fo.name || '') || !!fo.bold); math = !!fo && /math|cmmi|cmsy|cmex|msam|msbm|mt\s?extra|euclid|stix|symbol/i.test(fo.name || '') && !/^[\s•·\uf0b7\uf0a7\u25aa\u25cf\-–]*$/.test(it.str); } catch (er) {}
+      let bold = false, math = false; try { const fo = pg.commonObjs.has(it.fontName) && pg.commonObjs.get(it.fontName); bold = !!fo && (/bold|black|heavy|semibold|demi/i.test(fo.name || '') || !!fo.bold); math = !!fo && /math|cmmi|cmsy|cmex|msam|msbm|mt\s?extra|euclid|stix|symbol/i.test(fo.name || '') && !/^[\s•·\uf0b7\uf0a7\u25aa\u25cf\-–→←↔⇌⇒⟶×÷±°−+=<>≤≥≈≠∆Δπμαβγθλσω′″]*$/.test(it.str); } catch (er) {}
       return { s: it.str, box: [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])], bold, math }; });
     const chars = items.reduce((s, i) => s + i.s.trim().length, 0);
     pages.push({ img: pagePic(cv), w: cv.width, h: cv.height });
@@ -182,12 +213,12 @@ function pageLines(cv, items, pxPerPt) {
   figs.filter(f => f.inline).forEach(f => { const w = f.box[2] - f.box[0], h = f.box[3] - f.box[1], k = 1.4 / pxPerPt, rowH = keep.filter(b => b.box[3] > f.box[1] && b.box[1] < f.box[3]).map(b => b.box[3] - b.box[1]);
     const box = rowH.length ? [f.box[0], (f.box[1] + f.box[3]) / 2 - Math.min(...rowH) / 2, f.box[2], (f.box[1] + f.box[3]) / 2 + Math.min(...rowH) / 2] : f.box;
     keep.push({ s: ' ' + token(f.img, w * k, h * k) + ' ', box, tok: true }); });
-  const lines = toLines(keep, cv, pxPerPt); figs.filter(f => !f.inline).forEach(f => lines.push({ img: f.img, y: f.box[1], fig: true })); lines.sort((a, b) => a.y - b.y);
+  const lines = toLines(keep, cv, pxPerPt); figs.filter(f => !f.inline).forEach(f => lines.push({ img: f.img, y: f.top, fig: true })); lines.sort((a, b) => a.y - b.y);
   return lines;
 }
 /* the same header or footer on every page is not part of any question */
 function dropRepeats(pages) { if (pages.length < 2) return pages.flat(); const count = new Map(); pages.forEach(ls => new Set(ls.filter(l => l.t).map(l => l.t.replace(/\d+/g, '#'))).forEach(k => count.set(k, (count.get(k) || 0) + 1)));
-  const need = Math.max(2, Math.ceil(pages.length * 0.6)); return pages.flatMap(ls => ls.filter(l => !l.t || count.get(l.t.replace(/\d+/g, '#')) < need || l.t.length > 90)); }
+  const need = Math.max(2, Math.ceil(pages.length * 0.6)); return pages.flatMap(ls => ls.filter(l => !l.t || count.get(l.t.replace(/\d+/g, '#')) < need)); }
 
 /* ---------- photos and scans (Tesseract, the first time it downloads the reader) ---------- */
 let ocrLang = 'eng+ara';

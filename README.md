@@ -3,7 +3,7 @@
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
-Version **2.6.0** — three ways to run it, all built from the same `app/` source:
+Version **2.6.1** — three ways to run it, all built from the same `app/` source:
 
 | Device | What | Install |
 |---|---|---|
@@ -226,7 +226,11 @@ pasted text**. No AI and no internet are needed (photos need Tesseract once).
   their type ("True or False", "Fill in the blanks", "Match", "Arrange", "Explain", Arabic too), marks, "Answer:" lines,
   explanations, hints, "use the graph to answer questions 3–5" (the graph goes on all of them) and the **answer key**: a key
   page ("1-B 2-C 3-True", by section too), "Answer: B" under a question, or the right option marked with ✓ / * / bold /
-  underline. Nine types: multiple choice, several answers, true/false, short answer, number (tolerance, units), fill in the
+  underline. Key layouts read: one or several per line ("1. B 2. C"), "1-b, 2-a", "Q1: B", "1. (b)", option words instead
+  of letters, a key table (number | answer, several column pairs, answers wrapping onto two lines), a row of numbers with the
+  answers below, a list at the end with no heading, marks after answers "(1)", and alternatives "citric acid (also: TCA)".
+  Options may be written "A ribosome   B vesicle"; "Label the figure" lines (A ____ … O ____) become one blank per letter,
+  answered from "A nuclear pore · B nucleus …"; a fill-in equation is answered from the full equation in the key. Nine types: multiple choice, several answers, true/false, short answer, number (tolerance, units), fill in the
   blanks, matching, put in order, written answer (key words).
 - The review screen is Forms-style cards: edit anything, change the type, crop a figure from the page, or **copy a figure or
   equation anywhere and press Ctrl+V** on a question (as its figure) or inside its text (in place).

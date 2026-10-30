@@ -8,7 +8,7 @@
 'use strict';
 const AR_LET = { 'أ': 0, 'ا': 0, 'ب': 1, 'ج': 2, 'د': 3, 'ه': 4, 'هـ': 4, 'و': 5, 'ز': 6, 'ح': 7 };
 const digits = s => String(s == null ? '' : s).replace(/[٠-٩۰-۹]/g, d => String(d.charCodeAt(0) & 15));
-const letterIdx = l => { if (l == null) return -1; l = String(l).trim(); if (/^[a-h]$/i.test(l)) return l.toLowerCase().charCodeAt(0) - 97; return AR_LET[l] != null ? AR_LET[l] : -1; };
+const letterIdx = l => { if (l == null) return -1; l = String(l).trim(); if (/^[a-z]$/i.test(l)) return l.toLowerCase().charCodeAt(0) - 97; return AR_LET[l] != null ? AR_LET[l] : -1; };
 const BLANK = /_{3,}|\.{4,}|…{2,}/g;
 const hasBlank = s => /_{3,}|\.{4,}|…{2,}/.test(s);
 
@@ -30,7 +30,7 @@ const tfVal = s => { const m = String(s).trim().match(TF_WORDS); if (!m) return 
 const SECTIONS = [
   ['tf', /true\s*(?:or|\/|and|&)\s*false|\bT\s*\/\s*F\b|correct\s*(?:or|\/)\s*incorrect|صح\s*(?:أو|او|أم|ام|\/|و)\s*(?:خطأ|خطا)|صواب\s*(?:أو|او|أم|ام|\/)\s*خطأ|علامة\s*\(?\s*[✓√]|ضع\s*علامة/i],
   ['multi', /(?:choose|select|circle|tick)\s*(?:all|two|three|the\s*two|the\s*three|more\s*than\s*one)|all\s*that\s*apply|اختر\s*(?:إجابتين|اجابتين|كل|جميع)/i],
-  ['match', /\bmatch|connect\s*each|link\s*each|column\s*a\b|(?:^|\s)صل(?=\s|$)|وصل|اربط|توصيل|العمود\s*\(?أ/i],
+  ['match', /^\s*(?:section\s+\S+\s*[·:\-–]?\s*)?match(?:ing)?\b|\bmatch\s+(?:the|each|column|these|following|items|words|terms|a\b|up)|matching\s+(?:pairs|columns?|items|terms|section|exercise|questions)|connect\s*each|link\s*each|column\s*a\b|(?:^|\s)صل(?=\s|$)|وصل|اربط|توصيل|العمود\s*\(?أ/i],
   ['order', /\barrange|\bsequence|put\s*.{0,20}\s*in\s*(?:the\s*)?(?:right|correct)?\s*order|\border\s*(?:the|these)|رتب|ترتيب/i],
   ['blank', /fill\s*in|complete\s*(?:the|each|these)|\bblanks?\b|missing\s*words?|أكمل|اكمل|املأ|املا|الفراغ/i],
   ['mc', /choose|circle|select|multiple\s*choice|tick\s*the|best\s*answer|اختر|ضع\s*دائرة|اختيار\s*من\s*متعدد/i],
@@ -73,6 +73,8 @@ function parse(lines, opt) {
     const pm = t.match(POINTS); if (pm) { cur.pts = +pm[1]; t = t.replace(POINTS, ' '); }
     const am = t.match(/\s*[\(\[]\s*(?:ans(?:wer)?|key)\s*[:=]\s*([^)\]]+)[\)\]]\s*$/i); if (am) { cur.key = am[1].trim(); t = t.slice(0, am.index); }
     if (/\(\s*(?:T\s*\/\s*F|True\s*\/\s*False|صح\s*\/\s*خطأ)\s*\)/i.test(t)) { cur.tf = true; t = t.replace(/\(\s*(?:T\s*\/\s*F|True\s*\/\s*False|صح\s*\/\s*خطأ)\s*\)/ig, ' '); }
+    /* "Circle T or F" rows: "… statement   T F   ________ (correction)" */
+    if (/(?:^|\s)T\s*\/?\s*F(?:\s+_{3,})?\s*$/.test(t) && (sec.type === 'tf' || /(?:^|\s)T\s+F\s+_{3,}\s*$/.test(t))) { cur.tf = true; cur.corr = /_{3,}\s*$/.test(t); t = t.replace(/\s*(?:^|\s)T\s*\/?\s*F(?:\s+_{3,})?\s*$/, ''); }
     if (/\(\s{1,}\)\s*$|\[\s{1,}\]\s*$/.test(t)) { cur.box = true; t = t.replace(/\s*(?:\(\s{1,}\)|\[\s{1,}\])\s*$/, ''); }
     /* "( ✓ )" or "(T)" written into the box at the end = the key of a true/false statement */
     const tm = t.match(/\(\s*(✓|✔|✗|×|T|F|صح|خطأ)\s*\)\s*$/i); if (tm && (sec.type === 'tf' || cur.tf)) { cur.key = tm[1]; t = t.slice(0, tm.index); }
@@ -86,9 +88,12 @@ function parse(lines, opt) {
       if (range) { shares.push({ img: L.img, blk: range.blk, from: range.from, to: range.to }); range = null; } continue; }
     let t = digits(String(L.t || '')).replace(/ /g, ' ').replace(/[ \t]+$/g, '').replace(/^\s+/, ''); if (!t.trim()) continue;
     if (JUNK.test(t)) continue;
-    const km = t.match(KEY_HDR); if (km && (km[0].length >= t.length - 1 || /^\s*\d/.test(t.slice(km[0].length)))) { inKey = true; t = t.slice(km[0].length).trim(); if (!t) continue; }
-    if (inKey) { keyLines.push(t); continue; }
-    const rm = t.match(RANGE); if (rm) { range = { blk: Q.length ? blk + (Q_NUM.test(t) ? 0 : 0) : 0, from: +rm[1], to: +rm[2] }; if (pending.length) { shares.push({ img: pending[pending.length - 1], blk: range.blk, from: range.from, to: range.to }); range = null; } }
+    /* the answer key starts: "Answer key", "ANSWER KEY – Cells quiz", "Key:", "Answers: 1-B 2-C", "الإجابات" */
+    const km = t.match(KEY_HDR) || t.match(/^\s*key\s*[:：\-–]?\s*(?=\d|$)/i);
+    if (km && Q.length) { const rest = t.slice(km[0].length).trim();
+      if (!rest || /^[\(\[]?\d/.test(rest) || (t.length < 80 && !/[?؟_]/.test(t) && !Q_NUM.test(t))) { inKey = true; t = /^[\(\[]?\d/.test(rest) ? rest : ''; if (!t) continue; } }
+    if (inKey) { keyLines.push(L.cells && L.cells.length >= 2 ? L.cells.map(c => digits(c).trim()).join('\t') : t); continue; }
+    const rm = t.match(RANGE); if (rm && /\b(?:use|using|refer|look|answer|study|based\s+on)\b|استخدم|انظر|أجب|اجب|ادرس/i.test(t)) { range = { blk: Q.length ? blk + (Q_NUM.test(t) ? 0 : 0) : 0, from: +rm[1], to: +rm[2] }; if (pending.length) { shares.push({ img: pending[pending.length - 1], blk: range.blk, from: range.from, to: range.to }); range = null; } }
     /* matching: numbered left items and lettered right items, in two columns or one after the other */
     if (cur && cur.match && cur.match.open) { const M = cur.match;
       const cells = (L.cells && L.cells.length >= 2) ? L.cells.map(c => digits(c).trim()).filter(Boolean) : null;
@@ -103,6 +108,9 @@ function parse(lines, opt) {
       if (/^\s*(?:column|العمود|القائمة)/i.test(t)) continue;
       M.open = false;
     }
+    /* options written "A ribosome   B vesicle" (a capital letter and a space, one or more per line) */
+    if (cur && !cur.closed && !(cur.match && cur.match.open)) { const next = cur.opts.length, parts = (L.cells && L.cells.length >= 2 ? L.cells : [t]).map(c => digits(c).trim().match(/^([A-Z])\s+(\S.*)$/)).map(m => m && (letterIdx(m[1]) < 8 || /^[_.…\s]+$/.test(m[2])) ? m : null);
+      if (parts.every(Boolean) && parts.every((m, i) => letterIdx(m[1]) === next + i) && (next > 0 || /[?؟:"”'’_.)⟧]\s*$/.test(cur.text.trim()))) { parts.forEach(m => addOpt(m[2], L)); continue; } }
     const pre = t.match(Q_PRE), nm = !pre && t.match(Q_NUM);
     const om = t.match(OPT_EN) || t.match(OPT_AR);
     /* "a) cell  b) tissue  c) organ" on a line of its own */
@@ -117,7 +125,7 @@ function parse(lines, opt) {
       const st = sectionType(cur.text);
       if ((sec.type === 'match' && !cur.text.trim()) || ((st === 'match') && !cur.opts.length)) cur.match = { left: [], right: [], open: true };
       continue; }
-    const hm = t.match(ANS_LINE); if (hm && cur) { cur.key = hm[1].trim(); cur.closed = true; continue; }
+    const hm = t.match(ANS_LINE); if (hm && cur) { if (/^[_.…\s]+$/.test(hm[1])) { setStem(t, L); continue; } cur.key = hm[1].trim(); cur.closed = true; continue; }
     const em = t.match(EX_LINE); if (em && cur) { cur.ex = (cur.ex ? cur.ex + ' ' : '') + em[1].trim(); continue; }
     const hn = t.match(HINT_LINE); if (hn && cur) { cur.hint = hn[1].trim(); continue; }
     if (isHeader(t, L) && !(cur && !cur.text.trim())) {
@@ -140,6 +148,11 @@ function parse(lines, opt) {
     else if (sec.type === 'tf' || sec.type === 'blank') { newQ(null, t, L); cur.unnumbered = true; }
   }
   /* unnumbered items get numbers after the numbered ones of their block, so the key can still find numbered ones */
+  /* no heading: a last block of numbers that restarts and holds only answers (letters, True/False, a word or two) is the key */
+  if (!keyLines.length && Q.length > 2) { const lastBlk = Math.max(...Q.map(q => q.blk)), tail = Q.filter(q => q.blk === lastBlk);
+    if (lastBlk > 0 && tail.length >= 2 && tail.every(q => q.num != null && !q.opts.length && !q.match && !q.img && q.text.length <= 120 && !/[?؟_]/.test(q.text))) {
+      const looks = tail.filter(q => /^\s*[\(\[]?(?:[a-hA-H]|هـ|أ|ب|ج|د|ه|و)[\)\].]?\s*(?:$|[.:\-–\s])/.test(q.text) || tfVal(q.text.split(/[\s,.:–-]+/)[0]) != null || /^\s*\d+(?:\s*[.)\-:–]\s*\S+){1,}/.test(q.text)).length;
+      if (looks >= tail.length / 2) { tail.forEach(q => keyLines.push(q.num + '. ' + q.text.replace(/\n/g, ' '))); Q.splice(Q.indexOf(tail[0]), tail.length); } } }
   const keys = parseKey(keyLines, Q);
   const out = Q.map((q, i) => finish(q, keys.get(q) != null ? keys.get(q) : null, warnings)).filter(Boolean);
   shares.forEach(s => Q.forEach((q, i) => { if (q.num != null && q.num >= s.from && q.num <= s.to && q.blk === s.blk && out[i] && !out[i].img) out[i].img = s.img; }));
@@ -154,7 +167,8 @@ function parseKey(lines, Q) {
   const map = new Map(); if (!lines.length) return map;
   const entries = []; let kblk = 0, last = 0, expect = null;
   const qAt = (b, n) => Q.find(q => q.blk === b && q.num === n) || Q.find(q => q.num === n && !map.has(q));
-  const push = (n, raw) => { if (n <= last) kblk++; last = n; entries.push({ blk: kblk, num: n, raw: raw.trim() }); };
+  const push = (n, raw, flat) => { if (n <= last && !flat) kblk++; last = flat ? Math.max(last, n) : n; entries.push({ blk: kblk, num: n, raw: raw.replace(/\s*[\(\[]\s*\d+(?:\.\d+)?\s*(?:marks?|pts?|points?|درجة|درجات)?\s*[\)\]]\s*$/i, '').trim() }); };
+  let gridNums = null;
   for (let t of lines) { t = digits(t).trim(); if (!t) continue;
     /* "Section A: 1-B 2-C" / "السؤال الأول: ١- ب" — the heading starts a new block; "Question 3: B" is the answer to 3 */
     const hp = t.match(/^\s*(?:part|section|question|ques\.?|q|الجزء|القسم|السؤال)(?:\s*(\d{1,3})|\s*[A-Za-z]\b|\s+[\u0600-\u06FF]+)?\s*[:：\-–)]\s*(.*)$/i);
@@ -164,21 +178,33 @@ function parseKey(lines, Q) {
     if (sk) { const isM = !/order|arrange|sequence|رتب|الترتيب/i.test(sk[1]); const q = Q.find(q => !map.has(q) && (isM ? q.match : (q.secType === 'order')) && (q.num == null || isM)); if (q) { map.set(q, sk[2]); expect = null; if (!sk[2].trim()) expect = { set raw(v) { map.set(q, (map.get(q) || '') + v); }, get raw() { return ''; } }; continue; } }
     if (expect && /^(?:\s*\d{1,3}\s*[-–:→=.)]?\s*(?:[a-hA-H]|هـ|أ|ب|ج|د|ه|و)(?![\w\u0600-\u06FF])[,;\s]*)+$/.test(t)) { expect.raw += ' ' + t; continue; }
     expect = null;
+    /* table headings and notes inside the key ("Q  Answer", "Section B", "Answers only.") */
+    if (!/\d/.test(t) && t.length < 60 && /\b(?:answers?|questions?|section|part|correction|marks?|key|only)\b|^\s*(?:Q|T\s*\/\s*F)\b|الإجابة|السؤال|القسم/i.test(t)) continue;
+    /* a key table: "1 | D mitochondria | 7 | C lysosome | 13 B utilizes oxygen" */
+    if (t.includes('\t')) { let pend = null, got = false; t.split('\t').map(c => c.trim()).filter(Boolean).forEach(c => { const one = c.match(/^[\(\[]?(\d{1,3})[.)\]]?$/), two = c.match(/^[\(\[]?(\d{1,3})(?:\s*[.)\]\-:–]\s*|\s+)(\S.*)$/);
+        if (one) { if (pend != null) push(pend, '', 1); pend = +one[1]; got = true; } else if (two && (pend == null)) { push(+two[1], two[2], 1); got = true; } else if (pend != null) { push(pend, c, 1); pend = null; } else if (entries.length) entries[entries.length - 1].raw += ' ' + c; });
+      if (pend != null) push(pend, '', 1); if (got) continue; }
+    /* a grid: a row of question numbers, then the answers in the row below */
+    if (/^\s*\d{1,3}(?:\s+\d{1,3}){1,}\s*$/.test(t)) { const ns = t.trim().split(/\s+/).map(Number); if (ns.every((n, i) => !i || n === ns[i - 1] + 1)) { gridNums = ns; continue; } }
+    if (gridNums) { const cells = t.includes('\t') || /\s{2,}/.test(t) ? t.trim().split(/\t+|\s{2,}/) : t.trim().split(/\s+/); if (cells.length === gridNums.length) { gridNums.forEach((n, i) => push(n, cells[i])); gridNums = null; continue; } gridNums = null; }
     /* one entry per line, or several: "1-B 2-C 3-A", "1. True  2. False" */
     const lead = t.match(/^[\(\[]?(\d{1,3})(?:\s*[)\]\-:–=]\s*|\s*\.(?!\d)\s*|\s+)(.*)$/) || t.match(/^[\(\[]?(\d{1,3})()$/);
     if (!lead) { if (entries.length) entries[entries.length - 1].raw += ' ' + t; continue; }
     const n = +lead[1], tq = qAt(kblk + (n <= last ? 1 : 0), n);
     if (tq && (tq.match || tq.secType === 'match' || tq.secType === 'order')) { push(n, lead[2]); if (!lead[2].trim()) expect = entries[entries.length - 1]; continue; }
-    const re = /(?:^|[\s,;|])[\(\[]?(\d{1,3})(?:\s*[)\]\-:–=]\s*|\s*\.(?!\d)\s*|\s+)(?=\S)/g; const ms = [...t.matchAll(re)];
-    const parts = ms.map((m, i) => ({ n: +m[1], s: t.slice(m.index + m[0].length, i + 1 < ms.length ? ms[i + 1].index : t.length).replace(/^[\s,;|]+|[\s,;|]+$/g, '') }));
-    const ascending = parts.every((p, i) => i === 0 || (p.n > parts[i - 1].n && p.n <= parts[i - 1].n + 10));
-    if (parts.length >= 2 && ascending && parts.every(p => p.s && p.s.split(/\s+/).length <= 4)) parts.forEach(p => push(p.n, p.s));
+    const re = /(?:^|[\s,;|])[\(\[]?(\d{1,3})(?:\s*[)\]\-:–=]\s*|\s*\.(?!\d)\s*|\s+)(?=\S)|(?:\s)(\d{1,3})\s*[.)]\s*$/g; const ms = [...t.matchAll(re)];
+    /* several answers on one line: keep only the numbers that follow on from each other ("27. 2 carbons 28. lactic acid") */
+    ms.forEach(m => { if (m[1] == null) m[1] = m[2]; }); const seq = []; ms.forEach(m => { const k = +m[1]; if (!seq.length ? m.index === 0 : (k > +seq[seq.length - 1][1] && k <= +seq[seq.length - 1][1] + 10)) seq.push(m); });
+    const parts = seq.map((m, i) => ({ n: +m[1], s: t.slice(m.index + m[0].length, i + 1 < seq.length ? seq[i + 1].index : t.length).replace(/^[\s,;|]+|[\s,;|]+$/g, '') }));
+    if (parts.length >= 2 && parts.every((p, i) => (p.s || i === parts.length - 1) && p.s.split(/\s+/).length <= 12)) parts.forEach(p => push(p.n, p.s));
     else push(n, lead[2]);
   }
   /* match entries to questions: by block and number; else in order when the counts agree; else by number */
   const Qs = Q.filter(q => !map.has(q)), numbered = Qs.filter(q => q.num != null);
   const all = entries.every(e => numbered.some(q => q.blk === e.blk && q.num === e.num));
+  const uniq = new Set(entries.map(e => e.num)).size === entries.length && new Set(numbered.map(q => q.num)).size === numbered.length;
   if (all) entries.forEach(e => { const q = numbered.find(q => q.blk === e.blk && q.num === e.num); if (q && !map.has(q)) map.set(q, e.raw); });
+  else if (uniq && entries.every(e => numbered.some(q => q.num === e.num))) entries.forEach(e => { const q = numbered.find(q => q.num === e.num); if (q && e.raw) map.set(q, e.raw); });
   else if (entries.length === Qs.length) entries.forEach((e, i) => map.set(Qs[i], e.raw));
   else if (entries.length === numbered.length) entries.forEach((e, i) => map.set(numbered[i], e.raw));
   else entries.forEach(e => { const q = numbered.find(q => q.num === e.num && !map.has(q)); if (q) map.set(q, e.raw); });
@@ -190,8 +216,18 @@ const STOP = new Set('the a an and or of to in on at by for with from is are was
 function keywords(s) { const seen = new Set(); return String(s).replace(/⟦m:[a-z0-9]+⟧/g, ' ').split(/[\s,;:.()\[\]،؛!?؟"'“”]+/).map(w => w.trim()).filter(w => { const n = w.toLowerCase(); if (!n || STOP.has(n) || seen.has(n)) return false; if (/^[؀-ۿ]+$/.test(n) ? n.length < 3 : n.length < 4) return /^\d+(\.\d+)?$/.test(n); seen.add(n); return true; }).map((w, i) => [w, i]).sort((x, y) => y[0].length - x[0].length || x[1] - y[1]).slice(0, 5).sort((x, y) => x[1] - y[1]).map(x => x[0]); }
 const NUM_KEY = /^\s*[≈~]?\s*[-+]?\d[\d.,]*(?:\s*[×x*]\s*10\s*\^?\s*[-+]?\d+)?\s*([^\d\s].{0,14})?$/;
 function lettersOf(raw, n) { const s = String(raw).trim().replace(/^(?:option|choice|الخيار)\s*/i, '');
-  const m = s.match(/^[\(\[]?\s*((?:[a-hA-H]|هـ|أ|ب|ج|د|ه|و)(?:\s*[\)\]]?\s*(?:,|،|&|and|و|\+|\/|\s)\s*[\(\[]?\s*(?:[a-hA-H]|هـ|أ|ب|ج|د|ه|و))*)\s*[\)\]]?\s*(?:[.:\-–]\s*(.*))?$/);
-  if (!m) return null; const ls = m[1].split(/[^a-hA-Hأبجدهـو]+/).filter(Boolean).map(letterIdx); if (!ls.length || ls.some(k => k < 0 || k >= n)) return null; return { idx: [...new Set(ls)], rest: m[2] || '' }; }
+  const m = s.match(/^[\(\[]?\s*((?:[a-hA-H]|هـ|أ|ب|ج|د|ه|و)(?:\s*[\)\]]?\s*(?:,|،|&|\band\b|و|\+|\/)\s*[\(\[]?\s*(?:[a-hA-H]|هـ|أ|ب|ج|د|ه|و))*)\s*[\)\]]?\s*(?:[.:\-–]\s*(.*)|\s+(\S.*))?$/);
+  if (!m) return null; const ls = m[1].split(/[^a-hA-Hأبجدهـو]+/).filter(Boolean).map(letterIdx); if (!ls.length || ls.some(k => k < 0 || k >= n)) return null; return { idx: [...new Set(ls)], rest: m[2] || m[3] || '' }; }
+/* "citric acid (also: tricarboxylic acid, TCA)" → three accepted answers; "electron transport (chain)" → with and without; "2 carbons (as acetyl CoA)" → the note is dropped */
+function alts(s) { s = String(s).trim().replace(/[.;,]\s*$/, ''); const out = []; const m = s.match(/^(.*?)\s*\(([^)]*)\)\s*(.*)$/);
+  if (m) { const base = (m[1] + ' ' + m[3]).trim(), inner = m[2].trim(); if (base) out.push(base);
+    if (/^(?:also|or|accept|allow|أو|ويقبل)\b\s*:?\s*/i.test(inner)) inner.replace(/^(?:also|or|accept|allow|أو|ويقبل)\b\s*:?\s*/i, '').split(/\s*[,/،]\s*|\s+or\s+|\s+أو\s+/i).forEach(x => x && out.push(x.trim()));
+    else if (inner.split(/\s+/).length <= 2 && !/^(?:as|e\.?g|i\.?e|for|from)\b/i.test(inner)) out.push((m[1] + ' ' + inner + ' ' + m[3]).replace(/\s+/g, ' ').trim()); }
+  else out.push(s);
+  return [...new Set(out.flatMap(x => x.split(/\s+\/\s+|\s+or\s+|\s+أو\s+/i)).map(x => x.trim()).filter(Boolean))]; }
+/* "Animal cell: A nuclear pore · B nucleus · C nucleolus" → { A: 'nuclear pore', B: 'nucleus', … } */
+function labelPairs(raw) { const t = String(raw || '').replace(/^[^:·]{0,40}:\s*(?=[A-Z]\s)/, ''), out = {}; let n = 0;
+  for (const m of t.matchAll(/(?:^|[·;|,•]\s*)([A-Z])[\s.)\-:]+([^·;|•]+?)(?=\s*(?:[·;|•]|,\s*[A-Z][\s.)]|$))/g)) { out[m[1]] = m[2].trim(); n++; } return n >= 2 ? out : null; }
 function finish(q, keyRaw, warnings) {
   const raw = keyRaw != null && keyRaw !== '' ? keyRaw : q.key; let text = q.text.trim();
   const out = { type: 'short', q: text, pts: q.pts || 1, a: null, ex: q.ex || '', hint: q.hint || '', img: q.img || null, sec: (q.sec || '').slice(0, 160), num: q.num };
@@ -214,6 +250,12 @@ function finish(q, keyRaw, warnings) {
     if (raw) { const L = lettersOf(raw, 2); if (L && L.idx.length === 1) out.a = L.idx[0] === 0 ? first : !first; else { const v = tfVal(String(raw).split(/[\s,.:–-]+/)[0]); if (v != null) out.a = v; } }
     else { const mk = q.marks.indexOf(true); if (mk >= 0) out.a = mk === 0 ? first : !first; }
     return out; }
+  /* "Label the cell": A ____ B ____ … → one blank per letter, answers from "A nuclear pore · B nucleus …" */
+  const blankOpts = opts.length >= 2 && opts.every(o => /^[_.…\s]+$/.test(o));
+  if (blankOpts || (!opts.length && raw && labelPairs(raw) && !hasBlank(text))) { const pairs = raw ? labelPairs(raw) : null;
+    const letters = blankOpts ? opts.map((_, k) => String.fromCharCode(65 + k)) : Object.keys(pairs).sort();
+    out.type = 'blank'; out.q = text + '\n' + letters.map(l => l + ' ______').join('\n');
+    if (pairs && letters.every(l => pairs[l])) out.a = letters.map(l => alts(pairs[l])); return out; }
   if (opts.length >= 2) {
     const orderish = q.secType === 'order' || /\b(?:arrange|order|sequence)\b|رتب/i.test(text);
     if (orderish) { out.type = 'order'; out.o = opts.slice();
@@ -236,8 +278,12 @@ function finish(q, keyRaw, warnings) {
   /* blanks */
   const nb = (text.match(BLANK) || []).length;
   if (nb) { out.type = 'blank';
+    if (raw) { const lines = text.split('\n'), from = lines.findIndex(l => hasBlank(l)), tpl = lines.slice(from).join(' '), bits = tpl.split(BLANK).map(x => x.trim());
+      const rx = s2 => s2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+      const fill = bits.length - 1 === nb && String(raw).match(new RegExp('^\\s*' + bits.map(rx).join('\\s*(.+?)\\s*') + '\\s*[.]?\\s*$', 'i'));
+      if (fill && fill.slice(1).every(x => x && x.trim())) { out.a = fill.slice(1).map(alts); return out; } }
     if (raw) { let parts = String(raw).split(/\s*(?:[;|،؛]|\s[–-]\s|,\s+(?=\S))\s*/).map(s => s.replace(/^[\(\[]?\s*(?:\d{1,2}|[a-hA-H])\s*[\)\].]\s*/, '').trim()).filter(Boolean);
-      if (nb === 1) parts = [String(raw).trim()]; if (parts.length >= nb) out.a = parts.slice(0, nb).map(p => p.split(/\s*\/\s*|\s+or\s+|\s+أو\s+/i).map(s => s.trim()).filter(Boolean)); }
+      if (nb === 1) parts = [String(raw).trim()]; if (parts.length >= nb) out.a = parts.slice(0, nb).map(alts); }
     return out; }
   const kind = q.secType;
   const isTF = q.tf || kind === 'tf' || (q.box && !raw) || (raw && tfVal(String(raw).split(/[\s,.:–-]+/)[0]) != null && String(raw).trim().split(/\s+/).length <= 6 && (kind === 'tf' || q.box || tfVal(raw) != null));
@@ -251,7 +297,7 @@ function finish(q, keyRaw, warnings) {
       out.type = 'num'; out.a = { v: numVal(v), tol: '', unit }; if (!Number.isFinite(out.a.v)) { out.type = 'short'; out.a = [r]; } return out; }
     const wc = r.split(/\s+/).length;
     if (kind === 'long' || wc > 6) { out.type = 'long'; const km = r.match(/(?:key\s*words?|keywords|الكلمات\s*المفتاحية)\s*[:：]\s*(.+)$/i); out.a = { keys: km ? km[1].split(/\s*[,،;]\s*/).filter(Boolean) : keywords(r), text: km ? r.slice(0, km.index).trim() : r }; return out; }
-    out.type = 'short'; out.a = r.split(/\s*\/\s*|\s+or\s+|\s+أو\s+|\s*[،;]\s*/i).map(s => s.trim()).filter(Boolean); return out; }
+    out.type = 'short'; out.a = r.split(/\s*[،;]\s*/).flatMap(alts); return out; }
   out.type = kind === 'long' || /\b(?:explain|describe|discuss|why|compare|justify)\b|اشرح|فسر|علل|وضح|ناقش|قارن/i.test(text) ? 'long' : kind === 'num' ? 'num' : 'short';
   if (out.type === 'num') out.a = null;
   return out;

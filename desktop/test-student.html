@@ -30,6 +30,7 @@
   .sec { color: var(--brand); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
   img.eq { vertical-align: middle; max-width: 100%; height: auto; margin: 1px 2px; background: #fff; border-radius: 4px; }
   .rlist { display: grid; gap: 6px; margin-bottom: 10px; } .rlist div { padding: 6px 10px; border-radius: 10px; background: var(--soft); }
+  img.q { cursor: zoom-in; }
   img.q { max-width: 100%; max-height: 46vh; display: block; margin: 4px auto 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
   .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: start; padding: 13px 14px; margin: 8px 0; border: 2px solid var(--line); border-radius: 13px; background: #fff; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
   .opt .k { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); color: var(--brand); font-weight: 800; }
@@ -91,7 +92,7 @@
     'Hand in your test?': 'هل تريد تسليم الاختبار؟', 'You have not answered': 'لم تُجب عن', 'You cannot change your answers after handing in.': 'لا يمكنك تغيير إجاباتك بعد التسليم.', 'Cancel': 'إلغاء', 'Yes, hand in': 'نعم، سلّم',
     'Handed in': 'تم التسليم', 'Your score': 'درجتك', 'Back to the class': 'العودة إلى الصف', 'Review': 'مراجعة الإجابات', 'Your teacher will share the results.': 'سيشارك معلمك النتائج.', 'Marked by your teacher': 'يصححها معلمك',
     'Time is up — your test was handed in.': 'انتهى الوقت — تم تسليم اختبارك.', 'Your teacher closed the test.': 'أغلق المعلم الاختبار.', 'There is no test right now.': 'لا يوجد اختبار الآن.', 'Your teacher will tell you what to do next.': 'سيخبرك معلمك بما تفعله بعد ذلك.',
-    'Answer all the parts first.': 'أجب عن جميع الأجزاء أولًا.', 'Choose an answer first.': 'اختر إجابة أولًا.', 'No connection — trying again…': 'لا يوجد اتصال — نحاول مرة أخرى…', 'Questions': 'الأسئلة', 'Saved': 'تم الحفظ',
+    'Answer all the parts first.': 'أجب عن جميع الأجزاء أولًا.', 'Tap to enlarge': 'اضغط للتكبير', 'Choose an answer first.': 'اختر إجابة أولًا.', 'No connection — trying again…': 'لا يوجد اتصال — نحاول مرة أخرى…', 'Questions': 'الأسئلة', 'Saved': 'تم الحفظ',
     'Choose all that are right.': 'اختر كل الإجابات الصحيحة.', 'Put these in the right order (use the arrows).': 'رتّب العناصر بالترتيب الصحيح (استخدم الأسهم).', 'Match each item.': 'صِل كل عنصر بما يناسبه.', 'Fill in the blanks.': 'أكمل الفراغات.', 'Done': 'تم', 'Time taken': 'الوقت المستغرق', 'answered': 'تمت الإجابة' };
   const t = s => LANG === 'ar' && AR[s] ? AR[s] : s;
   if (LANG === 'ar') document.documentElement.dir = 'rtl';
@@ -137,7 +138,7 @@
     if (q.sec) body.append(h('div', { class: 'sec', dir: 'auto' }, q.sec));
     body.append(h('div', { class: 'qhead' }, h('span', { class: 'num' }, t('Question') + ' ' + (cur + 1)), h('span', { class: 'muted' }, t('of') + ' ' + P.questions.length), h('span', { class: 'pts' }, (q.pts || 1) + ' ' + ((q.pts || 1) === 1 ? t('pt') : t('pts')))));
     if (q.type !== 'blank') body.append(h('h2', { dir: 'auto' }, rich(q.q, q)));
-    if (q.img) body.append(h('img', { class: 'q', src: q.img, alt: '' }));
+    if (q.img) body.append(h('img', { class: 'q', src: q.img, alt: '', title: t('Tap to enlarge'), onclick: () => { const v = h('div', { class: 'modal', style: 'padding:6px;background:rgba(10,5,25,.92)', onclick: () => v.remove() }, h('img', { src: q.img, alt: '', style: 'max-width:100%;max-height:96vh;background:#fff;border-radius:10px' })); document.body.append(v); } }));
     body.append(input(q, i, lock));
     if (fb[i]) body.append(fbBox(q, fb[i]));
     set(body); nav();
@@ -205,7 +206,6 @@
   function primary() { const b = foot.querySelector('.grow'); b && b.click(); }
   async function check() {
     const i = qi(cur), q = P.questions[i]; if (!has(ans[i])) return toast(t('Choose an answer first.'));
-    if (q.type === 'blank' && [].concat(ans[i]).filter(Boolean).length < Math.max(1, q.n)) return toast(t('Answer all the parts first.'));
     if (busy) return; busy = true; clearTimeout(saveT[i]);
     try { const r = await api('/t/ans', { i, v: ans[i], check: true }); if (r.ok && r.j.fb) { fb[i] = r.j.fb; if (fb[i].final && (q.type === 'mc' || q.type === 'multi' || q.type === 'tf')) fb[i].keyIdx = keyIdx(q, fb[i].key); }
       else if (r.status === 403) { busy = false; return r.j.error === 'closed' ? closed(t('Your teacher closed the test.')) : timeUp(); } else if (r.j && r.j.fb) fb[i] = r.j.fb; }

@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 const { $, $$, esc, icon, set, bus, toast, modal, SND, REDUCE } = window.HB;
-const CFG = { url: 'https://ddmofmdaqvgtsceqfumh.supabase.co', key: 'sb_publishable_pjz6Af0luicBPQH2xmNu1g_eBilq9lE', domain: 'users.helixboard.app', version: '2.6.0' };
+const CFG = { url: 'https://ddmofmdaqvgtsceqfumh.supabase.co', key: 'sb_publishable_pjz6Af0luicBPQH2xmNu1g_eBilq9lE', domain: 'users.helixboard.app', version: '2.6.1' };
 const snd = k => { try { SND[k] && SND[k](); } catch (e) {} };
 const S = { sb: null, user: null, profile: null, queue: set.get('accQueue', []), flushing: false, tools: {}, lastAct: Date.now() };
 const platform = () => window.helixDesktop ? 'windows-app' : /iPad|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1 ? 'ipad' : /Android/.test(navigator.userAgent) ? 'android' : /iPhone/.test(navigator.userAgent) ? 'iphone' : 'browser';

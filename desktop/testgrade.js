@@ -24,6 +24,9 @@ function lev(a, b) { if (a === b) return 0; const m = a.length, n = b.length; if
 function same(x, y, strict) { const a = norm(x), b = norm(y); if (!a || !b) return false; if (a === b) return true;
   const strip = s => s.replace(/^ال/, '').replace(/ /g, ''); if (strip(a) === strip(b)) return true;
   if (strict) return false; const L = Math.min(a.length, b.length); const allow = L >= 9 ? 2 : L >= 5 ? 1 : 0; return allow > 0 && lev(a, b) <= allow; }
+/* a typed answer against one accepted answer: the same words, or the number of "2 carbons" / "36 ATP" on its own */
+function okText(v, k, strict) { if (same(v, k, strict)) return true; const m = norm(k).match(/^([-+]?\d+(?:\.\d+)?)\s+([\p{L} ]{2,20})$/u), a = norm(v).match(/^([-+]?\d+(?:\.\d+)?)(?:\s+(.*))?$/);
+  return !!(m && a && +m[1] === +a[1] && (!a[2] || same(a[2], m[2], strict) || m[2].startsWith(a[2]))); }
 /* "9.8", "9,8", "9.8 m/s²", "1/2", "3×10^8", "3e8" */
 function num(s) { s = digits(s).replace(/[٫]/g, '.').replace(/[٬\s]/g, '').replace(/[×x*]10\^?([-+]?\d+)/i, 'e$1');
   const fr = s.match(/^([-+]?\d+)\/(\d+)/); if (fr) return +fr[1] / +fr[2];
@@ -42,9 +45,9 @@ function grade(q, v, opt) {
     case 'tf': s = (v === true || v === 'true' || v === 1) === !!a ? 1 : 0; break;
     case 'multi': { const key = new Set(a.map(Number)), got = new Set([].concat(v).map(Number)); let r = 0, w = 0; got.forEach(k => key.has(k) ? r++ : w++);
       s = Math.max(0, (r - w) / key.size); break; }
-    case 'short': s = [].concat(a).some(k => same(v, k, opt.strict)) ? 1 : 0; break;
+    case 'short': s = [].concat(a).some(k => okText(v, k, opt.strict)) ? 1 : 0; break;
     case 'num': { const x = num(v); s = Number.isFinite(x) && Math.abs(x - +a.v) <= tolOf(a) + 1e-12 ? 1 : 0; break; }
-    case 'blank': { const vs = [].concat(v); let r = 0; a.forEach((acc, i) => { if ([].concat(acc).some(k => same(vs[i], k, opt.strict) || (Number.isFinite(num(k)) && /^[-+.\d\s,]+$/.test(digits(k)) && Math.abs(num(vs[i]) - num(k)) < 1e-9))) r++; }); s = r / a.length; break; }
+    case 'blank': { const vs = [].concat(v); let r = 0; a.forEach((acc, i) => { if ([].concat(acc).some(k => okText(vs[i], k, opt.strict) || (Number.isFinite(num(k)) && /^[-+.\d\s,]+$/.test(digits(k)) && Math.abs(num(vs[i]) - num(k)) < 1e-9))) r++; }); s = r / a.length; break; }
     case 'match': { const vs = [].concat(v); let r = 0; a.forEach((k, i) => { if (vs[i] != null && +vs[i] === +k) r++; }); s = r / a.length; break; }
     case 'order': { const vs = [].concat(v).map(Number), n = (q.o || []).length; let r = 0; for (let i = 0; i < n; i++) if (vs[i] === i) r++; s = n ? r / n : 0; break; }
     case 'long': { const keys = (a.keys || []).filter(Boolean); if (!keys.length) return null; const got = ' ' + words(v).join(' ') + ' ';
