@@ -206,6 +206,7 @@ function pickName() { const ps = players().filter(p => p.online); if (!ps.length
 
 /* ---------- events from the class link ---------- */
 function event(type, data, snap) { L.snap = snap;
+  if (type === 'test') { window.HBQB && HBQB.event(data); return; }
   if (type === 'reaction') return floatReact(data);
   if (type === 'response' && L.act && data.actId === L.act.id) {
     const isNew = !L.list.has(data.pid);
@@ -246,10 +247,13 @@ function renderTop() { const b = L.el.querySelector('#lcTopBtns'); const lock = 
   b.querySelector('#lcLock').onclick = toggleLock; b.querySelector('#lcPickB').onclick = pickName; b.querySelector('#lcReact').onclick = toggleReact; b.querySelector('#lcEndS').onclick = endSession;
   b.querySelector('#lcLb').onclick = leaderboard; b.querySelector('#lcRep').onclick = async () => { if (L.act) await record(); window.HBRP && HBRP.open(L.session && L.session.id); }; }
 function renderMain() { const m = L.el.querySelector('#lcMain');
-  if (!L.act) { m.innerHTML = '<div class="lc-hero"><div><h1>Choose a live activity</h1><p>It opens on every student’s phone at once. Answers arrive here live, with names.</p></div><div class="small muted">' + players().length + ' student' + (players().length === 1 ? '' : 's') + ' connected</div></div><div class="lc-cards">' +
+  const tab = set.get('lcTab', 'act'), tabs = '<div class="lc-tabs" role="tablist"><button data-tab="act" class="' + (tab !== 'tests' ? 'on' : '') + '">' + icon('radio-tower') + 'Live activities</button><button data-tab="tests" class="' + (tab === 'tests' ? 'on' : '') + '">' + icon('file-check-2') + 'Tests</button></div>';
+  const bindTabs = () => $$('.lc-tabs [data-tab]', m).forEach(b => b.onclick = () => { set.put('lcTab', b.dataset.tab); renderMain(); });
+  if (!L.act && tab === 'tests' && window.HBQB) { m.innerHTML = tabs + '<div id="lcTests"></div>'; bindTabs(); HBQB.renderLib(m.querySelector('#lcTests')); return; }
+  if (!L.act) { m.innerHTML = tabs + '<div class="lc-hero"><div><h1>Choose a live activity</h1><p>It opens on every student’s phone at once. Answers arrive here live, with names.</p></div><div class="small muted">' + players().length + ' student' + (players().length === 1 ? '' : 's') + ' connected</div></div><div class="lc-cards">' +
     Object.entries(TYPES).map(([k, t]) => '<button class="lc-card" data-k="' + k + '" style="--tint:' + t.tint + '"><div class="ic">' + icon(t.ic) + '</div><b>' + esc(t.name) + '</b><span>' + esc(t.desc) + '</span></button>').join('') + '</div>' +
     '<div class="lc-cards" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))"><button class="lc-card" id="lcBoardWrite" style="--tint:#22D3EE"><div class="ic">' + icon('monitor-smartphone') + '</div><b>Write on my board</b><span>Students see your board live and write on it together, each in their own colour.</span></button><button class="lc-card" id="lcVideo" style="--tint:#FF9F5A"><div class="ic">' + icon('clapperboard') + '</div><b>Video lesson</b><span>A video split into parts by your questions — it pauses, asks the phones, then plays on. Like Nearpod.</span></button><button class="lc-card" id="lcQuiz" style="--tint:#FFC928"><div class="ic">' + icon('trophy') + '</div><b>Phone quiz game</b><span>A timed quiz with points, a leaderboard and a podium — like Kahoot or Wayground.</span></button></div>';
-    $$('.lc-card[data-k]', m).forEach(b => b.onclick = () => setup(b.dataset.k));
+    bindTabs(); $$('.lc-card[data-k]', m).forEach(b => b.onclick = () => setup(b.dataset.k));
     m.querySelector('#lcBoardWrite').onclick = () => { hide(); HBCL.start(); };
     m.querySelector('#lcVideo').onclick = () => { hide(); window.HBVL && HBVL.open(); };
     m.querySelector('#lcQuiz').onclick = () => { hide(); window.HBL && HBL.phoneQuiz(); };

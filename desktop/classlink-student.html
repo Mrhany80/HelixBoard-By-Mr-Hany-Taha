@@ -141,8 +141,11 @@
   /* the teacher started the phone quiz inside the class: go there with this name (no new code, no typing) */
   function toQuiz() { const z = st && st.quiz; if (!z || !me) return false; let left = ''; try { left = sessionStorage.getItem('hbq-left') || ''; } catch (e) {} if (left === z.pin) return false;
     location.href = 'quiz/?pin=' + encodeURIComponent(z.pin) + '&name=' + encodeURIComponent(me.name) + '&auto=1&lang=' + (LANG || 'en') + '&back=' + encodeURIComponent(location.pathname + location.search); return true; }
+  /* a test the teacher opened: the whole paper on its own page, same student, then back here */
+  function toTest() { const z = st && st.test; if (!z || !z.open || z.done || !me || !pid) return false;
+    location.href = 'test/?pid=' + encodeURIComponent(pid) + '&lang=' + (LANG || 'en') + '&back=' + encodeURIComponent(location.pathname + location.search); return true; }
   function render(prev) {
-    if (toQuiz()) return;
+    if (toQuiz() || toTest()) return;
     nav.hidden = false; chrome();
     /* a new activity (or a shared answer) opens the Activity tab by itself, like Nearpod */
     if (st.act && (!prev || !prev.act || prev.act.id !== st.act.id)) { tab = 'act'; hwRun = null; }

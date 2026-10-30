@@ -1,6 +1,6 @@
 /* ================= HelixBoard — Concept maps, Miro style =================
-   Nodes are rounded boxes on the board joined by smooth, colour-coded branches. Select a node and press Tab for a child, Enter for a
-   sibling, Delete to remove the branch; double-click to type. A small bar above the selected node adds children, changes colour and
+   Nodes are rounded boxes on the board joined by smooth, colour-coded branches. Select a node and press Tab for a sub-branch, Enter for a
+   branch at the same level, Delete to remove the branch; double-click to type. A small bar above the selected node adds children, changes colour and
    shape, links two ideas with labelled arrows (cross-links), folds branches and switches layout (mind map, tree to the right, top-down).
    The map tidies itself after every change and a dragged node takes its branch with it. Everything is ordinary board objects,
    so Undo, saving, export and the slideshow all work. */
@@ -108,7 +108,7 @@ function bar() { const sel = I.selObjs(), n = sel.length >= 1 && sel.every(isNod
   if (!n || I.editing || document.body.classList.contains('deckshow') || document.body.classList.contains('presenting')) { if (barEl) { barEl.remove(); barEl = null; } if (plusEl) { plusEl.remove(); plusEl = null; } closePop(); return; }
   if (!barEl) { barEl = document.createElement('div'); barEl.id = 'mmBar'; document.body.appendChild(barEl); ['pointerdown', 'wheel'].forEach(ev => barEl.addEventListener(ev, e => e.stopPropagation())); }
   const root = rootOf(n.mm), lay = (root && root.lay) || 'mind', d = descendants(n).length;
-  barEl.innerHTML = '<button data-a="child" title="Add a child idea (Tab)">' + icon('git-branch-plus') + 'Child</button><button data-a="sib" title="Add a sibling idea (Enter)">' + icon('plus') + 'Sibling</button><span class="sep"></span>' +
+  barEl.innerHTML = '<button data-a="child" title="' + (n.root ? 'Add a main branch (Tab)' : 'Add a sub-branch (Tab)') + '">' + icon('git-branch-plus') + (n.root ? 'Main branch' : 'Sub-branch') + '</button>' + (n.root ? '' : '<button data-a="sib" title="Add a branch at the same level (Enter)">' + icon('plus') + 'Branch</button>') + '<span class="sep"></span>' +
     '<button data-a="color" title="Branch colour"><span class="sw" style="background:' + esc(n.bc || '#7950F2') + '"></span></button><button data-a="shape" title="Shape">' + icon('square') + '</button><button data-a="link" class="' + (linking ? 'on' : '') + '" title="Link to another idea with linking words">' + icon('link') + 'Link</button>' +
     (d || n.col ? '<button data-a="fold" title="' + (n.col ? 'Show the branch' : 'Fold the branch') + '">' + icon(n.col ? 'unfold-horizontal' : 'fold-horizontal') + '</button>' : '') + '<span class="sep"></span>' +
     '<button data-a="layout" title="Layout">' + icon(lay === 'down' ? 'network' : 'list-tree') + '</button><button data-a="fit" title="Show the whole map">' + icon('maximize-2') + '</button><button data-a="del" title="Delete this idea and its branch (Delete)">' + icon('trash-2') + '</button>';
@@ -128,9 +128,9 @@ function place(n) { const st = document.getElementById('stage').getBoundingClien
 let plusEl = null;
 function plus(n) { if (!plusEl) { plusEl = document.createElement('div'); plusEl.id = 'mmPlus'; document.body.appendChild(plusEl); ['pointerdown', 'wheel'].forEach(ev => plusEl.addEventListener(ev, e => e.stopPropagation())); }
   const st = document.getElementById('stage').getBoundingClientRect(), V = E.V, x = st.left + n.x * V.s + V.x, y = st.top + n.y * V.s + V.y, w = n.w * V.s, h = n.h * V.s, root = rootOf(n.mm), lay = (root && root.lay) || 'mind', H = [];
-  if (lay === 'down') { H.push(['c', x + w / 2, y + h + 18, 'Add a child idea below']); if (!n.root) H.push(['s', x + w + 18, y + h / 2, 'Add a sibling idea']); }
-  else if (n.root) { H.push(['c', x + w + 18, y + h / 2, 'Add an idea on the right', 1]); if (lay === 'mind') H.push(['c', x - 18, y + h / 2, 'Add an idea on the left', -1]); }
-  else { const sd = n.side || 1; H.push(['c', sd > 0 ? x + w + 18 : x - 18, y + h / 2, 'Add a child idea (Tab)']); H.push(['s', x + w / 2, y + h + 16, 'Add a sibling idea below (Enter)']); }
+  if (lay === 'down') { H.push(['c', x + w / 2, y + h + 18, 'Add a sub-branch below']); if (!n.root) H.push(['s', x + w + 18, y + h / 2, 'Add a branch at the same level']); }
+  else if (n.root) { H.push(['c', x + w + 18, y + h / 2, 'Add a main branch on the right', 1]); if (lay === 'mind') H.push(['c', x - 18, y + h / 2, 'Add a main branch on the left', -1]); }
+  else { const sd = n.side || 1; H.push(['c', sd > 0 ? x + w + 18 : x - 18, y + h / 2, 'Add a sub-branch (Tab)']); H.push(['s', x + w / 2, y + h + 16, 'Add a branch at the same level (Enter)']); }
   plusEl.innerHTML = H.map(([k, hx, hy, t], i) => '<button data-i="' + i + '" class="' + (k === 's' ? 'sib' : '') + '" title="' + t + '" style="left:' + Math.round(hx) + 'px;top:' + Math.round(hy) + 'px;--bc:' + esc(n.bc || '#7950F2') + '">+</button>').join('');
   $$('button', plusEl).forEach(b => b.onclick = e => { e.stopPropagation(); const h = H[+b.dataset.i]; if (h[0] === 'c') addChild(n, true, h[4]); else addSibling(n); }); }
 function pop(kind, n, btn) { closePop(); popEl = document.createElement('div'); popEl.id = 'mmPop'; const r = btn.getBoundingClientRect(); popEl.style.left = r.left + 'px'; popEl.style.top = (r.bottom + 6) + 'px';
@@ -155,12 +155,40 @@ bus.on('editing', on => { if (on) { const ed = I.editing; editingNode = ed && is
 /* after typing: the node grows to fit its words and the map tidies itself */
 bus.on('text-done', o => { if (!isNode(o)) return; const f = fit(o); E.tx(() => { if (Math.abs(f.w - o.w) > 1 || Math.abs(f.h - o.h) > 1) { E.mod(o, q => { q.w = f.w; q.h = f.h; }); } layout(o.mm, o); }); });
 /* dragging an idea takes its whole branch with it */
-bus.on('moved', ev => { if (!ev || ev.mode !== 'move') return; const moved = (ev.objs || []).filter(isNode); if (!moved.length) return; const ids = new Set(ev.objs.map(o => o.id));
+bus.on('moved', ev => { if (!ev || ev.mode !== 'move') return; const moved = (ev.objs || []).filter(isNode); if (!moved.length) return; const ids = new Set(ev.objs.map(o => o.id)), hStart = E.histLen() - 1;
   E.tx(() => moved.forEach(n => { if (n.mx == null) return; const dx = n.x - n.mx, dy = n.y - n.my; if (!dx && !dy) return;
     descendants(n).forEach(k => { if (!ids.has(k.id)) E.mod(k, q => { q.x += dx; q.y += dy; q.mx = q.x; q.my = q.y; }); }); E.mod(n, q => { q.mx = q.x; q.my = q.y; });
     /* a first-level idea dragged across the centre changes side */
     const p = n.par && E.byId(n.par); if (p && p.root && (p.lay || 'mind') === 'mind') { const side = n.x + n.w / 2 >= p.x + p.w / 2 ? 1 : -1; if (side !== n.side) { E.mod(n, q => { q.side = side; }); descendants(n).forEach(k => E.mod(k, q => { q.side = side; })); } } }));
-  E.dirty.all(); E.changed(); setTimeout(bar, 0); });
+  /* one branch dropped: re-attach it or put it in its new place among its siblings; the drag and this are one Undo step */
+  if (moved.length === 1 && !moved[0].root) { settle(E.byId(moved[0].id) || moved[0]); if (hStart >= 0 && E.histLen() - hStart > 1) E.squash(hStart); }
+  dropMark(null); E.dirty.all(); E.changed(); setTimeout(bar, 0); });
+
+/* ---------- moving branches: drop on another idea to attach it there, or anywhere to reorder ---------- */
+function dropTarget(n) { const cx = n.x + n.w / 2, cy = n.y + n.h / 2, bad = new Set([n.id].concat(descendants(n).map(k => k.id)));
+  return nodes(n.mm).filter(o => !o.off && !bad.has(o.id)).reverse().find(o => cx >= o.x - 8 && cx <= o.x + o.w + 8 && cy >= o.y - 8 && cy <= o.y + o.h + 8) || null; }
+let dropEl = null;
+function dropMark(t) { if (!t) { if (dropEl) { dropEl.remove(); dropEl = null; } return; } if (!dropEl) { dropEl = document.createElement('div'); dropEl.id = 'mmDrop'; dropEl.style.cssText = 'position:fixed;pointer-events:none;z-index:30;border:3px dashed var(--accent,#FF5FA2);border-radius:16px;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent,#FF5FA2) 25%,transparent);transition:all .08s'; document.body.appendChild(dropEl); }
+  const st = document.getElementById('stage').getBoundingClientRect(), V = E.V; Object.assign(dropEl.style, { left: (st.left + t.x * V.s + V.x - 6) + 'px', top: (st.top + t.y * V.s + V.y - 6) + 'px', width: (t.w * V.s + 12) + 'px', height: (t.h * V.s + 12) + 'px' }); }
+function settle(n) { const p = n.par && E.byId(n.par); if (!p) return; const root = rootOf(n.mm), lay = (root && root.lay) || 'mind', t = dropTarget(n);
+  if (t && t.id !== n.par) return reparent(n, t);
+  const all = nodes(n.mm), key = o => lay === 'down' ? o.x + o.w / 2 : o.y + o.h / 2, sib = kids(p, all).filter(k => !(p.root && lay === 'mind') || (k.side || 1) === (n.side || 1));
+  E.tx(() => sib.slice().sort((a, b) => key(a) - key(b)).forEach((k, i) => { if ((k.ord || 0) !== i) E.mod(k, q => { q.ord = i; }); }));
+  layout(n.mm, root); }
+function reparent(n, t) { const root = rootOf(n.mm), lay = (root && root.lay) || 'mind', all = nodes(n.mm), toRoot = !!t.root, sub = descendants(n);
+  const side = toRoot ? (lay === 'mind' ? (n.x + n.w / 2 >= t.x + t.w / 2 ? 1 : -1) : 1) : (t.side || 1);
+  const col = toRoot ? (n.bc && n.bc !== (E.byId(n.par) || {}).bc ? n.bc : PAL[kids(t, all).length % PAL.length]) : (t.bc || '#7950F2');
+  const ids = new Set([n.id].concat(sub.map(k => k.id)));
+  E.tx(() => { E.mod(n, q => { q.par = t.id; q.ord = kids(t, all).length + 1; q.side = side; q.bc = col; q.c = toRoot ? tint(col, 0.82) : '#FFFFFF'; q.size = toRoot ? 22 : 19; });
+    const f = fit(n); E.mod(n, q => { q.w = f.w; q.h = f.h; });
+    sub.forEach(k => E.mod(k, q => { q.side = side; q.bc = col; }));
+    P().filter(c => c.t === 'conn' && c.mm === n.mm && c.tree && ids.has(c.b)).forEach(c => E.mod(c, q => { if (q.b === n.id) q.a = t.id; q.c = col; }));
+    if (t.col) E.mod(t, q => { q.col = undefined; }); });
+  layout(n.mm, root); snd('pop'); toast('Moved under “' + String(t.s || 'Main idea').slice(0, 40) + '”.'); }
+/* while a branch is dragged with the selection tool, the idea it would join lights up */
+addEventListener('pointermove', e => { if (e.buttons !== 1 || I.editing) return; const sel = I.selObjs(); if (sel.length !== 1 || !isNode(sel[0]) || sel[0].root) return dropMark(null); const n = sel[0]; if (n.mx == null || (n.x === n.mx && n.y === n.my)) return dropMark(null);
+  const t = dropTarget(n); dropMark(t && t.id !== n.par ? t : null); }, { passive: true });
+addEventListener('pointerup', () => setTimeout(() => dropMark(null), 50), true);
 
 /* keys: Tab child, Enter sibling, Delete branch — while selected or while typing in a node */
 document.addEventListener('keydown', e => { const ed = I.editing;
@@ -188,7 +216,7 @@ document.addEventListener('pointerdown', e => { if (e.target.id !== 'cvLive' || 
   e.stopImmediatePropagation(); e.preventDefault(); const dbl = penTap && penTap.id === n.id && Date.now() - penTap.t < 380; penTap = null;
   if (dbl) { I.openEditor(n); return; }
   const sx = e.clientX, sy = e.clientY, start = [n].concat(descendants(n)).map(o => [o, o.x, o.y]); let moved = false;
-  const mv = ev => { const dx = (ev.clientX - sx) / V.s, dy = (ev.clientY - sy) / V.s; if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return; moved = true; start.forEach(([o, ox, oy]) => { o.x = ox + dx; o.y = oy + dy; E.invalidate(o); }); E.dirty.all(); };
+  const mv = ev => { const dx = (ev.clientX - sx) / V.s, dy = (ev.clientY - sy) / V.s; if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return; moved = true; start.forEach(([o, ox, oy]) => { o.x = ox + dx; o.y = oy + dy; E.invalidate(o); }); E.dirty.all(); const t = !n.root && dropTarget(n); dropMark(t && t.id !== n.par ? t : null); };
   const up = () => { removeEventListener('pointermove', mv, true); removeEventListener('pointerup', up, true); removeEventListener('pointercancel', up, true);
     if (!moved) { penTap = { id: n.id, t: Date.now() }; I.select(n); return; } const fx = n.x, fy = n.y; start.forEach(([o, ox, oy]) => { o.x = ox; o.y = oy; E.invalidate(o); }); E.tx(() => E.mod(n, q => { q.x = fx; q.y = fy; })); bus.emit('moved', { objs: [n], mode: 'move' }); I.select(n); };
   addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true); }, true);
@@ -206,7 +234,7 @@ function fromOutline(text) { const lines = text.split(/\r?\n/).filter(l => l.tri
   const clean = l => l.trim().replace(/^[-*•–]\s*/, ''); const root = [clean(lines[0]), []], stack = [[-1, root]];
   lines.slice(1).forEach(l => { const d = lvl(l), item = [clean(l), []]; while (stack.length > 1 && stack[stack.length - 1][0] >= d) stack.pop(); stack[stack.length - 1][1][1].push(item); stack.push([d, item]); });
   return root; }
-function open() { modal.open('<h2>' + icon('brain-circuit') + ' Concept map</h2><p class="small muted" style="margin-top:-4px">Select an idea and press <b>Tab</b> for a child, <b>Enter</b> for a sibling, <b>Delete</b> to remove a branch. Double-click to type. Use <b>Link</b> to join any two ideas with linking words.</p>' +
+function open() { modal.open('<h2>' + icon('brain-circuit') + ' Concept map</h2><p class="small muted" style="margin-top:-4px">Select an idea and press <b>Tab</b> for a sub-branch, <b>Enter</b> for a branch at the same level, <b>Delete</b> to remove a branch. Drag a branch onto another idea to move it there. Double-click to type. Use <b>Link</b> to join any two ideas with linking words.</p>' +
     '<div class="grid3">' + Object.keys(TEMPLATES).map(k => '<button class="btn" data-t="' + esc(k) + '" style="justify-content:center;padding:14px">' + esc(k) + '</button>').join('') + '</div>' +
     '<h3>Or paste an outline</h3><textarea id="mmO" placeholder="Enzymes\n  Structure\n    Active site\n  Factors\n    Temperature\n    pH" style="height:120px"></textarea><div class="foot"><button class="btn" data-close>Cancel</button><button class="btn primary" id="mmGo">' + icon('git-branch-plus') + 'Make map from outline</button></div>', sh => {
     $$('[data-t]', sh).forEach(b => b.onclick = () => { const [t, c, l] = TEMPLATES[b.dataset.t]; modal.close(); const r = newMap(t, c, l); if (b.dataset.t === 'Blank map') setTimeout(() => I.openEditor(r), 60); });

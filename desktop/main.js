@@ -219,6 +219,12 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   else if (cmd === 'xp') cl.setXp(a);
   else if (cmd === 'lowerHand') cl.lowerHand(a || null);
   else if (cmd === 'clearQuestions') cl.clearQuestions();
+  else if (cmd === 'testStart') return cl.testStart(a);
+  else if (cmd === 'testOpen') cl.testOpen(a);
+  else if (cmd === 'testEnd') cl.testEnd();
+  else if (cmd === 'testOver') cl.testOver(a);
+  else if (cmd === 'testSettings') cl.testSettings(a);
+  else if (cmd === 'testResults') return cl.testResults();
   else if (cmd === 'link') openClLink();
   else if (cmd === 'stop') { if (live.attached && live.on) await live.stop(); cl.setQuiz(null); await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
   return cl.snapshot();

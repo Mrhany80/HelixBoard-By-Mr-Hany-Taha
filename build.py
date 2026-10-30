@@ -15,9 +15,12 @@ D = R + 'dist/'
 # module doesn't stop the whole app
 ORDER = ['core','engine','input','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
          'recog','classtools','notes','smart','mindmap','deck','wheel','timer','water','io','ui',
-         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','videolesson','reports','xp','cards','account','install','lang','intro','main']
+         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','quizparse','quizimport','quizbuilder','testdash','videolesson','reports','xp','cards','account','install','lang','intro','main']
 
 parts = []
+# test marking is shared with the Windows app's class link server (desktop/testgrade.js)
+_tg = R + 'desktop/testgrade.js'
+if os.path.exists(_tg): parts.append('/* ==== testgrade.js ==== */\n' + open(_tg, encoding='utf-8').read())
 for m in ORDER:
     f = A + m + '.js'
     if not os.path.exists(f):

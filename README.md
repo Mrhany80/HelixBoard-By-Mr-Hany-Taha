@@ -3,7 +3,7 @@
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
-Version **2.3.2** — three ways to run it, all built from the same `app/` source:
+Version **2.6.0** — three ways to run it, all built from the same `app/` source:
 
 | Device | What | Install |
 |---|---|---|
@@ -208,10 +208,42 @@ starts in *attached* mode (no server of its own); `classlink.js` serves it under
 returns to the class when the quiz closes. The quiz page is in Arabic when the app is (`__LANG__`). Load test: 40 phones
 answering at once — all in, slowest answer 61 ms.
 
+## Tests from worksheets (like Microsoft Forms and Wayground)
+
+Live class → **Tests**. Settings come first (test name, class, phone language, feedback straight away / after handing in /
+none, a second try with a hint, time limit, pass mark, shuffling, going back, showing the score and the corrected copy,
+forgiving small spelling slips). Then the worksheet: **PDF, Word (.docx), photos or scans (Tesseract, English + Arabic), or
+pasted text**. No AI and no internet are needed (photos need Tesseract once).
+
+- `app/quizimport.js` turns the file into lines. PDF: text with position and boldness; every **figure, drawn shape, graph and
+  diagram** is found as whatever ink on the page is not text, cropped with its labels and placed between the questions
+  (tables of questions, frames round text and grids are left as text). Word: Word's own list numbering is written into the
+  text, bold/underlined options, pictures, **charts drawn again from the chart data**, drawn shapes and groups (boxes,
+  arrows, text-box labels on a picture, SmartArt). **Equations are kept exactly as they look**: Word equations (OMML →
+  MathML → picture), and in PDFs any line with math fonts, sub/superscripts or stacked fractions, and small vector formulas,
+  are cropped as pictures inside the text (`⟦m:id⟧`, pictures in `q.media`).
+- `app/quizparse.js` finds numbered questions (1. / Q1 / ١- / س١), options (a) / A. / أ)), options on one line, sections and
+  their type ("True or False", "Fill in the blanks", "Match", "Arrange", "Explain", Arabic too), marks, "Answer:" lines,
+  explanations, hints, "use the graph to answer questions 3–5" (the graph goes on all of them) and the **answer key**: a key
+  page ("1-B 2-C 3-True", by section too), "Answer: B" under a question, or the right option marked with ✓ / * / bold /
+  underline. Nine types: multiple choice, several answers, true/false, short answer, number (tolerance, units), fill in the
+  blanks, matching, put in order, written answer (key words).
+- The review screen is Forms-style cards: edit anything, change the type, crop a figure from the page, or **copy a figure or
+  equation anywhere and press Ctrl+V** on a question (as its figure) or inside its text (in place).
+- `desktop/testgrade.js` marks every answer — shared by the class link server and the app: spelling slips forgiven on longer
+  words, Arabic letter forms and diacritics ignored, numbers with tolerance, partial credit, a second try at half points.
+  The key never leaves the teacher's computer. Phones get `desktop/test-student.html` (one question at a time, instant
+  feedback, question map, timer, corrected copy, Arabic right-to-left) through the class link they already joined.
+- `app/testdash.js` — the dashboard: key numbers, score distribution, insights in plain language, accuracy by question and
+  by type, performance bands, item analysis (difficulty, discrimination, most common wrong answer, drill-down), a heat map of
+  every answer, the teacher's own marks for written answers (sent back to the phones), Excel export. Results are saved with
+  the test (IndexedDB) for every time it is given.
+
 ## Concept map details
 
-Notes → **Concept map**. Round **+** handles on the selected idea add a child (on the side its branches grow) or a sibling
-(below); the centre has one on each side. Ideas have no resize/rotate handles; the bar above an idea moves wherever it does not
+Notes → **Concept map**. Round **+** handles on the selected idea add a **sub-branch** (on the side its branches grow) or a
+**branch at the same level** (below); the centre has a **main branch** handle on each side. **Drag a branch onto another idea
+to attach it there** (it takes that branch's colour, one Undo step); drop it anywhere else to reorder it among its siblings. Ideas have no resize/rotate handles; the bar above an idea moves wherever it does not
 cover another idea. A pen tap selects an idea, a double tap types in it, a pen drag moves its branch (no ink). A new idea left
 empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/`E.squash`). Arrow keys walk the map.
 
@@ -228,7 +260,8 @@ empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/
 The test scripts (Playwright) run through one runner that gives every suite a fresh, empty profile: the Windows app reads
 `HB_USER_DATA` (test mode also skips the opening titles and the sign-in screen). Suites cover Live class, activities, reports,
 video lessons, class link, internet link, phone quiz (teams, boss, power-ups, confidence, ghost), one join with a 40-phone
-load, concept maps (keyboard, mouse, pen), PowerPoint animations and transitions, notes, paper cards and a crawl that clicks
+load, concept maps (keyboard, mouse, pen, moving branches), tests from PDF / Word / equations / Arabic with phones and
+the dashboard, PowerPoint animations and transitions, notes, paper cards and a crawl that clicks
 every tool in every tab and checks it visibly does something.
 
 ## Phone quiz game modes

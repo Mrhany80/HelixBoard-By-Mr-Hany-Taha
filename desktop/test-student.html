@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="__LANG__" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4C2A85">
+<title>Test · HelixBoard</title>
+<style>
+  :root { --bg:#F3F1F8; --card:#FFFFFF; --ink:#1F1830; --muted:#6B6380; --line:#E2DDEC; --brand:#6D3FD6; --brand2:#E0457B; --soft:#F1ECFD; --ok:#14935A; --okbg:#E6F6EE; --bad:#D03A3A; --badbg:#FDECEC; --warn:#B7791F; --warnbg:#FFF5DF; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.45 "Segoe UI", system-ui, -apple-system, Tahoma, Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: linear-gradient(120deg, var(--brand), var(--brand2)); color: #fff; padding: 12px 16px 10px; box-shadow: 0 4px 18px -8px rgba(60,20,120,.5); }
+  header .row { display: flex; align-items: center; gap: 10px; max-width: 760px; margin: 0 auto; }
+  header b { flex: 1; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .pill { background: rgba(255,255,255,.2); border-radius: 999px; padding: 3px 10px; font: 700 14px/1.4 ui-monospace, Consolas, monospace; white-space: nowrap; }
+  header .pill.hot { background: #fff; color: var(--bad); }
+  .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.28); max-width: 760px; margin: 9px auto 0; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: #fff; border-radius: 3px; transition: width .3s; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px 14px 120px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: 0 1px 2px rgba(30,20,60,.04); margin-bottom: 14px; }
+  .hero { border-top: 8px solid var(--brand); }
+  h1 { font-size: 24px; margin: 0 0 6px; line-height: 1.25; } h2 { font-size: 19px; margin: 0 0 12px; line-height: 1.45; font-weight: 600; white-space: pre-wrap; }
+  .muted { color: var(--muted); } .small { font-size: 13.5px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  .meta span { background: var(--soft); color: var(--brand); border-radius: 999px; padding: 4px 11px; font-weight: 600; font-size: 14px; }
+  .qhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--muted); font-size: 13.5px; font-weight: 600; }
+  .qhead .num { background: var(--brand); color: #fff; border-radius: 8px; padding: 2px 9px; }
+  .qhead .pts { margin-inline-start: auto; }
+  .sec { color: var(--brand); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  img.eq { vertical-align: middle; max-width: 100%; height: auto; margin: 1px 2px; background: #fff; border-radius: 4px; }
+  .rlist { display: grid; gap: 6px; margin-bottom: 10px; } .rlist div { padding: 6px 10px; border-radius: 10px; background: var(--soft); }
+  img.q { max-width: 100%; max-height: 46vh; display: block; margin: 4px auto 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: start; padding: 13px 14px; margin: 8px 0; border: 2px solid var(--line); border-radius: 13px; background: #fff; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+  .opt .k { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); color: var(--brand); font-weight: 800; }
+  .opt.multi .k { border-radius: 6px; }
+  .opt.on { border-color: var(--brand); background: var(--soft); } .opt.on .k { background: var(--brand); color: #fff; }
+  .opt.right { border-color: var(--ok); background: var(--okbg); } .opt.right .k { background: var(--ok); color: #fff; }
+  .opt.wrong { border-color: var(--bad); background: var(--badbg); } .opt.wrong .k { background: var(--bad); color: #fff; }
+  .opt:disabled { cursor: default; }
+  input.t, textarea.t, select.t { width: 100%; border: 2px solid var(--line); border-radius: 12px; background: #fff; color: inherit; font: inherit; font-size: 17px; padding: 11px 13px; }
+  textarea.t { min-height: 130px; resize: vertical; }
+  input.t:focus, textarea.t:focus, select.t:focus { outline: none; border-color: var(--brand); }
+  .unit { display: flex; align-items: center; gap: 8px; } .unit b { color: var(--muted); }
+  .blanks { font-size: 18px; line-height: 2.3; white-space: pre-wrap; }
+  .blanks input { display: inline-block; width: 9em; max-width: 60%; border: 0; border-bottom: 2px solid var(--brand); background: var(--soft); border-radius: 6px 6px 0 0; font: inherit; font-weight: 600; padding: 2px 8px; color: var(--brand); text-align: center; }
+  .blanks input:focus { outline: none; background: #E8DEFF; }
+  .match { display: grid; gap: 10px; } .match .row { display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; align-items: center; } .match .l { font-weight: 600; }
+  .ord { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 8px 0; border: 2px solid var(--line); border-radius: 12px; background: #fff; }
+  .ord .n { width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+  .ord span { flex: 1; } .ord button { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); color: var(--brand); font-size: 18px; font-weight: 800; }
+  .ord button:disabled { opacity: .3; }
+  .fb { border-radius: 13px; padding: 13px 15px; margin-top: 14px; font-weight: 500; animation: pop .25s ease; }
+  .fb b { display: block; font-size: 17px; margin-bottom: 3px; } .fb.ok { background: var(--okbg); color: var(--ok); } .fb.bad { background: var(--badbg); color: var(--bad); } .fb.retry { background: var(--warnbg); color: var(--warn); }
+  .fb .ex { color: var(--ink); margin-top: 6px; white-space: pre-wrap; } .fb .key { color: var(--ink); white-space: pre-wrap; }
+  @keyframes pop { from { transform: scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  .go { height: 50px; border: 0; border-radius: 13px; background: var(--brand); color: #fff; font: inherit; font-weight: 700; font-size: 16px; padding: 0 16px; cursor: pointer; white-space: nowrap; }
+  .foot .go.alt { padding: 0 13px; }
+  .go.alt { background: #fff; color: var(--brand); border: 2px solid var(--line); } .go.ok { background: var(--ok); }
+  .go:disabled { opacity: .45; cursor: default; }
+  .wide { width: 100%; }
+  .foot { position: fixed; inset: auto 0 0 0; background: rgba(255,255,255,.96); backdrop-filter: blur(8px); border-top: 1px solid var(--line); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); z-index: 6; }
+  .foot .row { display: flex; gap: 10px; max-width: 760px; margin: 0 auto; align-items: center; } .foot .grow { flex: 1; }
+  .dots { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+  .dots button { width: 38px; height: 38px; border-radius: 10px; border: 2px solid var(--line); background: #fff; font: inherit; font-weight: 700; color: var(--muted); }
+  .dots button.a { background: var(--soft); border-color: var(--brand); color: var(--brand); } .dots button.c { outline: 3px solid var(--brand2); outline-offset: 1px; }
+  .dots button.r { background: var(--okbg); border-color: var(--ok); color: var(--ok); } .dots button.w { background: var(--badbg); border-color: var(--bad); color: var(--bad); }
+  .ring { width: 150px; height: 150px; margin: 6px auto 10px; position: relative; } .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; }
+  .rv { border-inline-start: 5px solid var(--line); } .rv.r { border-inline-start-color: var(--ok); } .rv.w { border-inline-start-color: var(--bad); } .rv.p { border-inline-start-color: var(--warn); }
+  .rv .yours, .rv .right { margin-top: 6px; white-space: pre-wrap; } .rv .right { color: var(--ok); font-weight: 600; } .rv .yours.w { color: var(--bad); text-decoration: line-through; }
+  .center { text-align: center; } .err { color: var(--bad); min-height: 20px; margin-top: 8px; }
+  .modal { position: fixed; inset: 0; background: rgba(20,10,40,.45); display: grid; place-items: center; z-index: 10; padding: 16px; }
+  .modal .card { max-width: 420px; width: 100%; }
+  [dir=rtl] .ord button.up { transform: none; }
+</style>
+</head>
+<body>
+<header><div class="row"><b id="ttl">…</b><span class="pill" id="clk" hidden></span><span class="pill" id="cnt"></span></div><div class="bar"><i id="prog" style="width:0"></i></div></header>
+<main id="m"><div class="card center muted">Loading…</div></main>
+<div class="foot" id="foot" hidden></div>
+<script>
+(() => {
+  'use strict';
+  const qs = new URLSearchParams(location.search);
+  const pid = qs.get('pid') || '', back = qs.get('back') || '/';
+  const LANG = (document.documentElement.lang === 'ar' || qs.get('lang') === 'ar') ? 'ar' : 'en';
+  const AR = { 'Loading…': 'جارٍ التحميل…', 'Start the test': 'ابدأ الاختبار', 'questions': 'أسئلة', 'points': 'درجة', 'minutes': 'دقيقة', 'No time limit': 'بدون وقت محدد', 'Question': 'سؤال', 'of': 'من', 'pt': 'درجة', 'pts': 'درجات',
+    'Check answer': 'تحقق من الإجابة', 'Next': 'التالي', 'Back': 'السابق', 'Hand in': 'تسليم', 'Correct!': 'إجابة صحيحة!', 'Not quite': 'ليست صحيحة', 'Partly right': 'صحيحة جزئيًا', 'Try once more': 'حاول مرة أخرى',
+    'Hint': 'تلميح', 'Right answer': 'الإجابة الصحيحة', 'Why': 'التوضيح', 'Your answer': 'إجابتك', 'Type your answer': 'اكتب إجابتك', 'Choose…': 'اختر…', 'True': 'صح', 'False': 'خطأ',
+    'Hand in your test?': 'هل تريد تسليم الاختبار؟', 'You have not answered': 'لم تُجب عن', 'You cannot change your answers after handing in.': 'لا يمكنك تغيير إجاباتك بعد التسليم.', 'Cancel': 'إلغاء', 'Yes, hand in': 'نعم، سلّم',
+    'Handed in': 'تم التسليم', 'Your score': 'درجتك', 'Back to the class': 'العودة إلى الصف', 'Review': 'مراجعة الإجابات', 'Your teacher will share the results.': 'سيشارك معلمك النتائج.', 'Marked by your teacher': 'يصححها معلمك',
+    'Time is up — your test was handed in.': 'انتهى الوقت — تم تسليم اختبارك.', 'Your teacher closed the test.': 'أغلق المعلم الاختبار.', 'There is no test right now.': 'لا يوجد اختبار الآن.', 'Your teacher will tell you what to do next.': 'سيخبرك معلمك بما تفعله بعد ذلك.',
+    'Answer all the parts first.': 'أجب عن جميع الأجزاء أولًا.', 'Choose an answer first.': 'اختر إجابة أولًا.', 'No connection — trying again…': 'لا يوجد اتصال — نحاول مرة أخرى…', 'Questions': 'الأسئلة', 'Saved': 'تم الحفظ',
+    'Choose all that are right.': 'اختر كل الإجابات الصحيحة.', 'Put these in the right order (use the arrows).': 'رتّب العناصر بالترتيب الصحيح (استخدم الأسهم).', 'Match each item.': 'صِل كل عنصر بما يناسبه.', 'Fill in the blanks.': 'أكمل الفراغات.', 'Done': 'تم', 'Time taken': 'الوقت المستغرق', 'answered': 'تمت الإجابة' };
+  const t = s => LANG === 'ar' && AR[s] ? AR[s] : s;
+  if (LANG === 'ar') document.documentElement.dir = 'rtl';
+  const LET = LANG === 'ar' ? ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي'] : 'ABCDEFGHIJ'.split('');
+  const m = document.getElementById('m'), foot = document.getElementById('foot');
+  const h = (tag, at, ...kids) => { const e = document.createElement(tag); Object.entries(at || {}).forEach(([k, v]) => { if (v == null || v === false) return; if (k === 'class') e.className = v; else if (k.startsWith('on')) e[k] = v; else e.setAttribute(k, v === true ? '' : v); }); kids.flat().forEach(k => { if (k != null && k !== false) e.append(k.nodeType ? k : String(k)); }); return e; };
+  const set = (...kids) => { m.replaceChildren(...kids); window.scrollTo(0, 0); };
+  let P = null, cur = 0, ans = {}, fb = {}, skew = 0, timer = 0, saveT = {}, busy = false, review = false;
+  const api = (path, body) => fetch(path + (path.includes('?') ? '&' : '?') + 'pid=' + encodeURIComponent(pid), body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}).then(r => r.json().then(j => ({ ok: r.ok, status: r.status, j })));
+  const qi = k => P.order[k]; /* display position → question index */
+  const Q = k => P.questions[qi(k)];
+  /* equations and pasted pictures inside the text: ⟦m:id⟧ → the exact picture */
+  function rich(s, q) { const f = document.createDocumentFragment(), md = (q && q.media) || {}; String(s == null ? '' : s).split(/(⟦m:[a-z0-9]+⟧)/).forEach(part => { const m = part.match(/^⟦m:([a-z0-9]+)⟧$/); if (m && md[m[1]]) { const im = document.createElement('img'); im.className = 'eq'; im.src = md[m[1]].src; im.alt = ''; if (md[m[1]].w) im.style.width = md[m[1]].w + 'px'; f.append(im); } else if (part) f.append(m ? '▣' : part); }); return f; }
+  const plain = s => String(s == null ? '' : s).replace(/⟦m:[a-z0-9]+⟧/g, '▣');
+  const has = v => !(v == null || v === '' || (Array.isArray(v) && (!v.length || v.every(x => x == null || x === ''))));
+  const answered = () => P.questions.filter((q, i) => has(ans[i])).length;
+  const S = () => P.settings;
+  const final = i => fb[i] && fb[i].final;
+
+  async function load() {
+    let r; try { r = await api('/t/paper'); } catch (e) { set(h('div', { class: 'card center' }, t('No connection — trying again…'))); return setTimeout(load, 2500); }
+    if (!r.ok) return closed(t('There is no test right now.'));
+    P = r.j; ans = P.ans || {}; fb = P.fb || {}; skew = P.now - Date.now();
+    document.getElementById('ttl').textContent = P.title; document.title = P.title;
+    if (P.done) return result(P.result);
+    if (!P.open) return closed(t('Your teacher closed the test.'));
+    if (!Object.keys(ans).length && !Object.keys(fb).length) start(); else { cur = Math.max(0, P.order.findIndex(i => !has(ans[i]))); show(); }
+    tick(); watch();
+  }
+  function start() {
+    const tot = P.questions.reduce((s, q) => s + (+q.pts || 1), 0);
+    foot.hidden = true;
+    set(h('div', { class: 'card hero' }, h('h1', { dir: 'auto' }, P.title), h('div', { class: 'muted' }, P.name),
+      h('div', { class: 'meta' }, h('span', {}, P.questions.length + ' ' + t('questions')), h('span', {}, tot + ' ' + t('points')), h('span', {}, S().time ? S().time + ' ' + t('minutes') : t('No time limit'))),
+      h('button', { class: 'go wide', style: 'margin-top:16px', onclick: () => { cur = 0; show(); } }, t('Start the test'))));
+  }
+  /* ---------- one question at a time ---------- */
+  function show() {
+    const i = qi(cur), q = P.questions[i], lock = final(i) || P.done; review = false;
+    document.getElementById('cnt').textContent = (cur + 1) + ' / ' + P.questions.length;
+    document.getElementById('prog').style.width = (answered() / P.questions.length * 100) + '%';
+    const body = h('div', { class: 'card' });
+    if (q.sec) body.append(h('div', { class: 'sec', dir: 'auto' }, q.sec));
+    body.append(h('div', { class: 'qhead' }, h('span', { class: 'num' }, t('Question') + ' ' + (cur + 1)), h('span', { class: 'muted' }, t('of') + ' ' + P.questions.length), h('span', { class: 'pts' }, (q.pts || 1) + ' ' + ((q.pts || 1) === 1 ? t('pt') : t('pts')))));
+    if (q.type !== 'blank') body.append(h('h2', { dir: 'auto' }, rich(q.q, q)));
+    if (q.img) body.append(h('img', { class: 'q', src: q.img, alt: '' }));
+    body.append(input(q, i, lock));
+    if (fb[i]) body.append(fbBox(q, fb[i]));
+    set(body); nav();
+  }
+  const put = (i, v, now) => { if (has(v)) ans[i] = v; else delete ans[i]; document.getElementById('prog').style.width = (answered() / P.questions.length * 100) + '%'; clearTimeout(saveT[i]); saveT[i] = setTimeout(() => api('/t/ans', { i, v: has(v) ? v : null }).catch(() => {}), now ? 0 : 600); };
+  function input(q, i, lock) {
+    const v = ans[i], box = h('div');
+    if (q.type === 'mc' || q.type === 'multi' || q.type === 'tf') {
+      const multi = q.type === 'multi', list = q.type === 'tf' ? [[true, t('True')], [false, t('False')]] : q.perm.map(k => [k, q.o[k]]);
+      if (multi) box.append(h('div', { class: 'muted small' }, t('Choose all that are right.')));
+      const f = fb[i];
+      list.forEach(([k, label], n) => { const on = multi ? [].concat(v || []).includes(k) : v === k;
+        let cls = 'opt' + (multi ? ' multi' : '') + (on ? ' on' : '');
+        if (f && f.final && f.keyIdx != null) { const right = [].concat(f.keyIdx).includes(k); if (right) cls += ' right'; else if (on) cls += ' wrong'; }
+        box.append(h('button', { class: cls, disabled: lock, dir: 'auto', onclick: () => { let nv; if (multi) { const s = new Set([].concat(ans[i] || [])); s.has(k) ? s.delete(k) : s.add(k); nv = [...s].sort((a, b) => a - b); } else nv = k; put(i, nv, true); show(); } }, h('span', { class: 'k' }, q.type === 'tf' ? (k ? '✓' : '✗') : LET[n]), h('span', {}, rich(label, q)))); });
+    } else if (q.type === 'short' || q.type === 'num') {
+      const inp = h('input', { class: 't', dir: 'auto', value: v || '', placeholder: t('Type your answer'), disabled: lock, inputmode: q.type === 'num' ? 'decimal' : null, autocomplete: 'off' }); inp.oninput = () => put(i, inp.value.trim());
+      inp.onkeydown = e => { if (e.key === 'Enter') primary(); };
+      box.append(q.type === 'num' && q.unit ? h('div', { class: 'unit' }, inp, h('b', {}, q.unit)) : inp);
+    } else if (q.type === 'long') { const ta = h('textarea', { class: 't', dir: 'auto', placeholder: t('Type your answer'), disabled: lock }); ta.value = v || ''; ta.oninput = () => put(i, ta.value.trim()); box.append(ta); }
+    else if (q.type === 'blank') {
+      const parts = String(q.q).split(/_{3,}|\.{4,}|…{2,}/), vals = [].concat(v || []), p = h('div', { class: 'blanks', dir: 'auto' }), inps = [];
+      const n = Math.max(q.n, parts.length - 1);
+      parts.forEach((txt, k) => { p.append(rich(txt, q)); if (k < n) { const x = h('input', { value: vals[k] || '', disabled: lock, autocomplete: 'off', 'aria-label': 'blank ' + (k + 1) }); x.oninput = () => put(i, inps.map(e => e.value.trim())); inps.push(x); p.append(x); } });
+      for (let k = parts.length - 1; k < n; k++) { const x = h('input', { value: vals[k] || '', disabled: lock }); x.oninput = () => put(i, inps.map(e => e.value.trim())); inps.push(x); p.append(' ', x); }
+      box.append(h('div', { class: 'muted small', style: 'margin-bottom:6px' }, t('Fill in the blanks.')), p);
+    } else if (q.type === 'match') {
+      const vals = [].concat(v || []), g = h('div', { class: 'match' });
+      box.append(h('div', { class: 'muted small', style: 'margin-bottom:8px' }, t('Match each item.')));
+      const pics = q.right.some(r => /⟦m:/.test(r)); if (pics) box.append(h('div', { class: 'rlist', dir: 'auto' }, q.perm.map((r, n) => h('div', {}, h('b', {}, LET[n] + '. '), rich(q.right[r], q)))));
+      q.left.forEach((l, k) => { const s = h('select', { class: 't', disabled: lock, dir: 'auto' }, h('option', { value: '' }, t('Choose…')), q.perm.map((r, n) => h('option', { value: r, selected: vals[k] === r }, LET[n] + '. ' + plain(q.right[r]))));
+        s.onchange = () => { const nv = q.left.map((_, j) => { const e = g.querySelectorAll('select')[j]; return e.value === '' ? null : +e.value; }); put(i, nv); };
+        g.append(h('div', { class: 'row' }, h('div', { class: 'l', dir: 'auto' }, (k + 1) + '. ', rich(l, q)), s)); });
+      box.append(g);
+    } else if (q.type === 'order') {
+      let cur2 = Array.isArray(v) && v.length === q.o.length ? v.slice() : q.perm.slice();
+      box.append(h('div', { class: 'muted small' }, t('Put these in the right order (use the arrows).')));
+      const draw = () => { list.replaceChildren(...cur2.map((k, n) => h('div', { class: 'ord', dir: 'auto' }, h('span', { class: 'n' }, n + 1), h('span', {}, rich(q.o[k], q)),
+        h('button', { class: 'up', disabled: lock || n === 0, 'aria-label': 'up', onclick: () => { [cur2[n - 1], cur2[n]] = [cur2[n], cur2[n - 1]]; put(i, cur2.slice()); draw(); } }, '↑'),
+        h('button', { disabled: lock || n === cur2.length - 1, 'aria-label': 'down', onclick: () => { [cur2[n + 1], cur2[n]] = [cur2[n], cur2[n + 1]]; put(i, cur2.slice()); draw(); } }, '↓')))); };
+      const list = h('div'); draw(); box.append(list);
+      if (!has(v) && !lock) box.append(h('button', { class: 'go alt', style: 'margin-top:6px', onclick: () => { put(i, cur2.slice(), true); show(); } }, t('Done')));
+    }
+    return box;
+  }
+  function fbBox(q, f) {
+    if (f.retry) return h('div', { class: 'fb retry' }, h('b', {}, '↻ ' + t('Try once more')), f.hint ? h('div', { class: 'ex' }, '💡 ' + t('Hint') + ': ' + f.hint) : null);
+    if (f.ok == null) return h('div', { class: 'fb retry' }, h('b', {}, '✎ ' + t('Marked by your teacher')));
+    const part = !f.ok && f.score > 0;
+    return h('div', { class: 'fb ' + (f.ok ? 'ok' : part ? 'retry' : 'bad') }, h('b', {}, f.ok ? '✓ ' + t('Correct!') : part ? '◐ ' + t('Partly right') + ' (' + Math.round(f.score * 100) + '%)' : '✗ ' + t('Not quite')),
+      !f.ok && f.key ? h('div', { class: 'key', dir: 'auto' }, t('Right answer') + ': ', rich(f.key, q)) : null, f.ex ? h('div', { class: 'ex', dir: 'auto' }, '📘 ', rich(f.ex, q)) : null);
+  }
+  function nav() {
+    foot.hidden = false; const i = qi(cur), last = cur === P.questions.length - 1, instant = S().feedback === 'instant';
+    const needCheck = instant && !final(i) && !(fb[i] && fb[i].ok == null);
+    const prev = h('button', { class: 'go alt', disabled: cur === 0 || !S().nav, onclick: () => { cur--; show(); } }, t('Back'));
+    const map = h('button', { class: 'go alt', onclick: grid, 'aria-label': t('Questions') }, '▦');
+    let main;
+    if (needCheck) main = h('button', { class: 'go grow', onclick: check }, t('Check answer'));
+    else if (last) main = h('button', { class: 'go ok grow', onclick: confirmHand }, t('Hand in'));
+    else main = h('button', { class: 'go grow', onclick: () => { cur++; show(); } }, t('Next'));
+    const extra = needCheck && !last ? h('button', { class: 'go alt', 'aria-label': t('Next'), onclick: () => { cur++; show(); } }, LANG === 'ar' ? '←' : '→') : needCheck && last ? h('button', { class: 'go alt', onclick: confirmHand }, t('Hand in')) : null;
+    foot.replaceChildren(h('div', { class: 'row' }, prev, map, main, extra));
+  }
+  function primary() { const b = foot.querySelector('.grow'); b && b.click(); }
+  async function check() {
+    const i = qi(cur), q = P.questions[i]; if (!has(ans[i])) return toast(t('Choose an answer first.'));
+    if (q.type === 'blank' && [].concat(ans[i]).filter(Boolean).length < Math.max(1, q.n)) return toast(t('Answer all the parts first.'));
+    if (busy) return; busy = true; clearTimeout(saveT[i]);
+    try { const r = await api('/t/ans', { i, v: ans[i], check: true }); if (r.ok && r.j.fb) { fb[i] = r.j.fb; if (fb[i].final && (q.type === 'mc' || q.type === 'multi' || q.type === 'tf')) fb[i].keyIdx = keyIdx(q, fb[i].key); }
+      else if (r.status === 403) { busy = false; return r.j.error === 'closed' ? closed(t('Your teacher closed the test.')) : timeUp(); } else if (r.j && r.j.fb) fb[i] = r.j.fb; }
+    catch (e) { toast(t('No connection — trying again…')); }
+    busy = false; show(); }
+  /* which option(s) the key names, to colour them */
+  function keyIdx(q, key) { if (q.type === 'tf') return key === t('True') || key === 'True' || key === 'صح'; if (q.type === 'mc') return q.o.indexOf(key); return String(key).split(' · ').map(s => q.o.indexOf(s)).filter(k => k >= 0); }
+  function grid() {
+    const wrap = h('div', { class: 'modal', onclick: e => { if (e.target === wrap) wrap.remove(); } }), d = h('div', { class: 'dots' });
+    P.order.forEach((qx, k) => { const f = fb[qx]; d.append(h('button', { class: (has(ans[qx]) ? 'a ' : '') + (k === cur ? 'c ' : '') + (f && f.final ? (f.ok ? 'r' : 'w') : ''), disabled: !S().nav && k !== cur, onclick: () => { wrap.remove(); cur = k; show(); } }, k + 1)); });
+    wrap.append(h('div', { class: 'card' }, h('b', {}, t('Questions')), h('div', { class: 'muted small' }, answered() + ' / ' + P.questions.length + ' ' + t('answered')), d)); document.body.append(wrap);
+  }
+  function confirmHand() {
+    const left = P.questions.length - answered();
+    const wrap = h('div', { class: 'modal' });
+    wrap.append(h('div', { class: 'card' }, h('h2', {}, t('Hand in your test?')), left ? h('p', { style: 'color:var(--bad);font-weight:600' }, t('You have not answered') + ' ' + left + ' / ' + P.questions.length) : null,
+      h('p', { class: 'muted' }, t('You cannot change your answers after handing in.')),
+      h('div', { style: 'display:flex;gap:10px;margin-top:12px' }, h('button', { class: 'go alt', style: 'flex:1', onclick: () => wrap.remove() }, t('Cancel')), h('button', { class: 'go ok', style: 'flex:1', onclick: () => { wrap.remove(); hand(); } }, t('Yes, hand in')))));
+    document.body.append(wrap);
+  }
+  async function hand(why) {
+    if (busy) return; busy = true; Object.values(saveT).forEach(clearTimeout);
+    let r; for (let k = 0; k < 4; k++) { try { r = await api('/t/submit', { ans }); break; } catch (e) { await new Promise(ok => setTimeout(ok, 1500)); } }
+    busy = false; if (!r) return toast(t('No connection — trying again…'));
+    if (r.ok) { P.done = true; result(r.j.result, why); } else if (r.j.error === 'closed') closed(t('Your teacher closed the test.')); else toast(r.j.error || 'Error');
+  }
+  /* ---------- the result and a corrected copy ---------- */
+  function fmt(q, v) { if (!has(v)) return '—';
+    switch (q.type) { case 'mc': return q.o[v]; case 'multi': return v.map(k => q.o[k]).join(' · '); case 'tf': return v ? t('True') : t('False');
+      case 'blank': return [].concat(v).join(' · '); case 'match': return q.left.map((l, k) => l + ' → ' + (v[k] != null ? q.right[v[k]] : '?')).join('\n'); case 'order': return v.map(k => q.o[k]).join(' → '); default: return String(v); } }
+  function result(R, why) {
+    clearInterval(timer); document.getElementById('clk').hidden = true; foot.hidden = false; document.getElementById('prog').style.width = '100%';
+    foot.replaceChildren(h('div', { class: 'row' }, h('button', { class: 'go grow', onclick: goBack }, t('Back to the class'))));
+    const top = h('div', { class: 'card hero center' });
+    if (why) top.append(h('p', { style: 'color:var(--bad);font-weight:600' }, why));
+    top.append(h('div', { class: 'muted' }, '✓ ' + t('Handed in')));
+    if (R && R.pct != null) { const pct = R.pct, C = 2 * Math.PI * 64, col = pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--bad)';
+      const ring = h('div', { class: 'ring' }); ring.innerHTML = '<svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="64" fill="none" stroke="#EEE9F7" stroke-width="14"/><circle cx="75" cy="75" r="64" fill="none" stroke="' + col + '" stroke-width="14" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="' + C + '" style="transition:stroke-dashoffset 1.1s ease"/></svg><b style="color:' + col + '">' + Math.round(pct) + '%</b>';
+      top.append(h('h1', {}, t('Your score')), ring, h('div', { style: 'font-size:20px;font-weight:700' }, R.got + ' / ' + R.max + ' ' + t('points')));
+      requestAnimationFrame(() => setTimeout(() => { const c = ring.querySelectorAll('circle')[1]; c.style.strokeDashoffset = C * (1 - pct / 100); }, 60)); }
+    else top.append(h('h1', {}, t('Handed in')), h('p', { class: 'muted' }, t('Your teacher will share the results.')));
+    if (R && R.ms) top.append(h('div', { class: 'muted small', style: 'margin-top:6px' }, t('Time taken') + ': ' + Math.floor(R.ms / 60000) + ':' + String(Math.round(R.ms / 1000) % 60).padStart(2, '0')));
+    const out = [top];
+    if (R && R.per && R.per.some(p => p.key != null || p.ok != null)) { out.push(h('h2', { style: 'margin:18px 4px 10px' }, t('Review')));
+      P.order.forEach((qx, k) => { const q = P.questions[qx], p = R.per[qx] || {}; const cls = p.unscored ? '' : p.ok ? 'r' : p.pts > 0 ? 'p' : 'w';
+        out.push(h('div', { class: 'card rv ' + cls }, h('div', { class: 'qhead' }, h('span', { class: 'num' }, k + 1), p.pts != null && !p.unscored ? h('span', { class: 'pts' }, p.pts + ' / ' + p.max) : p.unscored ? h('span', { class: 'pts' }, t('Marked by your teacher')) : null),
+          h('div', { dir: 'auto', style: 'white-space:pre-wrap;font-weight:600' }, rich(q.q, q)), h('div', { class: 'yours' + (cls === 'w' ? ' w' : ''), dir: 'auto' }, t('Your answer') + ': ', rich(fmt(q, ans[qx]), q)),
+          p.key && !p.ok ? h('div', { class: 'right', dir: 'auto' }, t('Right answer') + ': ', rich(p.key, q)) : null, p.ex ? h('div', { class: 'muted small', dir: 'auto', style: 'margin-top:6px;white-space:pre-wrap' }, '📘 ', rich(p.ex, q)) : null)); }); }
+    set(...out); document.getElementById('cnt').textContent = '✓';
+  }
+  function closed(msg) { clearInterval(timer); foot.hidden = false; foot.replaceChildren(h('div', { class: 'row' }, h('button', { class: 'go grow', onclick: goBack }, t('Back to the class'))));
+    set(h('div', { class: 'card hero center' }, h('h1', {}, msg), h('p', { class: 'muted' }, t('Your teacher will tell you what to do next.')))); }
+  const goBack = () => { location.href = back; };
+  function timeUp() { hand(t('Time is up — your test was handed in.')); }
+  function tick() { const tm = +S().time || 0, c = document.getElementById('clk'); if (!tm) return; c.hidden = false; const end = P.start + tm * 60000;
+    const f = () => { const left = end - (Date.now() + skew); if (left <= 0) { clearInterval(timer); c.textContent = '0:00'; if (!P.done) timeUp(); return; } const s = Math.ceil(left / 1000); c.textContent = '⏱ ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); c.classList.toggle('hot', s <= 60); };
+    f(); timer = setInterval(f, 1000); }
+  /* the class link tells us when the teacher closes or ends the test */
+  async function watch() { let v = 0; for (;;) { if (P.done) return; try { const r = await fetch('/poll?pid=' + encodeURIComponent(pid) + '&v=' + v).then(r => r.ok ? r.json() : null); if (!r) return; v = r.ver;
+      if (r.v === 'closed' || !r.test || r.test.id !== P.id) return closed(t('There is no test right now.')); if (!r.test.open && !P.done) { const rr = await api('/t/paper'); if (rr.ok && rr.j.done) { P.done = true; return result(rr.j.result, t('Your teacher closed the test.')); } return closed(t('Your teacher closed the test.')); } }
+    catch (e) { await new Promise(ok => setTimeout(ok, 3000)); } } }
+  let toastEl = null; function toast(s) { if (toastEl) toastEl.remove(); toastEl = h('div', { style: 'position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:#1F1830;color:#fff;padding:10px 16px;border-radius:12px;z-index:20;font-weight:600;max-width:90vw;text-align:center' }, s); document.body.append(toastEl); const e = toastEl; setTimeout(() => e.remove(), 2600); }
+  document.querySelector('#m .card').textContent = t('Loading…');
+  load();
+})();
+</script>
+</body>
+</html>

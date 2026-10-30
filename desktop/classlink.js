@@ -11,6 +11,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PAGE = path.join(__dirname, 'classlink-student.html');
+const TEST_PAGE = path.join(__dirname, 'test-student.html');
+const G = require('./testgrade.js');
 const MAX_PLAYERS = 300;
 const MAX_FILE = 1024 * 1024 * 1024;
 
@@ -24,7 +26,7 @@ class ClassLink {
     this.pin = String(crypto.randomInt(100000, 1000000));
     this.players = new Map(); this.badPins = new Map();
     this.board = null; this.boardVer = 0; this.boardOn = false; this.drawOn = false; this.reactOn = true;
-    this.files = []; this.homework = new Map(); this.ver = 0; this.act = null; this.shared = null; this.lock = false; this.questions = []; this.tunnel = { state: 'off' }; this.closing = false;
+    this.files = []; this.homework = new Map(); this.ver = 0; this.act = null; this.shared = null; this.lock = false; this.questions = []; this.tunnel = { state: 'off' }; this.closing = false; this.test = null;
     this.html = fs.readFileSync(PAGE, 'utf8');
     this.server = http.createServer((req, res) => this.handle(req, res).catch(e => { try { json(res, 500, { error: 'Server error' }); } catch (er) {} }));
     this.server.on('clientError', (e, sock) => { try { sock.end('HTTP/1.1 400 Bad Request\r\n\r\n'); } catch (er) {} });
@@ -91,6 +93,38 @@ class ClassLink {
     if (this.shared && this.shared.actId === a.id) this.shared = null; const pl = this.players.get(pid); if (pl) this.flush(pl); this.changed(); }
   award(pid, n) { const pl = this.players.get(pid); if (!pl) return; pl.stars = Math.max(0, (pl.stars || 0) + (Number.isInteger(n) ? n : 1)); this.changed(); }
   /* "Eyes on board": phones pause and show the teacher's board (shared just for the pause if board sharing was off) */
+  /* ---------- tests: the whole paper on each phone, marked here as students go (the key never leaves this computer) ---------- */
+  testStart(def) { if (!def || !Array.isArray(def.questions) || !def.questions.length) return false; const old = this.test && this.test.def.id === def.id ? this.test : null;
+    this.test = { def, open: true, opened: Date.now(), papers: old ? old.papers : new Map(), over: old ? old.over : {} }; this.emit('test', { kind: 'start' }); this.changed(); return true; }
+  testOpen(v) { if (!this.test) return; this.test.open = !!v; if (!v) this.test.papers.forEach(p => { if (!p.done && Object.keys(p.ans).length) this.finish(p); }); this.emit('test', { kind: 'open' }); this.changed(); }
+  testEnd() { this.test = null; this.changed(); }
+  testOver(o) { if (!this.test || !o) return; const k = o.pid + ':' + o.i; if (o.pts == null) delete this.test.over[k]; else this.test.over[k] = +o.pts; this.test.papers.forEach(p => { if (p.done) p.mark = this.markOf(p); }); this.emit('test', { kind: 'mark' }); }
+  testSettings(s) { if (!this.test || !s) return; Object.assign(this.test.def.settings = this.test.def.settings || {}, s); this.changed(); }
+  markOf(p) { const t = this.test, over = {}; Object.keys(t.over).forEach(k => { const [pid, i] = k.split(':'); if (pid === p.pid) over[i] = t.over[k]; }); const ans = t.def.questions.map((q, i) => p.ans[i]); return G.mark(t.def, ans, t.def.questions.map((q, i) => p.tries[i] || 0), over); }
+  paperOf(pl) { const t = this.test; let p = t.papers.get(pl.id); if (!p) { p = { pid: pl.id, name: pl.name, ans: {}, tries: {}, fb: {}, start: Date.now(), done: false, at: 0, seen: Date.now() }; t.papers.set(pl.id, p); this.emit('test', { kind: 'start', pid: pl.id }); } p.seen = Date.now(); return p; }
+  late(p) { const tm = +(this.test.def.settings || {}).time || 0; return tm > 0 && Date.now() > p.start + tm * 60000 + 30000; }
+  tPaper(pl, res) { const t = this.test; if (!t) return json(res, 404, { error: 'There is no test right now.' }); const p = this.paperOf(pl), S = t.def.settings || {};
+    const copy = G.studentCopy(t.def, pl.id + t.def.id); return json(res, 200, Object.assign(copy, { open: t.open, name: pl.name, start: p.start, now: Date.now(), ans: p.ans, tries: p.tries, fb: p.fb, done: p.done, result: p.done ? this.resultFor(p) : null })); }
+  feedback(q, g, lang) { return { ok: g ? g.ok : null, score: g ? g.score : null, key: G.keyText(q, lang), ex: q.ex || '' }; }
+  tAns(pl, d, res) { const t = this.test; if (!t) return json(res, 404, { error: 'There is no test right now.' }); if (!t.open) return json(res, 403, { error: 'closed' });
+    const p = this.paperOf(pl); if (p.done) return json(res, 409, { error: 'You have already handed in this test.' }); if (this.late(p)) return json(res, 403, { error: 'Time is up.' });
+    const i = d.i | 0, q = t.def.questions[i]; if (!q) return json(res, 400, { error: 'No such question.' }); const S = t.def.settings || {}, fbMode = S.feedback || 'instant';
+    if (p.fb[i] && p.fb[i].final) return json(res, 409, { error: 'This question is already checked.', fb: p.fb[i] });
+    const v = G.cleanValue(q, d.v); if (v === undefined) return json(res, 400, { error: 'That answer could not be read.' });
+    if (v == null) delete p.ans[i]; else p.ans[i] = v;
+    let fb = null; if (d.check && fbMode === 'instant' && v != null) { p.tries[i] = (p.tries[i] || 0) + 1; const g = G.grade(q, v, { strict: S.strict });
+      if (g && !g.ok && S.retry && p.tries[i] < 2) fb = { ok: false, retry: true, hint: q.hint || '', score: g.score };
+      else fb = Object.assign(this.feedback(q, g, t.def.lang), { final: true, tries: p.tries[i] }); p.fb[i] = fb; }
+    this.emit('test', { kind: 'ans', pid: pl.id, i }); return json(res, 200, { ok: true, fb }); }
+  finish(p) { p.done = true; p.at = Date.now(); p.ms = p.at - p.start; p.mark = this.markOf(p); }
+  resultFor(p) { const t = this.test, S = t.def.settings || {}, m = p.mark || this.markOf(p);
+    return { got: S.showScore !== false ? m.got : null, max: m.max, pct: S.showScore !== false ? m.pct : null, ms: p.ms, per: m.per.map((r, i) => ({ ok: S.showScore !== false ? r.ok : null, pts: S.showScore !== false ? r.pts : null, max: r.max, unscored: !!r.unscored, key: S.showKey !== false ? G.keyText(t.def.questions[i], t.def.lang) : null, ex: S.showKey !== false ? t.def.questions[i].ex || '' : '' })) }; }
+  tSubmit(pl, d, res) { const t = this.test; if (!t) return json(res, 404, { error: 'There is no test right now.' }); const p = this.paperOf(pl);
+    if (p.done) return json(res, 200, { ok: true, result: this.resultFor(p) }); if (!t.open) return json(res, 403, { error: 'closed' });
+    if (d && d.ans && typeof d.ans === 'object' && !this.late(p)) Object.keys(d.ans).slice(0, 500).forEach(k => { const q = t.def.questions[k | 0]; if (!q || (p.fb[k] && p.fb[k].final)) return; const v = G.cleanValue(q, d.ans[k]); if (v != null) p.ans[k | 0] = v; });
+    this.finish(p); this.emit('test', { kind: 'done', pid: pl.id, name: p.name }); this.changed(); return json(res, 200, { ok: true, result: this.resultFor(p) }); }
+  testResults() { const t = this.test; if (!t) return null; const online = new Set([...this.players.values()].filter(x => Date.now() - x.seen < 30000).map(x => x.id));
+    return { id: t.def.id, open: t.open, opened: t.opened, over: t.over, papers: [...t.papers.values()].map(p => ({ pid: p.pid, name: p.name, ans: p.ans, tries: p.tries, done: p.done, start: p.start, at: p.at, ms: p.ms || (Date.now() - p.start), online: online.has(p.pid), mark: p.done ? p.mark : this.markOf(p) })) }; }
   setQuiz(q) { this.quiz = q || null; this.changed(); }
   setXp(m) { this.xp = m && typeof m === 'object' ? m : null; this.changed(); }
   setLock(v) { v = !!v; if (v && !this.lock) { this.lockBoard = !this.boardOn; this.boardOn = true; } else if (!v && this.lock && this.lockBoard) { this.boardOn = false; this.lockBoard = false; } this.lock = v; this.changed(); }
@@ -114,6 +148,8 @@ class ClassLink {
       return res.end(this.html.split('__TITLE__').join(escapeHtml(this.title)).split('__LANG__').join(this.lang));
     }
     if (req.method === 'POST' && url.pathname === '/join') return this.body(req, res, d => this.join(d, res, req));
+    /* a test (imported worksheet): its own page, the same student */
+    if (req.method === 'GET' && (url.pathname === '/test' || url.pathname === '/test/')) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' blob: data:" }); return res.end(fs.readFileSync(TEST_PAGE, 'utf8').split('__LANG__').join(this.test && this.test.def.lang === 'ar' ? 'ar' : this.lang)); }
     const pl = this.players.get(url.searchParams.get('pid') || '');
     if (!pl) return json(res, 403, { error: 'gone' });
     pl.seen = Date.now();
@@ -127,6 +163,9 @@ class ClassLink {
     if (req.method === 'POST' && url.pathname === '/working') return this.working(pl, res);
     if (req.method === 'POST' && url.pathname === '/react') return this.body(req, res, d => this.react(pl, d, res), 1024);
     if (req.method === 'POST' && url.pathname === '/hand') return this.body(req, res, d => this.hand(pl, d, res), 4096);
+    if (req.method === 'GET' && url.pathname === '/t/paper') return this.tPaper(pl, res);
+    if (req.method === 'POST' && url.pathname === '/t/ans') return this.body(req, res, d => this.tAns(pl, d, res), 64 * 1024);
+    if (req.method === 'POST' && url.pathname === '/t/submit') return this.body(req, res, d => this.tSubmit(pl, d, res), 256 * 1024);
     if (req.method === 'POST' && url.pathname === '/hwsubmit') return this.body(req, res, d => this.hwSubmit(pl, d, res), 64 * 1024);
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
   }
@@ -158,7 +197,7 @@ class ClassLink {
       board: this.boardOn && this.board ? { ver: this.boardVer, ar: this.boardView ? this.boardView.ar : 1.6 } : null, draw: this.boardOn && this.drawOn,
       files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })),
       homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })),
-      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn, quiz: this.quiz && this.quiz.on ? { pin: this.quiz.pin, title: this.quiz.title } : null };
+      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn, test: this.test ? { id: this.test.def.id, title: this.test.def.title, n: this.test.def.questions.length, open: this.test.open, done: !!(this.test.papers.get(pl.id) || {}).done } : null, quiz: this.quiz && this.quiz.on ? { pin: this.quiz.pin, title: this.quiz.title } : null };
   }
   actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
     return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar, once: a.once, auto: a.auto, grace: !a.open && a.auto && a.closedAt ? Math.max(0, 6000 - (Date.now() - a.closedAt)) : 0,
