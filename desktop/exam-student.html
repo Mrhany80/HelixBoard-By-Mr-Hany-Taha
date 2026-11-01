@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="__LANG__" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F4A2C">
+<title>Exam · HelixBoard</title>
+<style>
+  :root { --bg:#EEF3F0; --card:#FFFFFF; --ink:#13241B; --muted:#5E6E65; --line:#D7E2DB; --brand:#136B3E; --brand2:#1F9A56; --gold:#C9971C; --soft:#E6F4EC; --bad:#C2372F; --badbg:#FCEBEA; --warn:#9A6A00; --warnbg:#FFF4D6; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.45 "Segoe UI", system-ui, -apple-system, Tahoma, Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(120deg, var(--brand), var(--brand2)); color: #fff; box-shadow: 0 4px 16px -8px rgba(0,60,30,.6); }
+  header b { flex: 1; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill { background: rgba(255,255,255,.18); border-radius: 999px; padding: 4px 11px; font: 700 14px ui-monospace, Consolas, monospace; white-space: nowrap; }
+  .pill.hot { background: #fff; color: var(--bad); }
+  .hbtn { min-height: 40px; border: 0; border-radius: 11px; padding: 0 14px; font: inherit; font-weight: 700; cursor: pointer; background: #fff; color: var(--brand); }
+  .hbtn.ghost { background: rgba(255,255,255,.16); color: #fff; }
+  .mon { font-size: 12.5px; background: var(--warnbg); color: var(--warn); padding: 5px 14px; text-align: center; }
+  .tabs { display: none; gap: 6px; padding: 8px 10px 0; background: var(--bg); }
+  .tabs button { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 700; color: var(--muted); }
+  .tabs button.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+  main { flex: 1; display: flex; min-height: 0; }
+  #doc { flex: 0 0 var(--split, 56%); min-width: 0; overflow: auto; background: #DDE6E0; position: relative; touch-action: pan-x pan-y pinch-zoom; }
+  #doc .pages { padding: 12px; display: grid; gap: 12px; justify-items: center; }
+  #doc img { width: calc(100% * var(--zoom, 1)); max-width: none; background: #fff; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.12); display: block; }
+  #doc .zoom { position: sticky; top: 8px; float: right; z-index: 2; display: flex; gap: 6px; margin: 8px; }
+  #doc .zoom button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font: 700 20px inherit; color: var(--brand); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+  #split { flex: 0 0 12px; cursor: col-resize; background: linear-gradient(90deg, transparent 4px, var(--line) 4px, var(--line) 8px, transparent 8px); touch-action: none; }
+  #sheet { flex: 1; min-width: 0; overflow: auto; padding: 14px 14px 110px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+  .prog { height: 7px; border-radius: 4px; background: var(--soft); overflow: hidden; margin: 6px 0 2px; } .prog i { display: block; height: 100%; background: var(--brand2); transition: width .3s; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 6px 18px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 6px 6px; border-radius: 12px; }
+  .row.cur { background: var(--soft); }
+  .row .n { width: 34px; text-align: end; font: 800 16px ui-monospace, Consolas, monospace; color: var(--muted); }
+  .bub { width: 46px; height: 46px; border-radius: 50%; border: 2px solid #9DB3A6; background: #fff; font: 700 17px inherit; color: var(--muted); cursor: pointer; display: grid; place-items: center; transition: transform .08s; }
+  .bub:active { transform: scale(.94); }
+  .bub.on { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 0 0 3px rgba(31,154,86,.25); }
+  .star { width: 44px; height: 44px; border: 0; background: transparent; font-size: 22px; color: #B8C6BD; cursor: pointer; }
+  .star.on { color: var(--gold); }
+  .foot { position: fixed; inset: auto 0 0 auto; width: var(--footw, 44%); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.95); border-top: 1px solid var(--line); display: flex; gap: 10px; z-index: 5; }
+  .go { flex: 1; min-height: 50px; border: 0; border-radius: 13px; background: var(--brand); color: #fff; font: inherit; font-weight: 800; font-size: 17px; cursor: pointer; }
+  .go.alt { flex: 0 0 auto; padding: 0 16px; background: #fff; color: var(--brand); border: 2px solid var(--line); }
+  .modal { position: fixed; inset: 0; background: rgba(10,30,20,.45); display: grid; place-items: center; z-index: 20; padding: 16px; }
+  .modal .card { max-width: 460px; width: 100%; max-height: 86vh; overflow: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; } .chips button { min-width: 44px; min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 700; }
+  .chips.flag button { border-color: var(--gold); color: var(--gold); }
+  .center { text-align: center; } .muted { color: var(--muted); } .big { font-size: 40px; font-weight: 800; }
+  .rv { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); } .rv:first-child { border-top: 0; }
+  .ok { color: var(--brand); font-weight: 700; } .no { color: var(--bad); font-weight: 700; }
+  #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #13241B; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 30; font-weight: 600; max-width: 90vw; text-align: center; }
+  @media (max-width: 899px) { .tabs { display: flex; } main { display: block; position: relative; } #doc, #sheet { position: absolute; inset: 0; } #split { display: none; } body:not(.showdoc) #doc { display: none; } body.showdoc #sheet { display: none; } .foot { width: 100%; } }
+  [dir=rtl] .foot { inset: auto auto 0 0; }
+</style>
+</head>
+<body>
+<header><b id="ttl">…</b><span class="pill" id="clk" hidden></span><span class="pill" id="cnt"></span><button class="hbtn ghost" id="fs" title="Full screen">⛶</button><button class="hbtn" id="hand">Hand in</button></header>
+<div class="mon" id="mon">This exam is monitored: leaving the page or full screen is recorded for your teacher.</div>
+<div class="tabs"><button id="tDoc">Exam</button><button id="tAns" class="on">Answers</button></div>
+<main><section id="doc"><div class="zoom"><button id="zOut" aria-label="Zoom out">−</button><button id="zIn" aria-label="Zoom in">+</button></div><div class="pages" id="pages"></div></section><div id="split" title="Drag to resize"></div><section id="sheet"><div class="card center muted">Loading…</div></section></main>
+<div class="foot" id="foot"><button class="go alt" id="rev">Review</button><button class="go" id="hand2">Hand in</button></div>
+<script>
+(() => {
+  'use strict';
+  const qs = new URLSearchParams(location.search), pid = qs.get('pid') || '', back = qs.get('back') || '/';
+  let LANG = (document.documentElement.lang === 'ar' || qs.get('lang') === 'ar') ? 'ar' : 'en';
+  const AR = { 'Hand in': 'تسليم', 'Review': 'مراجعة', 'Exam': 'الامتحان', 'Answers': 'الإجابات', 'Loading…': 'جارٍ التحميل…', 'Answer sheet': 'ورقة الإجابة', 'answered': 'تمت الإجابة', 'Flag for review': 'علّم للمراجعة',
+    'This exam is monitored: leaving the page or full screen is recorded for your teacher.': 'هذا الامتحان مراقَب: يُسجَّل لمعلمك الخروج من الصفحة أو من وضع ملء الشاشة.', 'Not answered': 'لم تُجب عنها', 'Flagged': 'معلّمة للمراجعة', 'Everything is answered.': 'أجبت عن كل الأسئلة.',
+    'Hand in your exam?': 'هل تريد تسليم الامتحان؟', 'You cannot change your answers after handing in.': 'لا يمكنك تغيير إجاباتك بعد التسليم.', 'Cancel': 'إلغاء', 'Yes, hand in': 'نعم، سلّم', 'Handed in': 'تم التسليم', 'Your score': 'درجتك', 'points': 'درجة',
+    'Your teacher will share the results.': 'سيشارك معلمك النتائج.', 'Back to the class': 'العودة إلى الصف', 'Time is up — your exam was handed in.': 'انتهى الوقت — تم تسليم امتحانك.', '5 minutes left': 'بقيت ٥ دقائق', '1 minute left': 'بقيت دقيقة واحدة',
+    'Saved on this phone — it will be sent when the connection is back.': 'محفوظ على هذا الهاتف — سيُرسل عند عودة الاتصال.', 'Your teacher closed the exam.': 'أغلق المعلم الامتحان.', 'There is no exam right now.': 'لا يوجد امتحان الآن.', 'Question': 'السؤال', 'Right answer': 'الإجابة الصحيحة', 'Your answer': 'إجابتك', 'True': 'صح', 'False': 'خطأ' };
+  const t = s => LANG === 'ar' && AR[s] ? AR[s] : s;
+  const $ = s => document.querySelector(s), sheet = $('#sheet');
+  const h = (tag, at, ...kids) => { const e = document.createElement(tag); Object.entries(at || {}).forEach(([k, v]) => { if (v == null || v === false) return; if (k === 'class') e.className = v; else if (k.startsWith('on')) e[k] = v; else e.setAttribute(k, v === true ? '' : v); }); kids.flat().forEach(k => k != null && k !== false && e.append(k.nodeType ? k : String(k))); return e; };
+  let P = null, ans = {}, flags = {}, skew = 0, timer = 0, cur = 0, busy = false, queue = {}, warned = {};
+  const KEY = () => 'hbexam:' + (P ? P.id : '') + ':' + pid;
+  const api = (path, body) => fetch(path + (path.includes('?') ? '&' : '?') + 'pid=' + encodeURIComponent(pid), body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}).then(r => r.json().then(j => ({ ok: r.ok, status: r.status, j })));
+  const toast = s => { let e = $('#toast'); if (e) e.remove(); e = h('div', { id: 'toast' }, s); document.body.append(e); setTimeout(() => e.remove(), 2600); };
+  const AR_LET = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'], AR_NUM = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const lab = (q, k) => q.type === 'tf' ? (k ? (P.letters === 'ar' ? 'ص' : 'T') : (P.letters === 'ar' ? 'خ' : 'F')) : P.letters === 'ar' ? AR_LET[k] : 'ABCDEF'[k];
+  const num = n => P.letters === 'ar' ? AR_NUM(n) : String(n);
+  const save = () => { try { localStorage.setItem(KEY(), JSON.stringify({ ans, flags })); } catch (e) {} };
+
+  async function load() {
+    let r; try { r = await api('/t/paper'); } catch (e) { sheet.innerHTML = '<div class="card center">' + t('Saved on this phone — it will be sent when the connection is back.') + '</div>'; return setTimeout(load, 2500); }
+    if (!r.ok) return closed(t('There is no exam right now.'));
+    P = r.j; skew = P.now - Date.now(); if (P.dir === 'rtl' || P.lang === 'ar') { document.documentElement.dir = 'rtl'; } if (P.lang === 'ar') LANG = 'ar';
+    applyText(); $('#ttl').textContent = P.title; document.title = P.title;
+    ans = Object.assign({}, P.ans || {}); let local = null; try { local = JSON.parse(localStorage.getItem(KEY()) || 'null'); } catch (e) {}
+    if (local) { flags = local.flags || {}; Object.entries(local.ans || {}).forEach(([i, v]) => { if (ans[i] !== v) { ans[i] = v; queue[i] = v; } }); }
+    if (P.done) return result(P.result);
+    if (!P.open) return closed(t('Your teacher closed the exam.'));
+    docs(); draw(); tick(); flush(); watch();
+  }
+  function applyText() { $('#hand').textContent = t('Hand in'); $('#hand2').textContent = t('Hand in'); $('#rev').textContent = t('Review'); $('#tDoc').textContent = t('Exam'); $('#tAns').textContent = t('Answers'); $('#mon').textContent = t('This exam is monitored: leaving the page or full screen is recorded for your teacher.'); }
+  /* ---------- the document, exactly as the teacher gave it ---------- */
+  let zoom = +(localStorage.getItem('hbexam:zoom') || 1);
+  function docs() { const box = $('#pages'); box.replaceChildren(); for (let i = 0; i < (P.docN || 0); i++) box.append(h('img', { src: '/t/doc?i=' + i + '&pid=' + encodeURIComponent(pid), alt: 'Page ' + (i + 1), loading: 'lazy' }));
+    if (!P.docN) { $('#doc').hidden = true; $('#split').hidden = true; document.body.style.setProperty('--footw', '100%'); } setZoom(zoom); }
+  function setZoom(z) { zoom = Math.max(0.6, Math.min(3, z)); $('#doc').style.setProperty('--zoom', zoom); try { localStorage.setItem('hbexam:zoom', zoom); } catch (e) {} }
+  $('#zIn').onclick = () => setZoom(zoom + 0.25); $('#zOut').onclick = () => setZoom(zoom - 0.25);
+  /* the divider between the document and the answers, remembered */
+  (() => { const sp = $('#split'); let d = false; const apply = v => { document.documentElement.style.setProperty('--split', v + '%'); document.body.style.setProperty('--footw', (100 - v) + '%'); };
+    apply(+(localStorage.getItem('hbexam:split') || 56)); sp.onpointerdown = e => { d = true; sp.setPointerCapture(e.pointerId); };
+    sp.onpointermove = e => { if (!d) return; let v = e.clientX / innerWidth * 100; if (document.documentElement.dir === 'rtl') v = 100 - v; v = Math.max(25, Math.min(75, v)); apply(v); try { localStorage.setItem('hbexam:split', v); } catch (er) {} };
+    sp.onpointerup = () => { d = false; }; })();
+  $('#tDoc').onclick = () => { document.body.classList.add('showdoc'); $('#tDoc').classList.add('on'); $('#tAns').classList.remove('on'); };
+  $('#tAns').onclick = () => { document.body.classList.remove('showdoc'); $('#tAns').classList.add('on'); $('#tDoc').classList.remove('on'); };
+  /* ---------- the bubble sheet ---------- */
+  function draw() { const N = P.questions.length, done = Object.keys(ans).filter(i => ans[i] != null).length;
+    $('#cnt').textContent = num(done) + ' / ' + num(N);
+    const top = h('div', { class: 'card' }, h('b', {}, t('Answer sheet')), h('div', { class: 'muted', style: 'font-size:13px' }, num(done) + ' / ' + num(N) + ' ' + t('answered')), h('div', { class: 'prog' }, h('i', { style: 'width:' + (done / N * 100) + '%' })));
+    const g = h('div', { class: 'grid' });
+    P.questions.forEach((q, i) => { const opts = q.type === 'tf' ? [true, false] : q.o.map((_, k) => k);
+      g.append(h('div', { class: 'row' + (i === cur ? ' cur' : ''), id: 'r' + i }, h('span', { class: 'n' }, num(i + 1)),
+        opts.map(k => h('button', { class: 'bub' + (ans[i] === k ? ' on' : ''), 'aria-label': t('Question') + ' ' + (i + 1) + ' ' + lab(q, k), onclick: () => pick(i, k) }, lab(q, k))),
+        h('button', { class: 'star' + (flags[i] ? ' on' : ''), title: t('Flag for review'), 'aria-label': t('Flag for review'), onclick: () => { flags[i] = !flags[i]; save(); draw(); } }, '★'))); });
+    const y = sheet.scrollTop; sheet.replaceChildren(top, h('div', { class: 'card' }, g)); sheet.scrollTop = y; }
+  function pick(i, k) { if (P.done) return; ans[i] = ans[i] === k ? null : k; cur = i; save(); queue[i] = ans[i]; draw(); flush(); }
+  /* every tap is saved on the phone at once and sent to the teacher; a lost connection loses nothing */
+  async function flush() { const items = Object.entries(queue); if (!items.length || !P || P.done) return;
+    for (const [i, v] of items) { try { const r = await api('/t/ans', { i: +i, v: v == null ? null : v }); if (r.ok || r.status === 400) delete queue[i]; else if (r.status === 403 && r.j.error === 'closed') return closed(t('Your teacher closed the exam.')); else if (r.status === 403) return timeUp(); } catch (e) { return; } } }
+  setInterval(flush, 5000); document.addEventListener('visibilitychange', () => { flush(); integrity(document.hidden ? 'left' : 'back'); });
+  /* ---------- review and hand in ---------- */
+  function reviewBox(confirmHand) { const un = P.questions.map((_, i) => i).filter(i => ans[i] == null), fl = P.questions.map((_, i) => i).filter(i => flags[i]);
+    const jump = i => { wrap.remove(); cur = i; $('#tAns').click(); draw(); const r = document.getElementById('r' + i); r && r.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+    const wrap = h('div', { class: 'modal', onclick: e => { if (e.target === wrap) wrap.remove(); } });
+    wrap.append(h('div', { class: 'card' }, confirmHand ? h('h2', {}, t('Hand in your exam?')) : null,
+      un.length ? [h('b', {}, t('Not answered') + ' (' + num(un.length) + ')'), h('div', { class: 'chips' }, un.map(i => h('button', { onclick: () => jump(i) }, num(i + 1))))] : h('p', { class: 'ok' }, t('Everything is answered.')),
+      fl.length ? [h('b', {}, '★ ' + t('Flagged') + ' (' + num(fl.length) + ')'), h('div', { class: 'chips flag' }, fl.map(i => h('button', { onclick: () => jump(i) }, num(i + 1))))] : null,
+      confirmHand ? [h('p', { class: 'muted' }, t('You cannot change your answers after handing in.')), h('div', { style: 'display:flex;gap:10px' }, h('button', { class: 'go alt', style: 'flex:1', onclick: () => wrap.remove() }, t('Cancel')), h('button', { class: 'go', style: 'flex:1', onclick: () => { wrap.remove(); hand(); } }, t('Yes, hand in')))] : null));
+    document.body.append(wrap); }
+  $('#rev').onclick = () => reviewBox(false); $('#hand').onclick = $('#hand2').onclick = () => reviewBox(true);
+  async function hand(why) { if (busy || P.done) return; busy = true; const all = {}; P.questions.forEach((_, i) => { if (ans[i] != null) all[i] = ans[i]; });
+    let r; for (let k = 0; k < 6; k++) { try { r = await api('/t/submit', { ans: all }); break; } catch (e) { await new Promise(ok => setTimeout(ok, 2000)); } }
+    busy = false; if (!r) return toast(t('Saved on this phone — it will be sent when the connection is back.'));
+    if (r.ok) { P.done = true; try { localStorage.removeItem(KEY()); } catch (e) {} result(r.j.result, why); } else if (r.j.error === 'closed') closed(t('Your teacher closed the exam.')); }
+  function result(R, why) { clearInterval(timer); $('#clk').hidden = true; $('#foot').replaceChildren(h('button', { class: 'go', onclick: () => location.href = back }, t('Back to the class'))); $('#hand').hidden = true; $('#doc').hidden = true; $('#split').hidden = true; document.body.style.setProperty('--footw', '100%');
+    const out = [h('div', { class: 'card center' }, why ? h('p', { class: 'no' }, why) : null, h('div', { class: 'muted' }, '✓ ' + t('Handed in')), R && R.pct != null ? [h('div', { class: 'muted', style: 'margin-top:8px' }, t('Your score')), h('div', { class: 'big' }, Math.round(R.pct) + '%'), h('div', {}, R.got + ' / ' + R.max + ' ' + t('points'))] : h('p', { class: 'muted' }, t('Your teacher will share the results.')))];
+    if (R && R.per && R.per.some(p => p.key != null)) out.push(h('div', { class: 'card' }, P.questions.map((q, i) => { const p = R.per[i] || {}; const yours = ans[i] == null ? '—' : lab(q, ans[i]);
+      return h('div', { class: 'rv' }, h('b', { style: 'width:34px' }, num(i + 1)), h('span', { class: p.ok ? 'ok' : 'no' }, p.ok ? '✓' : '✗'), h('span', {}, t('Your answer') + ': ' + yours), !p.ok && p.key ? h('span', { class: 'ok' }, ' · ' + t('Right answer') + ': ' + p.key) : null); })));
+    sheet.replaceChildren(...out); }
+  function closed(msg) { clearInterval(timer); sheet.replaceChildren(h('div', { class: 'card center' }, h('h2', {}, msg))); $('#foot').replaceChildren(h('button', { class: 'go', onclick: () => location.href = back }, t('Back to the class'))); }
+  function timeUp() { hand(t('Time is up — your exam was handed in.')); }
+  function tick() { const tm = +P.settings.time || 0, c = $('#clk'); if (!tm) return; c.hidden = false; const end = P.start + tm * 60000;
+    const f = () => { const left = end - (Date.now() + skew); if (left <= 0) { clearInterval(timer); c.textContent = '0:00'; if (!P.done) timeUp(); return; } const s = Math.ceil(left / 1000); c.textContent = '⏱ ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); c.classList.toggle('hot', s <= 60);
+      if (s <= 300 && s > 290 && !warned[5]) { warned[5] = 1; toast(t('5 minutes left')); } if (s <= 60 && !warned[1]) { warned[1] = 1; toast(t('1 minute left')); } };
+    f(); timer = setInterval(f, 1000); }
+  /* the class link tells us when the teacher closes the exam */
+  async function watch() { let v = 0; for (;;) { if (P.done) return; try { const r = await fetch('/poll?pid=' + encodeURIComponent(pid) + '&v=' + v).then(r => r.ok ? r.json() : null); if (!r) return; v = r.ver;
+      if (r.v === 'closed' || !r.test || r.test.id !== P.id) return closed(t('There is no exam right now.')); if (!r.test.open && !P.done) { await flush(); const rr = await api('/t/paper'); if (rr.ok && rr.j.done) { P.done = true; return result(rr.j.result, t('Your teacher closed the exam.')); } return closed(t('Your teacher closed the exam.')); } }
+    catch (e) { await new Promise(ok => setTimeout(ok, 3000)); } } }
+  /* integrity: recorded for the teacher, never blocking */
+  let lastFlag = 0; function integrity(what) { if (!P || P.done) return; if (what !== 'back' && Date.now() - lastFlag < 1500) return; lastFlag = Date.now(); api('/t/flag', { what }).catch(() => {}); }
+  document.addEventListener('copy', () => integrity('copy'));
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) integrity('fullscreen'); });
+  $('#fs').onclick = () => { const d = document.documentElement; (document.fullscreenElement ? document.exitFullscreen() : d.requestFullscreen && d.requestFullscreen()).catch && 0; };
+  sheet.innerHTML = '<div class="card center muted">' + t('Loading…') + '</div>';
+  load();
+})();
+</script>
+</body>
+</html>

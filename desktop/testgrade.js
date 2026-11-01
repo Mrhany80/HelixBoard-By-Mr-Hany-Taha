@@ -85,7 +85,7 @@ function shuffled(n, r) { const id = [...Array(n).keys()]; for (let i = n - 1; i
 function studentCopy(t, seed) {
   const r = rng(seed || 'x'), S = t.settings || {};
   let order = [...Array(t.questions.length).keys()]; if (S.shuffleQ) order = shuffled(order.length, r);
-  return { id: t.id, title: t.title, lang: t.lang || 'en', settings: { feedback: S.feedback || 'instant', retry: !!S.retry, time: S.time || 0, showKey: S.showKey !== false, showScore: S.showScore !== false, nav: S.nav !== false },
+  return { id: t.id, title: t.title, lang: t.lang || 'en', kind: t.kind || 'test', docN: (t.doc || []).length, dir: S.dir || 'ltr', letters: S.letters || 'en', settings: { neg: +S.neg || 0, feedback: S.feedback || 'instant', retry: !!S.retry, time: S.time || 0, showKey: S.showKey !== false, showScore: S.showScore !== false, nav: S.nav !== false },
     order, questions: t.questions.map(q => { const c = { type: q.type, q: q.q, pts: q.pts || 1, img: q.img || null, sec: q.sec || '' };
       if (q.type === 'mc' || q.type === 'multi') { c.o = q.o; c.perm = S.shuffleO ? shuffled(q.o.length, r) : [...q.o.keys()]; }
       if (q.type === 'order') { c.o = q.o; c.perm = shuffled(q.o.length, r); }
@@ -121,9 +121,11 @@ function mark(t, ans, tries, over) {
     if (o != null) { max += pts; got += Math.min(pts, Math.max(0, o)); return { pts: Math.min(pts, Math.max(0, o)), max: pts, ok: o >= pts, score: o / pts, manual: true }; }
     if (!g) return { pts: 0, max: 0, ok: null, score: null, unscored: true };
     let p = g.score * pts; if (tries && tries[i] > 1 && S.retry) p *= g.ok ? (S.retryShare != null ? S.retryShare : 0.5) : 1;
+    /* negative marking (bubble-sheet exams): a wrong answer costs points; a blank costs nothing */
+    if (!g.ok && !g.blank && +S.neg > 0) p = -Math.abs(+S.neg);
     max += pts; got += p; return { pts: Math.round(p * 100) / 100, max: pts, ok: g.ok, score: g.score, blank: !!g.blank };
   });
-  return { per, got: Math.round(got * 100) / 100, max, pct: max ? Math.round(got / max * 1000) / 10 : 0 };
+  got = Math.max(0, got); return { per, got: Math.round(got * 100) / 100, max, pct: max ? Math.round(got / max * 1000) / 10 : 0 };
 }
 
 const G = { TYPES, norm, same, num, grade, keyText, studentCopy, cleanValue, mark, rng, shuffled, words, digits };

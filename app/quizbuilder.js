@@ -340,7 +340,7 @@ async function start(id) {
   if (!D()) return modal.open('<h2>Tests on phones</h2><p>Tests run on students\' phones through the class link. This needs the <b>HelixBoard Windows app</b>.</p><div class="foot"><button class="btn primary" onclick="HB.modal.close()">OK</button></div>');
   if (!window.HBCL.on) { await HBCL.start({ quiet: true }); if (!HBCL.on) return; }
   if (S.open && S.open.testId !== id) { if (!confirm('Another test is running. Close it and start this one?')) return; await stop(); }
-  const def = { id: t.id, title: t.title, lang: t.lang, settings: t.settings, questions: t.questions.map(q => { const c = Object.assign({}, q); delete c.id; delete c.num; return c; }) };
+  const def = { id: t.id, kind: t.kind || 'test', doc: t.doc || null, title: t.title, lang: t.lang, settings: t.settings, questions: t.questions.map(q => { const c = Object.assign({}, q); delete c.id; delete c.num; return c; }) };
   const ok = await D().cmd('testStart', def); if (!ok) return toast('The test could not start.');
   const run = { id: uid(), testId: t.id, title: t.title, cls: t.cls || (window.HBX ? HBX.cur() : ''), at: Date.now(), papers: [], over: {}, open: true };
   S.open = run; await store.saveRun(run); refreshLib(); window.HBLC && HBLC.hide && HBLC.hide();

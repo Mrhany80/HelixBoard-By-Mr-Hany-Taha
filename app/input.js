@@ -69,7 +69,15 @@ const outsidePage = e => { if (B.mode !== 'scroll' || !INK_TOOLS.includes(T.tool
 const pressureOf = e => { if (!(e.pointerType === 'pen' && e.pressure > 0)) return 0.5; const k = E.SENS(); return Math.round(Math.max(k.floor, Math.min(1, Math.pow(e.pressure, k.gamma))) * 1000) / 1000; };
 function startPan(e) { activeId = e.pointerId; act = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: V.x, vy: V.y }; cv.style.cursor = 'grabbing'; }
 function startPinch() { const [a, b] = [...ptrs.values()]; act = { k: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), m0: [(a.x + b.x) / 2, (a.y + b.y) / 2], s0: V.s, vx: V.x, vy: V.y }; }
-cv.addEventListener('contextmenu', e => e.preventDefault());
+/* one right-click menu (v2.7.0): Windows fires 'contextmenu' when the button is released, by which time the radial menu is
+   under the cursor, so blocking it only on the canvas let the browser's own menu open on top of ours. Block it everywhere except
+   text fields (they keep copy/paste). A press-and-hold that the OS turns into a right-click opens the radial menu itself, but only
+   if no menu opened in the last 700 ms, so one gesture never opens two menus. */
+let menuAt = 0;
+document.addEventListener('contextmenu', e => { const t = e.target; if (t && t.closest && t.closest('input,textarea,select,[contenteditable="true"],[contenteditable=""]')) return; e.preventDefault();
+  if (t === cv && Date.now() - menuAt > 700 && $('#radial').hidden && !deckBack()) { clearTimeout(longT); radial(e.clientX, e.clientY); } }, true);
+/* in the slideshow a laser right-click goes back a step (deck.js), so it must not also open the radial menu */
+const deckBack = () => document.body.classList.contains('deckshow') && T.tool === 'laser';
 /* the board area must never scroll as a web page (a long text box would push everything sideways); the canvas view does the moving */
 stage.addEventListener('scroll', () => { if (stage.scrollLeft || stage.scrollTop) { stage.scrollLeft = 0; stage.scrollTop = 0; } });
 cv.addEventListener('pointerdown', e => { e.preventDefault(); if (!editing) cv.focus({ preventScroll: true });
@@ -82,9 +90,9 @@ cv.addEventListener('pointerdown', e => { e.preventDefault(); if (!editing) cv.f
   if (e.pointerType === 'pen') lastPenAt = Date.now();
   if (ptrs.size === 2 && [...ptrs.values()].every(p => p.t === 'touch')) { if (act && act.k === 'draw' && act.o.pts.length < 30) { act = null; SND.writeStop(); dirty.live = true; } startPinch(); return; }
   if (ptrs.size > 1) return;
-  if (e.button === 2) { radial(e.clientX, e.clientY); return; }
+  if (e.button === 2) { if (!deckBack()) radial(e.clientX, e.clientY); return; }
   if (e.button === 1 || spaceDown || T.tool === 'hand' || (e.pointerType === 'touch' && (T.penOnly || (!T.board && Date.now() - lastPenAt < 2500)) && T.tool !== 'select')) { startPan(e); return; }
-  if (e.pointerType === 'touch') { clearTimeout(longT); const sx = e.clientX, sy = e.clientY; longT = setTimeout(() => { const p = ptrs.get(e.pointerId); if (!p || p.moved) return; if (act && act.k === 'draw' && act.o.pts.length > 6) return; if (act && act.k === 'erase') return; act = null; live = null; SND.writeStop(); dirty.live = true; radial(sx, sy); }, T.board ? 1300 : 900); }
+  if (e.pointerType === 'touch') { clearTimeout(longT); const sx = e.clientX, sy = e.clientY; longT = setTimeout(() => { const p = ptrs.get(e.pointerId); if (!p || p.moved) return; if (act && act.k === 'draw' && act.o.pts.length > 6) return; if (act && act.k === 'erase') return; if (Date.now() - menuAt < 700 || !$('#radial').hidden) return; act = null; live = null; SND.writeStop(); dirty.live = true; radial(sx, sy); }, T.board ? 1300 : 900); }
   if (outsidePage(e)) return; /* a pen touching outside the page does nothing */
   activeId = e.pointerId;
   const [x, y] = evPos(e); if (window.HBInst && HBInst.down(x, y, e)) { act = { k: 'inst' }; return; }
@@ -221,16 +229,20 @@ liveDrawers.push({ active: () => laserPts.length > 0 || magic.length > 0 || dust
 } });
 
 /* ---------- radial menu (right-click or long-press) ---------- */
-function radial(cx, cy) { const R = $('#radial'); const pal = E.PALETTE[E.isDark() ? 'dark' : 'light']; const tools = [['draw', 'pen-line', 'pen'], ['draw', 'highlighter', 'hi'], ['erase', 'eraser'], ['select', 'mouse-pointer-2'], ['laser', 'locate-fixed'], ['undo', 'undo-2']];
+let radialOutside = null;
+function radial(cx, cy) { menuAt = Date.now(); if (radialOutside) { document.removeEventListener('pointerdown', radialOutside, true); radialOutside = null; } const R = $('#radial'); const pal = E.PALETTE[E.isDark() ? 'dark' : 'light']; const tools = [['draw', 'pen-line', 'pen'], ['draw', 'highlighter', 'hi'], ['erase', 'eraser'], ['select', 'mouse-pointer-2'], ['laser', 'locate-fixed'], ['undo', 'undo-2']];
   R.style.left = clamp(cx, 130, innerWidth - 130) + 'px'; R.style.top = clamp(cy, 130, innerHeight - 200) + 'px'; let h = '<button class="rc" data-x="1" aria-label="Close">' + T.size + 'px</button>';
   pal.forEach((c, i) => { const a = -Math.PI / 2 + i * Math.PI * 2 / pal.length; h += '<button class="rb" data-c="' + c + '" style="background:' + c + ';transform:translate(' + (Math.cos(a) * 98).toFixed(0) + 'px,' + (Math.sin(a) * 98).toFixed(0) + 'px)" aria-label="Colour ' + c + '"></button>'; });
   tools.forEach((t, i) => { const a = -Math.PI / 2 + Math.PI / 6 + i * Math.PI * 2 / tools.length; h += '<button class="rb" data-t="' + t[0] + '" data-s="' + (t[2] || '') + '" style="transform:translate(' + (Math.cos(a) * 52).toFixed(0) + 'px,' + (Math.sin(a) * 52).toFixed(0) + 'px);width:40px;height:40px;margin:-20px">' + window.HB.icon(t[1]) + '</button>'; });
   const SZ = [2, 4, 8, 14, 24, 40]; h += '<div class="rsz" aria-label="Pen size">' + SZ.map(z => '<button data-z="' + z + '" class="' + (T.size === z ? 'on' : '') + '" title="' + z + ' px"><i style="width:' + Math.min(26, z * 0.65 + 3) + 'px;height:' + Math.min(26, z * 0.65 + 3) + 'px;background:' + T.color + '"></i></button>').join('') + '<input type="range" min="1" max="60" value="' + T.size + '" aria-label="Pen size"><b>' + T.size + '</b></div>';
+  /* with something selected, the same menu also offers what you'd do to it (no second menu) */
+  if (sel.size) h += '<div class="rsel">' + [['dup', 'copy-plus', 'Duplicate'], ['copy', 'copy', 'Copy'], ['front', 'bring-to-front', 'Bring to front'], ['del', 'trash-2', 'Delete']].map(a => '<button data-sa="' + a[0] + '" title="' + a[2] + '" aria-label="' + a[2] + '">' + window.HB.icon(a[1]) + '</button>').join('') + '</div>';
   R.innerHTML = h; R.hidden = false; SND.pop();
   { const rz = $('#radial .rsz'), rg = $('input', rz), lb = $('b', rz); const upd = z => { setSize(z); rg.value = T.size; lb.textContent = T.size; $('#radial [data-x]').textContent = T.size + 'px'; $$('[data-z]', rz).forEach(b => b.classList.toggle('on', +b.dataset.z === T.size)); };
     $$('[data-z]', rz).forEach(b => b.onclick = () => upd(+b.dataset.z)); rg.oninput = () => upd(+rg.value); } if (window.gsap && !REDUCE) gsap.from('#radial .rb', { scale: 0, duration: 0.25, stagger: 0.015, ease: 'back.out(1.4)' });
-  const close = () => { R.hidden = true; document.removeEventListener('pointerdown', outside, true); }; const outside = e => { if (!e.target.closest('#radial')) close(); };
-  setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+  const close = () => { R.hidden = true; if (radialOutside) document.removeEventListener('pointerdown', radialOutside, true); radialOutside = null; }; const outside = e => { if (!e.target.closest('#radial')) close(); };
+  radialOutside = outside; setTimeout(() => { if (radialOutside === outside) document.addEventListener('pointerdown', outside, true); }, 0);
+  $$('#radial [data-sa]').forEach(b => b.onclick = () => { const a = b.dataset.sa; if (a === 'dup') duplicate(); else if (a === 'copy') copySel(); else if (a === 'front') zorder(1); else if (a === 'del') deleteSel(); close(); });
   $$('#radial [data-c]').forEach(b => b.onclick = () => { setColor(b.dataset.c); close(); }); $$('#radial [data-t]').forEach(b => b.onclick = () => { if (b.dataset.t === 'undo') E.undo(); else setTool(b.dataset.t, b.dataset.s || undefined); close(); }); $('#radial [data-x]').onclick = close; }
 
 /* ---------- clipboard, duplicate, group, z-order ---------- */
@@ -243,7 +255,11 @@ const ungroup = () => { mod(selObjs().filter(o => o.g), o => delete o.g); toast(
 function zorder(dir) { if (!sel.size) return; const P = page().objs.slice(), s = P.filter(o => sel.has(o.id)), r = P.filter(o => !sel.has(o.id)); E.reorder((dir > 0 ? r.concat(s) : s.concat(r)).map(o => o.id)); }
 function align(how) { const objs = selObjs(); if (objs.length < 2) return; const b = selBox(); mod(objs, o => { const ob = bbox(E.clean(o)) || bbox(o); let dx = 0, dy = 0; if (how === 'l') dx = b[0] - ob[0]; if (how === 'r') dx = b[0] + b[2] - ob[0] - ob[2]; if (how === 'c') dx = b[0] + b[2] / 2 - ob[0] - ob[2] / 2; if (how === 't') dy = b[1] - ob[1]; if (how === 'b') dy = b[1] + b[3] - ob[1] - ob[3]; if (how === 'm') dy = b[1] + b[3] / 2 - ob[1] - ob[3] / 2; applyT(o, E.clean(o), { dx, dy }); });
   if (how === 'dh' || how === 'dv') { const list = objs.map(o => [o, bbox(o)]).sort((p, q) => how === 'dh' ? p[1][0] - q[1][0] : p[1][1] - q[1][1]); const tot = list.reduce((a, [, bb]) => a + (how === 'dh' ? bb[2] : bb[3]), 0), gap = ((how === 'dh' ? b[2] : b[3]) - tot) / (list.length - 1); let pos = how === 'dh' ? b[0] : b[1]; mod(list.map(l => l[0]), o => { const bb = bbox(o); const d = pos - (how === 'dh' ? bb[0] : bb[1]); applyT(o, E.clean(o), how === 'dh' ? { dx: d, dy: 0 } : { dx: 0, dy: d }); pos += (how === 'dh' ? bb[2] : bb[3]) + gap; }); } }
-const deleteSel = () => { if (!sel.size) return; del(selObjs()); clearSel(); };
+/* v2.7.0: a concept-map idea deleted from anywhere (Delete in Shapes, the dock, the right-click menu) takes its branch with it,
+   exactly like the map's own Delete; deleting it alone left its lines and child ideas floating on the board */
+const deleteSel = () => { if (!sel.size) return; const list = selObjs(), M = window.HBMM;
+  if (M && M.removeBranch && list.some(M.isNode)) { tx(() => { const rest = list.filter(o => !M.isNode(o)); if (rest.length) del(rest); list.filter(M.isNode).forEach(n => { const cur = byId(n.id); if (cur) M.removeBranch(cur, true); }); }); clearSel(); return; }
+  del(list); clearSel(); };
 function insertObj(o, opts) { opts = opts || {}; const vr = E.viewRect(); if (o.x == null) { o.x = vr[0] + vr[2] / 2 - (o.w || 200) / 2 + (Math.random() - 0.5) * 60; o.y = vr[1] + vr[3] / 2 - (o.h || 200) / 2 + (Math.random() - 0.5) * 40; } if (B.mode === 'scroll') { o.x = clamp(o.x, 10, B.width - (o.w || 100) - 10); o.y = Math.max(10, o.y); } add(o, opts.layer); if (!opts.noSelect) { setTool('select'); select(o); } SND.pop(); return o; }
 
 /* ---------- keyboard shortcuts ---------- */
