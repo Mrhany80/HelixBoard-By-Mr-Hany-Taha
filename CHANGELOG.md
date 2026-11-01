@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.7.1
+
+**Leaving the app while presenting** — switching away (Alt+Tab, Windows key, another window) during a PDF or PowerPoint
+share no longer leaves a pen stroke, slide click or fade "held down". On return every gesture is released and the board
+repaints. The phone board stream pauses while the app is hidden and can never get stuck after a lost frame.
+**Highlighter** — keeps its own thick width (no more 4 px highlighter) and is visible again on white slides and PDF pages.
+**Collaborate** — every structure opens on a page of its own named after it (no more layouts piling up), and its frame is
+a normal group you can move, resize or delete.
+**Problem report** — if anything ever stalls, press Ctrl+Shift+D and paste the copied report in a message.
+
 ## 2.7.0
 
 **Slides (B1)** — writing or typing on PowerPoint slides never stops the slideshow again. In 2.6.1 a text box left open after

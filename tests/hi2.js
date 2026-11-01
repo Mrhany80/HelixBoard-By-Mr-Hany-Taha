@@ -1,0 +1,8 @@
+const { chromium } = require('playwright'); const fs = require('fs'); (async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1400, height: 850 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage();
+ await p.goto('file:///home/user/helixboard/dist/index.html?nointro'); await p.waitForTimeout(1200);
+ const px = () => p.evaluate(() => { const cv = document.getElementById('cvMain') || document.querySelector('#stage canvas'); const g = cv.getContext('2d'), r = cv.getBoundingClientRect(), k = cv.width / r.width; const d = g.getImageData(Math.round((900 - r.left) * k), Math.round((566 - r.top) * k), 1, 1).data; return [cv.id, ...d].join(','); });
+ const draw = async () => { await p.evaluate(() => HBI.setTool('draw', 'hi')); await p.mouse.move(800, 560); await p.mouse.down(); for (let i = 0; i < 15; i++) await p.mouse.move(800 + i * 12, 560 + i * 1); await p.mouse.up(); await p.waitForTimeout(500); };
+ await draw(); console.log('plain board pixel under the stroke:', await px()); await p.screenshot({ path: 'hi_plain.png', clip: { x: 700, y: 480, width: 400, height: 160 } });
+ const b64 = fs.readFileSync(__dirname + '/anim.pptx').toString('base64'); await p.evaluate(b64 => HBIO.importPptx(new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'a.pptx')), b64);
+ await p.waitForSelector('#ppGo'); await p.click('#ppGo'); await p.waitForFunction(() => HBE.page().deck, null, { timeout: 120000 }); await p.waitForTimeout(800);
+ await draw(); console.log('slide page pixel under the stroke:', await px()); await p.screenshot({ path: 'hi_slide.png', clip: { x: 700, y: 480, width: 400, height: 160 } }); await b.close(); })();

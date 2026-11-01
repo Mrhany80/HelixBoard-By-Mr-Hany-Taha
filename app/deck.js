@@ -260,6 +260,7 @@ function endCard() { if ($('#showEnd')) return; const e = document.createElement
 document.addEventListener('pointermove', () => show && poke(), { passive: true });
 /* click to go forward with the laser, like a presentation; right-click goes back */
 let downAt = null;
+const calm = () => { downAt = null; endFade(); }; window.addEventListener('blur', calm); document.addEventListener('visibilitychange', () => { calm(); if (!document.hidden) { dlog('back to the app'); E.dirty.all(); } });
 document.addEventListener('pointerdown', e => { if (!show || e.target.closest('#showCtl,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } downAt = [e.clientX, e.clientY, Date.now(), e.button]; }, true);
 document.addEventListener('pointerup', e => { if (!show || !downAt || e.target.closest('#showCtl,#showEnd,#showBlank,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } const [x, y, t, b] = downAt; downAt = null; if (Math.hypot(e.clientX - x, e.clientY - y) > 8 || Date.now() - t > 500) return; const tl = I.T.tool;
   if (tl === 'laser') { if (b === 2) prev(); else if (b === 0) next(); return; }
@@ -287,3 +288,6 @@ setTimeout(() => { rebuild(); if (isDeck()) goSlide(P().deck.cur || 0, false); }
 window.HBD = { enterFull, exitFull, get cur() { return cur; }, get full() { return full; }, create, goSlide, next, prev, startShow, endShow, rects, buckets, move, dup, del, hide, addBlank, clearInk, toggleInk, sorter, exportDeck, get cur() { return cur; }, get show() { return show; }, isDeck };
 })();
 
+/* diagnostics: remember long main-thread stalls; Ctrl+Shift+D copies a problem report to paste to support */
+try { const PL = window.__hbPerfLog = []; new PerformanceObserver(l => l.getEntries().forEach(en => { PL.push({ t: Math.round(performance.timeOrigin + en.startTime), ms: Math.round(en.duration) }); if (PL.length > 40) PL.shift(); })).observe({ entryTypes: ['longtask'] }); } catch (e) {}
+document.addEventListener('keydown', e => { if (!(e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd'))) return; e.preventDefault(); const rep = { v: (window.CFG && CFG.version) || '', ua: navigator.userAgent, page: E.B.cur, pages: E.B.pages.length, objs: E.page().objs.length, deck: window.__hbDeckLog || [], stalls: window.__hbPerfLog || [] }; const txt = JSON.stringify(rep); (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => window.HB && HB.toast && HB.toast('Problem report copied — paste it in a message')).catch(() => {}); });

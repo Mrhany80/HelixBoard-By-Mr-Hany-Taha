@@ -37,7 +37,7 @@ function clearInk() { const objs = E.page().objs.filter(o => o.stu); if (!objs.l
 /* ---------- the board picture: what the teacher sees, refreshed whenever it changes ---------- */
 ['view', 'changed', 'page', 'stroke-added', 'selection', 'img-loaded'].forEach(ev => bus.on(ev, () => { S.dirty = true; }));
 document.addEventListener('pointermove', e => { if (e.buttons && e.target.closest && e.target.closest('#stage')) S.dirty = true; }, true);
-function stream() { clearInterval(S.t); S.t = setInterval(() => { if (!S.on || S.busy || !(S.snap && S.snap.boardOn)) return; if (!S.dirty && Date.now() - S.last < 5000) return; send(); }, 700); }
+function stream() { clearInterval(S.t); S.t = setInterval(() => { if (S.busy && Date.now() - S.last > 4000) S.busy = false; /* a lost frame never blocks the stream */ if (!S.on || S.busy || document.hidden || !(S.snap && S.snap.boardOn)) return; if (!S.dirty && Date.now() - S.last < 5000) return; send(); }, 700); }
 /* the board as a picture (white behind it), for phones and for Draw-it backgrounds */
 function boardCanvas(maxW) { const cs = [document.getElementById('cvBg'), E.cvMain, E.cvLive], W = E.cvMain.width, H = E.cvMain.height; if (!W || !H) return null; const k = Math.min(1, (maxW || 1600) / W);
   const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); cs.forEach(x => x && g.drawImage(x, 0, 0, c.width, c.height)); return c; }

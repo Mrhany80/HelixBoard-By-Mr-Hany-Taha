@@ -20,7 +20,11 @@ function curFor(t) { if (set.get('helixCursor', true) === false) return { hand: 
   if (t === 'hand') return 'grab'; if (t === 'text') return 'text'; if (t === 'laser') return 'none'; if (t === 'erase') return 'none';
   const arrow = t === 'select' || t === 'lasso'; const key = (arrow ? 'a' : 'p') + T.color; if (!curCache[key]) curCache[key] = arrow ? curURL(helixSVG(T.color, true), 4, 3, 'default') : curURL(helixSVG(T.color, false), 3, 29, 'crosshair'); return curCache[key]; }
 const NOTE_COLORS = ['#FFF3BF', '#D3F9D8', '#D0EBFF', '#FFE3E3', '#E5DBFF'];
-function setTool(t, sub) { if (editing) commitEdit(); T.tool = t; if (t === 'draw' && sub) { T.pen = sub; set.put('pen', sub); if (sub === 'hi' && /^#(1E1419|000000|FFFFFF)$/i.test(T.color)) { T._prev = T.color; T.color = T._auto = E.isDark(page()) ? '#FFE066' : '#FFD43B'; set.put('color', T.color); } }
+function setTool(t, sub) { if (editing) commitEdit(); T.tool = t; if (t === 'draw' && sub) {
+    /* the highlighter keeps its own (wide) width; the pens get theirs back — chosen from the tab, the dock, the slideshow bar or H */
+    const wasHi = T.pen === 'hi', isHi = sub === 'hi'; if (isHi && !wasHi) { set.put('penSize', T.size); T.size = Math.max(12, set.get('hiSize', 22)); } else if (!isHi && wasHi) { set.put('hiSize', T.size); T.size = set.get('penSize', T.size < 12 ? T.size : 4); }
+    if (isHi !== wasHi) { set.put('size', T.size); window.HBUI && HBUI.refresh && setTimeout(() => HBUI.refresh(), 0); }
+    T.pen = sub; set.put('pen', sub); if (sub === 'hi' && /^#(1E1419|000000|FFFFFF)$/i.test(T.color)) { T._prev = T.color; T.color = T._auto = E.isDark(page()) ? '#FFE066' : '#FFD43B'; set.put('color', T.color); } }
   if (T._prev && !(t === 'draw' && T.pen === 'hi')) { if (T.color === T._auto) { T.color = T._prev; set.put('color', T.color); } T._prev = T._auto = null; } if (t === 'shape' && sub) T.shape = sub; if (t === 'erase' && sub) T.eraser = sub;
   cv.style.cursor = curFor(t); if (t !== 'select' && t !== 'lasso') clearSel(); dirty.live = true; bus.emit('tool', T); }
 const setColor = c => { T.color = c; set.put('color', c); cv.style.cursor = curFor(T.tool); if (sel.size) mod(selObjs(), o => { if (o.t === 'note') return; if ('c' in o || o.t === 'stroke' || o.t === 'shape' || o.t === 'text' || o.t === 'pin' || o.t === 'conn') o.c = c; if (o.t === 'stamp') o.stroke = c; }); bus.emit('tool', T); };
@@ -113,6 +117,9 @@ if (RAW) cv.addEventListener('pointerrawupdate', e => { if (!act || act.k !== 'd
 const up = e => { clearTimeout(longT); ptrs.delete(e.pointerId); if (act && act.k !== 'pinch' && activeId != null && e.pointerId !== activeId) return; if (e.pointerId === activeId) activeId = null; if (!act) return; if (act.k === 'pan') { act = null; cv.style.cursor = T.tool === 'hand' ? 'grab' : ''; setTool(T.tool); return; } if (act.k === 'pinch') { if (!ptrs.size) act = null; return; } if (act.k === 'inst') { HBInst.up(e); act = null; return; } const h = TOOLS[T.tool]; if (h && h.up) h.up(...evPos(e), e); };
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 cv.addEventListener('lostpointercapture', e => { if (ptrs.has(e.pointerId)) up(e); });
+/* leaving the app (Alt+Tab, Win key, another window) mid-gesture: finish every open pointer so nothing is left "held down" on return */
+const releaseAll = () => { [...ptrs.entries()].forEach(([id, q]) => { try { up({ pointerId: id, clientX: q.x, clientY: q.y, pointerType: q.t || 'mouse', button: 0, buttons: 0, preventDefault() {}, stopPropagation() {} }); } catch (e) {} ptrs.delete(id); }); };
+window.addEventListener('blur', releaseAll); document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); else setTimeout(() => E.dirty.all(), 50); });
 /* first touch on a large screen with no pen seen: switch on Smartboard mode once, and say so */
 let seenTouch = false;
 function firstTouch() { seenTouch = true; if (set.get('boardMode', null) !== null || lastPenAt) return; if (Math.max(screen.width, screen.height) >= 1600 || innerWidth >= 1600) { T.board = true; set.put('boardMode', true); toast('Smartboard mode is on: one finger writes, extra touches are ignored. Change it in Board → Input.'); window.HBUI && HBUI.refresh(); } }

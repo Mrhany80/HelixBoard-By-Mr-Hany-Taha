@@ -31,7 +31,8 @@ if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d)
 { const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
   const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
     const tests = () => { if (!window.HBLC) return; set.put('lcTab', 'tests'); HBLC.open(); };
-    const items = [['scan-line', 'Bubble-sheet exams', 'Live class → Tests: students read your document as it is and answer on a bubble sheet. Marked at once.', tests],
+    const items = [['presentation', 'Smooth return while presenting', 'Leave the app during a PDF or PowerPoint share and it answers at once when you come back. Highlighter and Collaborate fixed too.', null],
+      ['scan-line', 'Bubble-sheet exams', 'Live class → Tests: students read your document as it is and answer on a bubble sheet. Marked at once.', tests],
       ['handshake', 'New Collaborate tab', 'Think–Pair–Share, Jigsaw, Gallery walk and seven more structures, with groups, roles and phase timers.', () => window.HBUI && HBUI.selectTab('collab')],
       ['presentation', 'Slides keep going', 'After writing on PowerPoint slides, every key, the clicker and ▶ move to the next step at once.', null],
       ['keyboard', 'A real touch keyboard', 'Big keys, a full English and Arabic layout, science symbols and units. Press K.', () => window.HBK && HBK.toggle(true)],

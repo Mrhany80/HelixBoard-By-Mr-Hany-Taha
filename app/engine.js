@@ -194,7 +194,7 @@ function texPattern(g, color, kind) { const key = color + kind; let c = texCache
 const hexRgb = h => { h = (h || '#000').replace('#', ''); if (h.length === 3) h = h.split('').map(x => x + x).join(''); const n = parseInt(h.slice(0, 6), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
 function drawStroke(g, o, p) { const th = (p || page()).theme; const path = strokePath(o); g.save(); g.globalAlpha = o.a == null ? 1 : o.a;
   let tex = (PEN[o.pen] || {}).tex; if (THEMES[th] && THEMES[th].chalk && (o.pen === 'pen' || o.pen === 'marker' || o.pen === 'pencil')) tex = 'chalk';
-  if (o.pen === 'hi') { g.globalAlpha = 0.36; g.globalCompositeOperation = isDark(p) ? 'screen' : 'multiply'; g.fillStyle = o.c; g.fill(path); g.restore(); return; }
+  if (o.pen === 'hi') { g.globalAlpha = 0.36; /* slides and PDF pages are light pictures on a dark page: highlight them like paper */ g.globalCompositeOperation = isDark(p) && !(p && p.deck) ? 'screen' : 'multiply'; g.fillStyle = o.c; g.fill(path); g.restore(); return; }
   if ((PEN[o.pen] || {}).glow || th === 'deepsea') { g.shadowColor = o.c; g.shadowBlur = Math.max(6, o.w * (o.pen === 'glow' ? 2.2 : 1.1)); }
   if (o.pen === 'dash') { g.strokeStyle = o.c; g.lineWidth = o.w; g.lineCap = 'round'; g.lineJoin = 'round'; g.setLineDash([o.w * 2.6, o.w * 2]); g.stroke(path); g.restore(); return; }
   g.fillStyle = tex ? texPattern(g, o.c, tex) : o.c; g.fill(path); if (o.pen === 'glow') { g.shadowBlur = 0; g.globalAlpha *= 0.55; g.fillStyle = 'rgba(255,255,255,.7)'; g.scale(1, 1); }

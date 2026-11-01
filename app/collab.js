@@ -20,11 +20,11 @@ const mmss = s => Math.floor(s / 60) + ':' + String(Math.max(0, s % 60)).padStar
 
 /* ---------- building blocks (board units) ---------- */
 function area(w, h) { const vr = E.viewRect(), W = Math.min(w, vr[2] * 0.92), k = W / w, H = h * k; return { x: vr[0] + (vr[2] - W) / 2, y: vr[1] + Math.max(40, (vr[3] - H) / 2), k }; }
-const frame = (g, x, y, w, h, col, title, sub) => { const o = [{ id: uid(), ts: Date.now(), t: 'shape', k: 'round', x, y, w, h, c: col, sw: 4, fill: tint(col, E.isDark() ? 0.25 : 0.88), layer: 0, g, co: 1 }];
-  if (title) o.push({ id: uid(), ts: Date.now(), t: 'text', x: x + 22, y: y + 16, w: w - 44, s: title, font: 'Lexend', size: 28, b: true, c: E.isDark() ? '#FFFFFF' : col, layer: 0, g, co: 1 });
-  if (sub) o.push({ id: uid(), ts: Date.now(), t: 'text', x: x + 22, y: y + 58, w: w - 44, s: sub, font: 'Lexend', size: 19, c: ink(), layer: 0, g, co: 1 }); return o; };
+const frame = (g, x, y, w, h, col, title, sub) => { const o = [{ id: uid(), ts: Date.now(), t: 'shape', k: 'round', x, y, w, h, c: col, sw: 4, fill: tint(col, E.isDark() ? 0.25 : 0.88), layer: 1, g, co: 1 }];
+  if (title) o.push({ id: uid(), ts: Date.now(), t: 'text', x: x + 22, y: y + 16, w: w - 44, s: title, font: 'Lexend', size: 28, b: true, c: E.isDark() ? '#FFFFFF' : col, layer: 1, g, co: 1 });
+  if (sub) o.push({ id: uid(), ts: Date.now(), t: 'text', x: x + 22, y: y + 58, w: w - 44, s: sub, font: 'Lexend', size: 19, c: ink(), layer: 1, g, co: 1 }); return o; };
 const sticky = (x, y, w, h, s, c, size) => ({ id: uid(), ts: Date.now(), t: 'note', x, y, w, h, c: c || STICKY[0], s, size: size || 24, font: 'Lexend', co: 1 });
-const label = (g, x, y, w, s, size, col, b) => ({ id: uid(), ts: Date.now(), t: 'text', x, y, w, s, font: 'Lexend', size: size || 24, b: !!b, c: col || ink(), layer: 0, g, co: 1 });
+const label = (g, x, y, w, s, size, col, b) => ({ id: uid(), ts: Date.now(), t: 'text', x, y, w, s, font: 'Lexend', size: size || 24, b: !!b, c: col || ink(), layer: 1, g, co: 1 });
 function place(objs, fmt) { E.tx(() => E.add(objs, 1)); E.dirty.all(); E.changed(); snd('pop');
   const xs = objs.map(o => [o.x, o.y, o.x + (o.w || 0), o.y + (o.h || 0)]), x0 = Math.min(...xs.map(a => a[0])), y0 = Math.min(...xs.map(a => a[1])), x1 = Math.max(...xs.map(a => a[2])), y1 = Math.max(...xs.map(a => a[3]));
   const pad = 70, s = Math.min(1.6, (E.SW - pad * 2) / (x1 - x0), (E.SH - pad * 2 - 110) / (y1 - y0)); E.setView(s, E.SW / 2 - (x0 + x1) / 2 * s, (E.SH - 110) / 2 - (y0 + y1) / 2 * s + 30);
@@ -58,8 +58,8 @@ const F = {
     [['Strongly agree', COL[3]], ['Agree', COL[1]], ['Disagree', COL[2]], ['Strongly disagree', COL[0]]].forEach((c, i) => o.push(...frame(g, a.x + (i % 2) * (W - w), a.y + Math.floor(i / 2) * (H - h), w, h, c[1], c[0], 'Count: ___   Best reason:')));
     o.push(sticky(a.x + W / 2 - 260 * k, a.y + H / 2 - 110 * k, 520 * k, 220 * k, 'Statement: write it here…', STICKY[0], 28)); return o; } },
   fishbowl: { name: 'Fishbowl', ic: 'circle-dot', phases: [['Round 1: inner circle talks', 300], ['Swap places', 30], ['Round 2: inner circle talks', 300], ['Debrief', 120]], build(g) { const a = area(1400, 900), k = a.k, o = [], cx = a.x + 700 * k, cy = a.y + 450 * k;
-    o.push({ id: uid(), ts: Date.now(), t: 'shape', k: 'ellipse', x: cx - 650 * k, y: cy - 420 * k, w: 1300 * k, h: 840 * k, c: COL[1], sw: 4, fill: tint(COL[1], 0.9), layer: 0, g, co: 1 });
-    o.push({ id: uid(), ts: Date.now(), t: 'shape', k: 'ellipse', x: cx - 330 * k, y: cy - 210 * k, w: 660 * k, h: 420 * k, c: COL[0], sw: 4, fill: tint(COL[0], 0.85), layer: 0, g, co: 1 });
+    o.push({ id: uid(), ts: Date.now(), t: 'shape', k: 'ellipse', x: cx - 650 * k, y: cy - 420 * k, w: 1300 * k, h: 840 * k, c: COL[1], sw: 4, fill: tint(COL[1], 0.9), layer: 1, g, co: 1 });
+    o.push({ id: uid(), ts: Date.now(), t: 'shape', k: 'ellipse', x: cx - 330 * k, y: cy - 210 * k, w: 660 * k, h: 420 * k, c: COL[0], sw: 4, fill: tint(COL[0], 0.85), layer: 1, g, co: 1 });
     o.push(label(g, cx - 260 * k, cy - 40 * k, 520 * k, 'Inner circle: discuss', 32 * k, COL[0], true), label(g, cx - 560 * k, cy - 380 * k, 600 * k, 'Outer circle: listen and take notes', 26 * k, COL[1], true));
     o.push(sticky(a.x + 1420 * k, a.y, 360 * k, 300 * k, 'Observers note:\n• a strong point\n• a question\n• who built on whom', STICKY[2], 22)); return o; } },
   hats: { name: 'Six thinking hats', ic: 'graduation-cap', phases: [['White: facts', 90], ['Red: feelings', 60], ['Black: cautions', 90], ['Yellow: benefits', 90], ['Green: new ideas', 120], ['Blue: decide', 90]], build(g) { const a = area(1560, 860), k = a.k, o = [], w = 500, h = 410;
@@ -86,7 +86,9 @@ function options(id, cb) { const f = F[id];
       else if (f.ask === 'stations') o.n = Math.max(2, Math.min(10, +sh.querySelector('#coN').value || 6));
       else o.size = Math.max(2, Math.min(6, +sh.querySelector('#coS').value || 4));
       modal.close(); cb(o); }; }); }
-function start(id) { const f = F[id]; if (!f) return; options(id, opt => { const g = uid(); place(f.build(g, opt), id); const ph = f.phasesFor ? f.phasesFor(opt) : f.phases; if (ph) run(f.name, ph, f.extra); else stop(); }); }
+/* each structure gets a page of its own (unless this one is still empty), so layouts never pile up on each other */
+function freshPage(name) { const busy = E.page().objs.some(o => !o.off); if (busy && window.HBUI && HBUI.addPage) HBUI.addPage(); try { E.page().name = String(name).slice(0, 40); window.HBUI && HBUI.refresh && HBUI.refresh(); } catch (e) {} }
+function start(id) { const f = F[id]; if (!f) return; options(id, opt => { freshPage(f.name); const g = uid(); place(f.build(g, opt), id); const ph = f.phasesFor ? f.phasesFor(opt) : f.phases; if (ph) run(f.name, ph, f.extra); else stop(); }); }
 
 /* ---------- the phase bar ---------- */
 const st = { el: null, name: '', ph: [], i: 0, left: 0, on: false, iv: 0, extra: null };
