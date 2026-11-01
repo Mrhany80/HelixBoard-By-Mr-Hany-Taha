@@ -230,6 +230,13 @@ ipcMain.handle('cl:cmd', async (e, cmd, a) => {
   return cl.snapshot();
 });
 /* Reports → PDF: the page switches to its print layout, Chromium prints it, the teacher picks where to save */
+/* a Word document (as HTML) → PDF, so an exam document looks the same on every phone; also used for printable bubble sheets */
+ipcMain.handle('doc:pdf', async (e, html) => {
+  const os = require('os'), fs2 = require('fs'), f = path.join(os.tmpdir(), 'hb-doc-' + Date.now() + '.html'); fs2.writeFileSync(f, String(html || ''));
+  const w = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
+  try { await w.loadFile(f); return await w.webContents.printToPDF({ pageSize: 'A4', printBackground: true }); }
+  finally { w.destroy(); try { fs2.unlinkSync(f); } catch (er) {} }
+});
 ipcMain.handle('report:pdf', async (e, name) => {
   if (!fromMain(e)) return null;
   const r = await dialog.showSaveDialog(win, { title: 'Save the report as PDF', defaultPath: path.join(app.getPath('documents'), String(name || 'HelixBoard report.pdf').replace(/[\\/:*?"<>|]+/g, '-')), filters: [{ name: 'PDF', extensions: ['pdf'] }] });

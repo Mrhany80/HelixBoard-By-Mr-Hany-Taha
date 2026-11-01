@@ -84,8 +84,11 @@ function setLayout(n, lay) { const root = rootOf(n.mm); if (!root) return; E.tx(
 let linking = null;
 function startLink(n) { linking = n; toast('Now tap the idea to link “' + esc((n.s || 'this idea').slice(0, 40)) + '” to. Esc cancels.', 5000); bar(); }
 function finishLink(target) { const a = linking; linking = null; if (!a || !target || target.id === a.id) { bar(); return; }
-  const lab = (window.prompt('Linking words (for example: produces, is part of, needs):', '') || '').trim().slice(0, 40);
-  E.tx(() => E.add([{ id: uid(), t: 'conn', mm: a.mm, a: a.id, b: target.id, k: 'arrow', c: '#5C4A6B', w: 2.5, dash: 1, label: lab }], 1)); E.dirty.all(); E.changed(); I.select(a); snd('pop'); }
+  /* v2.7.0: the linking words are asked in the app; window.prompt is blocked on many classroom boards */
+  const make = lab => { if (!E.byId(a.id) || !E.byId(target.id)) return; E.tx(() => E.add([{ id: uid(), t: 'conn', mm: a.mm, a: a.id, b: target.id, k: 'arrow', c: '#5C4A6B', w: 2.5, dash: 1, label: (lab || '').trim().slice(0, 40) }], 1)); E.dirty.all(); E.changed(); I.select(E.byId(a.id)); snd('pop'); };
+  modal.open('<h2>Linking words</h2><p>How are the two ideas connected? For example: produces, is part of, needs.</p><input id="mmLinkW" maxlength="40" autocomplete="off" style="width:100%"><div class="foot"><button class="btn" id="mmLinkN">No words</button><button class="btn primary" id="mmLinkY">Link</button></div>',
+    sh => { const inp = sh.querySelector('#mmLinkW'), go = v => { modal.close(); make(v); }; sh.querySelector('#mmLinkY').onclick = () => go(inp.value); sh.querySelector('#mmLinkN').onclick = () => go('');
+      inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(inp.value); } }; setTimeout(() => inp.focus(), 30); }); }
 function fitView(n) { const all = nodes(n.mm).filter(x => !x.off); if (!all.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; all.forEach(o => { x0 = Math.min(x0, o.x); y0 = Math.min(y0, o.y); x1 = Math.max(x1, o.x + o.w); y1 = Math.max(y1, o.y + o.h); });
   const pad = 60, s = Math.min(3, (E.SW - pad * 2) / (x1 - x0), (E.SH - pad * 2 - 90) / (y1 - y0)); E.setView(s, E.SW / 2 - (x0 + x1) / 2 * s, (E.SH - 90) / 2 - (y0 + y1) / 2 * s + 10); }
 
@@ -111,11 +114,11 @@ function bar() { const sel = I.selObjs(), n = sel.length >= 1 && sel.every(isNod
   barEl.innerHTML = '<button data-a="child" title="' + (n.root ? 'Add a main branch (Tab)' : 'Add a sub-branch (Tab)') + '">' + icon('git-branch-plus') + (n.root ? 'Main branch' : 'Sub-branch') + '</button>' + (n.root ? '' : '<button data-a="sib" title="Add a branch at the same level (Enter)">' + icon('plus') + 'Branch</button>') + '<span class="sep"></span>' +
     '<button data-a="color" title="Branch colour"><span class="sw" style="background:' + esc(n.bc || '#7950F2') + '"></span></button><button data-a="shape" title="Shape">' + icon('square') + '</button><button data-a="link" class="' + (linking ? 'on' : '') + '" title="Link to another idea with linking words">' + icon('link') + 'Link</button>' +
     (d || n.col ? '<button data-a="fold" title="' + (n.col ? 'Show the branch' : 'Fold the branch') + '">' + icon(n.col ? 'unfold-horizontal' : 'fold-horizontal') + '</button>' : '') + '<span class="sep"></span>' +
-    '<button data-a="layout" title="Layout">' + icon(lay === 'down' ? 'network' : 'list-tree') + '</button><button data-a="fit" title="Show the whole map">' + icon('maximize-2') + '</button><button data-a="del" title="Delete this idea and its branch (Delete)">' + icon('trash-2') + '</button>';
+    '<button data-a="layout" title="Layout">' + icon(lay === 'down' ? 'network' : 'list-tree') + '</button><button data-a="fit" title="Show the whole map">' + icon('maximize-2') + '</button><button data-a="outline" title="Outline: the map as an indented list next to it, also copied">' + icon('list') + '</button><button data-a="del" title="Delete this idea and its branch (Delete)">' + icon('trash-2') + '</button>';
   if (n.id !== lastBar) { lastBar = n.id; if (!I.editing) { const before = E.V.y + ',' + E.V.x; show(n); if (before !== E.V.y + ',' + E.V.x) return; } }
   place(n); plus(n);
   $$('button', barEl).forEach(b => b.onclick = e => { e.stopPropagation(); const a = b.dataset.a; closePop();
-    if (a === 'child') addChild(n); else if (a === 'sib') addSibling(n); else if (a === 'fold') toggleFold(n); else if (a === 'fit') fitView(n); else if (a === 'del') removeBranch(n); else if (a === 'link') { if (linking) { linking = null; bar(); } else startLink(n); }
+    if (a === 'child') addChild(n); else if (a === 'sib') addSibling(n); else if (a === 'fold') toggleFold(n); else if (a === 'fit') fitView(n); else if (a === 'outline') outline(n); else if (a === 'del') removeBranch(n); else if (a === 'link') { if (linking) { linking = null; bar(); } else startLink(n); }
     else pop(a, n, b); }); }
 /* the bar goes above the idea, or below it, wherever it does not cover another idea (so a click always lands where it looks) */
 function place(n) { const st = document.getElementById('stage').getBoundingClientRect(), bw = barEl.offsetWidth, bh = barEl.offsetHeight, V = E.V;
@@ -240,5 +243,18 @@ function open() { modal.open('<h2>' + icon('brain-circuit') + ' Concept map</h2>
     $$('[data-t]', sh).forEach(b => b.onclick = () => { const [t, c, l] = TEMPLATES[b.dataset.t]; modal.close(); const r = newMap(t, c, l); if (b.dataset.t === 'Blank map') setTimeout(() => I.openEditor(r), 60); });
     sh.querySelector('#mmGo').onclick = () => { const o = fromOutline(sh.querySelector('#mmO').value); if (!o) { toast('Type or paste an outline first.'); return; } modal.close(); newMap(o[0], o[1], 'mind'); }; }); }
 
-window.HBMM = { open, newMap, addChild, addSibling, layout, fromOutline, isNode };
+/* map → outline: the whole map as an indented list placed beside it (and copied), for notes, revision sheets or a slide */
+function outline(n) { const root = rootOf(n.mm); if (!root) return; const all = nodes(n.mm), lines = [];
+  const walk = (x, d) => { lines.push('    '.repeat(d) + (d ? '• ' : '') + (x.s || '…').replace(/\s+/g, ' ').trim()); kids(x, all).forEach(k => walk(k, d + 1)); }; walk(root, 0);
+  const vis = all.filter(o => !o.off); const x1 = Math.max(...vis.map(o => o.x + o.w)), y0 = Math.min(...vis.map(o => o.y)), txt = lines.join('\n');
+  const o = { id: uid(), ts: Date.now(), t: 'text', x: x1 + 120, y: y0, w: 560, s: txt, font: 'Lexend', size: 22, c: E.isDark() ? '#F1E9F5' : '#2B1B3D', b: false };
+  E.tx(() => E.add([o], 1)); E.dirty.all(); E.changed(); I.select(o); try { navigator.clipboard && navigator.clipboard.writeText(txt).catch(() => {}); } catch (e) {}
+  toast('Outline added beside the map (' + lines.length + ' ideas) and copied.'); snd('pop'); return txt; }
+function repair(pg) { pg = pg || E.page(); if (!pg || !pg.objs) return 0; const ids = new Set(pg.objs.map(o => o.id)); let n = 0;
+  for (let i = pg.objs.length - 1; i >= 0; i--) { const c = pg.objs[i]; if (c.t === 'conn' && c.mm && (!ids.has(c.a) || !ids.has(c.b))) { pg.objs.splice(i, 1); n++; } }
+  const maps = new Set(pg.objs.filter(o => isNode(o)).map(o => o.mm));
+  maps.forEach(mm => { const root = pg.objs.find(o => isNode(o) && o.mm === mm && o.root); if (!root) return; pg.objs.filter(o => isNode(o) && o.mm === mm && !o.root && (!o.par || !ids.has(o.par))).forEach(o => { o.par = root.id; o.ord = 999; pg.objs.push(branch(mm, root, o, o.bc || '#7950F2')); n++; }); });
+  return n; }
+bus.on('board-loaded', () => { let n = 0; (E.B.pages || []).forEach(pg => { n += repair(pg); }); if (n) { E.dirty.all(); console.info('HelixBoard: concept maps repaired', n); } });
+window.HBMM = { open, newMap, addChild, addSibling, layout, fromOutline, isNode, removeBranch, repair, outline };
 })();

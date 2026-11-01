@@ -12,6 +12,7 @@ const crypto = require('crypto');
 
 const PAGE = path.join(__dirname, 'classlink-student.html');
 const TEST_PAGE = path.join(__dirname, 'test-student.html');
+const EXAM_PAGE = path.join(__dirname, 'exam-student.html');
 const G = require('./testgrade.js');
 const MAX_PLAYERS = 300;
 const MAX_FILE = 1024 * 1024 * 1024;
@@ -105,6 +106,10 @@ class ClassLink {
   late(p) { const tm = +(this.test.def.settings || {}).time || 0; return tm > 0 && Date.now() > p.start + tm * 60000 + 30000; }
   tPaper(pl, res) { const t = this.test; if (!t) return json(res, 404, { error: 'There is no test right now.' }); const p = this.paperOf(pl), S = t.def.settings || {};
     const copy = G.studentCopy(t.def, pl.id + t.def.id); return json(res, 200, Object.assign(copy, { open: t.open, name: pl.name, start: p.start, now: Date.now(), ans: p.ans, tries: p.tries, fb: p.fb, done: p.done, result: p.done ? this.resultFor(p) : null })); }
+  /* the exam document, page by page (pictures made on the teacher's computer, so every phone sees the same pages) */
+  tDoc(i, res) { const t = this.test, d = t && t.def.doc && t.def.doc[i | 0]; if (!d) { res.writeHead(404); return res.end(); } const m = String(d).match(/^data:(image\/[a-z]+);base64,(.*)$/); if (!m) { res.writeHead(404); return res.end(); } const b = Buffer.from(m[2], 'base64'); res.writeHead(200, { 'Content-Type': m[1], 'Content-Length': b.length, 'Cache-Control': 'private, max-age=3600' }); res.end(b); }
+  /* integrity: leaving the exam, leaving full screen, copying — logged for the teacher, never blocked */
+  tFlag(pl, d, res) { const t = this.test; if (!t) return json(res, 404, {}); const p = this.paperOf(pl), what = String(d && d.what || '').slice(0, 30); if (!/^(left|back|fullscreen|copy|resume)$/.test(what)) return json(res, 400, {}); (p.flags = p.flags || []).push({ what, at: Date.now() }); if (p.flags.length > 200) p.flags.shift(); this.emit('test', { kind: 'flag', pid: pl.id }); json(res, 200, { ok: true }); }
   feedback(q, g, lang) { return { ok: g ? g.ok : null, score: g ? g.score : null, key: G.keyText(q, lang), ex: q.ex || '' }; }
   tAns(pl, d, res) { const t = this.test; if (!t) return json(res, 404, { error: 'There is no test right now.' }); if (!t.open) return json(res, 403, { error: 'closed' });
     const p = this.paperOf(pl); if (p.done) return json(res, 409, { error: 'You have already handed in this test.' }); if (this.late(p)) return json(res, 403, { error: 'Time is up.' });
@@ -124,7 +129,7 @@ class ClassLink {
     if (d && d.ans && typeof d.ans === 'object' && !this.late(p)) Object.keys(d.ans).slice(0, 500).forEach(k => { const q = t.def.questions[k | 0]; if (!q || (p.fb[k] && p.fb[k].final)) return; const v = G.cleanValue(q, d.ans[k]); if (v != null) p.ans[k | 0] = v; });
     this.finish(p); this.emit('test', { kind: 'done', pid: pl.id, name: p.name }); this.changed(); return json(res, 200, { ok: true, result: this.resultFor(p) }); }
   testResults() { const t = this.test; if (!t) return null; const online = new Set([...this.players.values()].filter(x => Date.now() - x.seen < 30000).map(x => x.id));
-    return { id: t.def.id, open: t.open, opened: t.opened, over: t.over, papers: [...t.papers.values()].map(p => ({ pid: p.pid, name: p.name, ans: p.ans, tries: p.tries, done: p.done, start: p.start, at: p.at, ms: p.ms || (Date.now() - p.start), online: online.has(p.pid), mark: p.done ? p.mark : this.markOf(p) })) }; }
+    return { id: t.def.id, open: t.open, opened: t.opened, over: t.over, papers: [...t.papers.values()].map(p => ({ pid: p.pid, name: p.name, ans: p.ans, tries: p.tries, done: p.done, start: p.start, at: p.at, ms: p.ms || (Date.now() - p.start), online: online.has(p.pid), mark: p.done ? p.mark : this.markOf(p), flags: p.flags || [] })) }; }
   setQuiz(q) { this.quiz = q || null; this.changed(); }
   setXp(m) { this.xp = m && typeof m === 'object' ? m : null; this.changed(); }
   setLock(v) { v = !!v; if (v && !this.lock) { this.lockBoard = !this.boardOn; this.boardOn = true; } else if (!v && this.lock && this.lockBoard) { this.boardOn = false; this.lockBoard = false; } this.lock = v; this.changed(); }
@@ -149,6 +154,7 @@ class ClassLink {
     }
     if (req.method === 'POST' && url.pathname === '/join') return this.body(req, res, d => this.join(d, res, req));
     /* a test (imported worksheet): its own page, the same student */
+    if (req.method === 'GET' && (url.pathname === '/exam' || url.pathname === '/exam/')) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' blob: data:" }); return res.end(fs.readFileSync(EXAM_PAGE, 'utf8').split('__LANG__').join(this.test && this.test.def.lang === 'ar' ? 'ar' : this.lang)); }
     if (req.method === 'GET' && (url.pathname === '/test' || url.pathname === '/test/')) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' blob: data:" }); return res.end(fs.readFileSync(TEST_PAGE, 'utf8').split('__LANG__').join(this.test && this.test.def.lang === 'ar' ? 'ar' : this.lang)); }
     const pl = this.players.get(url.searchParams.get('pid') || '');
     if (!pl) return json(res, 403, { error: 'gone' });
@@ -164,6 +170,8 @@ class ClassLink {
     if (req.method === 'POST' && url.pathname === '/react') return this.body(req, res, d => this.react(pl, d, res), 1024);
     if (req.method === 'POST' && url.pathname === '/hand') return this.body(req, res, d => this.hand(pl, d, res), 4096);
     if (req.method === 'GET' && url.pathname === '/t/paper') return this.tPaper(pl, res);
+    if (req.method === 'GET' && url.pathname === '/t/doc') return this.tDoc(url.searchParams.get('i'), res);
+    if (req.method === 'POST' && url.pathname === '/t/flag') return this.body(req, res, d => this.tFlag(pl, d, res), 2048);
     if (req.method === 'POST' && url.pathname === '/t/ans') return this.body(req, res, d => this.tAns(pl, d, res), 64 * 1024);
     if (req.method === 'POST' && url.pathname === '/t/submit') return this.body(req, res, d => this.tSubmit(pl, d, res), 256 * 1024);
     if (req.method === 'POST' && url.pathname === '/hwsubmit') return this.body(req, res, d => this.hwSubmit(pl, d, res), 64 * 1024);
@@ -197,7 +205,7 @@ class ClassLink {
       board: this.boardOn && this.board ? { ver: this.boardVer, ar: this.boardView ? this.boardView.ar : 1.6 } : null, draw: this.boardOn && this.drawOn,
       files: this.files.map(f => ({ id: f.id, name: f.name, kind: f.kind, size: f.size })),
       homework: [...this.homework.values()].map(h => ({ id: h.id, title: h.title, due: h.due, n: h.questions.length, done: !!(h.results && h.results[pl.id]) })),
-      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn, test: this.test ? { id: this.test.def.id, title: this.test.def.title, n: this.test.def.questions.length, open: this.test.open, done: !!(this.test.papers.get(pl.id) || {}).done } : null, quiz: this.quiz && this.quiz.on ? { pin: this.quiz.pin, title: this.quiz.title } : null };
+      act: this.actState(pl), shared: this.shared, stars: pl.stars || 0, lvl: this.xp ? this.xp[pl.name.toLowerCase().replace(/ \d+$/, '')] || null : null, hand: !!pl.hand, lock: this.lock, react: this.reactOn, test: this.test ? { id: this.test.def.id, kind: this.test.def.kind || 'test', title: this.test.def.title, n: this.test.def.questions.length, open: this.test.open, done: !!(this.test.papers.get(pl.id) || {}).done } : null, quiz: this.quiz && this.quiz.on ? { pin: this.quiz.pin, title: this.quiz.title } : null };
   }
   actState(pl) { const a = this.act; if (!a) return null; const r = a.responses.get(pl.id);
     return { id: a.id, type: a.type, prompt: a.prompt, options: a.options, open: a.open, left: a.endsAt ? Math.max(0, a.endsAt - Date.now()) : 0, bg: !!a.bg, ar: a.ar, once: a.once, auto: a.auto, grace: !a.open && a.auto && a.closedAt ? Math.max(0, 6000 - (Date.now() - a.closedAt)) : 0,

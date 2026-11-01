@@ -1,0 +1,25 @@
+const {_electron,chromium}=require('playwright');const S=process.argv[2];const log=(...a)=>console.log(...a);
+(async()=>{const app=await _electron.launch({executablePath:'/home/user/helixboard/desktop/node_modules/electron/dist/electron',args:['--no-sandbox','/home/user/helixboard/desktop'],env:Object.assign({},process.env,{HB_CLOUDFLARED:S+'/fake-cloudflared',HB_TUNNEL_PING_ORIGIN:'http://127.0.0.1:9555'})});
+const w=await app.firstWindow();await w.waitForLoadState();await w.evaluate(()=>{localStorage['hb:askSession']='true';localStorage['hb:classes']='["7A"]';localStorage['hb:curClass']='"7A"'});await w.reload();await w.waitForLoadState();const errs=[];w.on('pageerror',e=>errs.push('T:'+e.message));
+await w.waitForTimeout(2500);await w.evaluate(()=>HB.modal.close());
+log('live btn before:',await w.evaluate(()=>document.getElementById('aLive').className+'|'+document.getElementById('aLive').textContent));
+w.evaluate(()=>HBLC.open());await w.waitForTimeout(800);log('dialog:',(await w.textContent('.modal, [role=dialog]').catch(()=>'')).slice(0,120));
+await w.fill('#xsLes','Photosynthesis');await w.click('#xsGo');await w.waitForTimeout(2500);
+log('name button:',await w.textContent('#lcName'));
+const sn=await w.evaluate(()=>helixDesktop.cl.cmd('snapshot'));const br=await chromium.launch();const c=await br.newContext({viewport:{width:390,height:800},isMobile:true});const p=await c.newPage();
+await p.goto('http://127.0.0.1:'+sn.port+'/?pin='+sn.pin);await p.fill('input[placeholder="Your full name"]','Sara');await p.click('.go');await p.waitForTimeout(700);log('single name →',await p.textContent('.err'));
+await p.fill('input[placeholder="Your full name"]','Sara Ali');await p.click('.go');await p.waitForTimeout(1500);log('phone header:',await p.textContent('header'));
+await w.waitForTimeout(1200);log('live btn on:',await w.evaluate(()=>document.getElementById('aLive').className+'|'+document.getElementById('aLive').textContent));
+// poll with right answer, Sara wrong → redemption
+await w.click('.lc-card[data-k="poll"]');await w.fill('#lcP','Where does photosynthesis happen?');await w.click('[data-pre="abcd"]');await w.waitForTimeout(200);
+const ins=await w.$$('[data-o]');const vals=['Mitochondria','Chloroplast','Nucleus','Ribosome'];for(let i=0;i<4;i++)await ins[i].fill(vals[i]);await w.click('[data-c="1"]');await w.click('#lcGo');await w.waitForTimeout(1200);
+await p.click('.opt:nth-child(1)');await p.click('button.go:has-text("Submit")',{timeout:2000}).catch(()=>{});await w.waitForTimeout(800);
+await w.click('[data-st]').catch(()=>{});await w.evaluate(()=>document.querySelector('.lc-st button[data-st]').click());await w.waitForTimeout(500);
+await w.click('#lcHide');await w.waitForTimeout(300);await w.screenshot({path:S+'/xp_livebtn.png',clip:{x:400,y:0,width:500,height:56}});
+await w.evaluate(()=>HBLC.endSession());await w.waitForTimeout(400);await w.click('#lcEndOnly');await w.waitForTimeout(3500);
+log('live btn after end:',await w.evaluate(()=>document.getElementById('aLive').className+'|'+document.getElementById('aLive').textContent));
+const rep=await w.evaluate(async()=>{const ix=await HB.IDB.get('reports:index');const s=await HB.IDB.get('report:'+ix[0].id);return s.title+' | cls='+s.cls});log('report:',rep);
+await w.evaluate(()=>HBX.open('7A'));await w.waitForTimeout(1500);log('xp:',(await w.textContent('#xpBody')).slice(0,200));await w.screenshot({path:S+'/xp_screen.png'});
+await w.click('#xpRed');await w.waitForTimeout(1000);log('redemption:',(await w.textContent('.modal, [role=dialog]').catch(()=>'')).slice(0,200));
+log('sets:',await w.evaluate(()=>Object.keys(JSON.parse(localStorage['hb:quizSets']||'{}')).filter(k=>k.includes('Redemption')).join(',')));
+log('errs',errs);await br.close();await app.close();})();

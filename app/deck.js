@@ -75,12 +75,20 @@ function morph(how, t, back, tr) { if (trEl) { gsap.killTweensOf(trEl); trEl.rem
   }); }
 /* PowerPoint click animations: each build step is a picture with a step number; in the slideshow they appear one click at a time */
 let step = 0, wantStep = null;
-const stepsOf = i => { const b = buckets()[i] || []; return b.reduce((m, o) => Math.max(m, o.step || 0), 0); };
+/* v2.7.0: steps come from the step pictures alone; scanning every stroke on the page on each click made heavy-ink slides slow */
+const stepObjs = i => { const p = P(), R = rects(p); return p.objs.filter(o => o.step && o.deckBase && slideOf(o, R) === i); };
+const stepsOf = i => stepObjs(i).reduce((m, o) => Math.max(m, o.step || 0), 0);
+/* a short diagnostic trail, so a "stuck" report can be explained: window.__hbDeckLog */
+const dlog = what => { const L = window.__hbDeckLog = window.__hbDeckLog || []; L.push({ t: Date.now(), what, slide: cur, step, tool: I.T.tool, sel: I.selObjs().length, editing: !!I.editing, show }); if (L.length > 60) L.shift(); };
+let fadeTw = null, fadeObjs = [], fadeDog = null;
+/* finish a fade at once: a fade cut short (fast clicks, a hidden window pausing animation frames) must never leave a step half-transparent */
+const endFade = () => { if (fadeTw) { fadeTw.kill(); fadeTw = null; } clearTimeout(fadeDog); fadeObjs.forEach(o => { delete o._fa; }); fadeObjs = []; };
 E.setStepFilter(o => show && o.step > step);
-function reveal() { const objs = (buckets()[cur] || []).filter(o => o.step === step); objs.forEach(o => { o._fa = 0; }); E.dirty.all();
-  if (!window.gsap || REDUCE) { objs.forEach(o => { delete o._fa; }); E.dirty.all(); return; } const t = { v: 0 }; gsap.to(t, { v: 1, duration: 0.45, ease: 'power2.out', onUpdate: () => { objs.forEach(o => { o._fa = t.v; }); E.dirty.main = true; }, onComplete: () => { objs.forEach(o => { delete o._fa; }); E.dirty.all(); } }); }
-const next = () => { if (!isDeck()) return; if (show && step < stepsOf(cur)) { step++; reveal(); SND.tick && SND.tick(); updShow(); return; } const sl = P().deck.slides; let i = cur + 1; while (show && i < sl.length && sl[i].hid) i++; if (i >= sl.length) { if (show) endCard(); return; } goSlide(i, true); SND.tick && SND.tick(); };
-const prev = () => { if (!isDeck()) return; if (show && step > 0) { step--; E.dirty.all(); updShow(); return; } const sl = P().deck.slides; let i = cur - 1; while (show && i > 0 && sl[i].hid) i--; if (i < 0) return; wantStep = show ? stepsOf(i) : 0; goSlide(i, true); E.dirty.all(); };
+function reveal() { endFade(); const objs = stepObjs(cur).filter(o => o.step === step); objs.forEach(o => { o._fa = 0; }); fadeObjs = objs; E.dirty.all();
+  if (!window.gsap || REDUCE) { endFade(); E.dirty.all(); return; } const t = { v: 0 }; fadeTw = gsap.to(t, { v: 1, duration: 0.45, ease: 'power2.out', onUpdate: () => { objs.forEach(o => { o._fa = t.v; }); E.dirty.main = true; }, onComplete: () => { fadeTw = null; endFade(); E.dirty.all(); } });
+  fadeDog = setTimeout(() => { if (fadeObjs.length) { dlog('fade watchdog'); endFade(); E.dirty.all(); } }, 900); }
+const next = () => { if (!isDeck()) return; dlog('next'); endFade(); if (show && step < stepsOf(cur)) { step++; reveal(); SND.tick && SND.tick(); updShow(); return; } const sl = P().deck.slides; let i = cur + 1; while (show && i < sl.length && sl[i].hid) i++; if (i >= sl.length) { if (show) endCard(); return; } goSlide(i, true); SND.tick && SND.tick(); };
+const prev = () => { if (!isDeck()) return; dlog('prev'); endFade(); if (show && step > 0) { step--; E.dirty.all(); updShow(); return; } const sl = P().deck.slides; let i = cur - 1; while (show && i > 0 && sl[i].hid) i--; if (i < 0) return; wantStep = show ? stepsOf(i) : 0; goSlide(i, true); E.dirty.all(); };
 /* follow the view when the teacher scrolls by hand */
 bus.on('view', () => { if (!isDeck() || show) return; const a = area(), cy = (a.y + a.h / 2 - E.V.y) / E.V.s, R = rects(); let best = cur, bd = 1e12; R.forEach((r, i) => { const d = Math.abs(r[1] + r[3] / 2 - cy); if (d < bd) { bd = d; best = i; } }); if (best !== cur) { cur = best; P().deck.cur = cur; updUI(); } });
 
@@ -228,7 +236,7 @@ function exportDeck() { const p = P(), d = p.deck; modal.open('<h2>Export deck a
 
 /* ---------- slideshow ---------- */
 let ctl = null, pbar = null, idleT = 0, clockIv = 0, t0 = 0, savedTheme = null, savedTool = null, blank = null;
-function startShow(i) { if (!isDeck()) return; show = true; step = 0; css(); const p = P(); savedTheme = p.theme; p.theme = 'black'; savedTool = [I.T.tool, I.T.pen]; document.body.classList.add('deckshow'); I.clearSel();
+function startShow(i) { if (!isDeck()) return; show = true; step = 0; penHint = false; css(); const p = P(); savedTheme = p.theme; p.theme = 'black'; savedTool = [I.T.tool, I.T.pen]; document.body.classList.add('deckshow'); I.clearSel();
   const fs = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen().catch(() => {}) : Promise.resolve();
   ctl = document.createElement('div'); ctl.id = 'showCtl'; document.body.appendChild(ctl); pbar = document.createElement('div'); pbar.id = 'showBar'; document.body.appendChild(pbar);
   ctl.append(bt('chevron-left', '', prev, 'Previous (←)'), Object.assign(document.createElement('span'), { className: 'cnt', id: 'shCnt' }), bt('chevron-right', '', next, 'Next (→, Space, click)'), sep(),
@@ -243,21 +251,32 @@ function tool(t, pen) { I.setTool(t, pen); updShowBtns(); poke(); }
 function updShowBtns() { if (!ctl) return; const bs = ctl.querySelectorAll('button'); const T = I.T; [[2, T.tool === 'laser'], [3, T.tool === 'draw' && T.pen !== 'hi'], [4, T.tool === 'draw' && T.pen === 'hi'], [5, T.tool === 'erase'], [7, isDeck() && P().deck.inkOff]].forEach(([k, on]) => bs[k] && bs[k].classList.toggle('on', !!on)); }
 function updShow() { if (!show || !ctl || !isDeck()) return; const n = P().deck.slides.length; const c = $('#shCnt'), ns = stepsOf(cur); if (c) c.textContent = (cur + 1) + ' / ' + n + (ns ? ' · ✦ ' + step + '/' + ns : ''); if (pbar) pbar.style.width = ((cur + 1) / n * 100) + '%'; updShowBtns(); }
 function updClock() { const c = $('#shClk'); if (!c) return; const s = Math.floor((Date.now() - t0) / 1000); c.textContent = '⏱ ' + String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') + '  ·  ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
-function poke() { if (!ctl) return; ctl.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => ctl && ctl.classList.add('idle'), 2800); }
+function poke() { if (!ctl) return; ctl.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => ctl && !inkOn() && ctl.classList.add('idle'), 2800); }
+/* with the pen, highlighter or eraser on, a click writes instead of advancing, so the ◀ ▶ buttons stay on screen */
+const inkOn = () => ['draw', 'erase'].includes(I.T.tool);
+let penHint = false;
 function blankScreen(col) { if (blank) { blank.remove(); blank = null; return; } blank = document.createElement('div'); blank.id = 'showBlank'; blank.style.background = col; blank.style.color = col === '#000' ? '#333' : '#ccc'; blank.textContent = 'Click or press any key to return'; blank.onclick = () => { blank.remove(); blank = null; }; document.body.appendChild(blank); }
 function endCard() { if ($('#showEnd')) return; const e = document.createElement('div'); e.id = 'showEnd'; e.innerHTML = '<div><b>End of slideshow</b>Click or press Esc to exit · ← to go back</div>'; e.onclick = () => { e.remove(); endShow(); }; document.body.appendChild(e); }
 document.addEventListener('pointermove', () => show && poke(), { passive: true });
 /* click to go forward with the laser, like a presentation; right-click goes back */
 let downAt = null;
 document.addEventListener('pointerdown', e => { if (!show || e.target.closest('#showCtl,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } downAt = [e.clientX, e.clientY, Date.now(), e.button]; }, true);
-document.addEventListener('pointerup', e => { if (!show || !downAt || e.target.closest('#showCtl,#showEnd,#showBlank,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } const [x, y, t, b] = downAt; downAt = null; if (I.T.tool !== 'laser' || Math.hypot(e.clientX - x, e.clientY - y) > 8 || Date.now() - t > 500) return; if (b === 2) prev(); else if (b === 0) next(); }, true);
+document.addEventListener('pointerup', e => { if (!show || !downAt || e.target.closest('#showCtl,#showEnd,#showBlank,#dkAsk,#lcChip,#lcStage,#lcSpot,#lcPick')) { downAt = null; return; } const [x, y, t, b] = downAt; downAt = null; if (Math.hypot(e.clientX - x, e.clientY - y) > 8 || Date.now() - t > 500) return; const tl = I.T.tool;
+  if (tl === 'laser') { if (b === 2) prev(); else if (b === 0) next(); return; }
+  if ((tl === 'select' || tl === 'hand') && b === 0) { setTimeout(() => { if (show && !I.selObjs().length && !I.editing) next(); }, 0); return; }
+  if (inkOn() && b === 0 && !penHint) { penHint = true; poke(); toast(tl === 'erase' ? 'Eraser is on: use ▶ or the arrow keys to continue (L = laser).' : 'Pen is on: use ▶ or the arrow keys to continue (L = laser).'); } }, true);
 document.addEventListener('contextmenu', e => { if (show) e.preventDefault(); }, true);
 document.addEventListener('fullscreenchange', () => { if (show && !document.fullscreenElement) setTimeout(() => { if (show) { E.resize && E.resize(); goSlide(cur, false); } }, 120); });
 /* keyboard: PowerPoint keys in the slideshow; PageUp/PageDown, arrows and F5 on a deck tab */
 let typed = '';
-document.addEventListener('keydown', e => { const tg = e.target.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || I.editing) return; if (!isDeck()) return; const k = e.key;
+document.addEventListener('keydown', e => { const k = e.key;
+  /* v2.7.0: typing on a slide used to leave the text box open and every key, the presenter clicker included, was then ignored.
+     In the slideshow Esc now closes the text box, and PageDown / PageUp close it and keep going. */
+  if (I.editing) { if (!show || !isDeck()) return; if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); I.commitEdit(); dlog('esc commits text'); return; } if (k !== 'PageDown' && k !== 'PageUp') return; I.commitEdit(); }
+  else { const tg = e.target.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || e.target.isContentEditable) return; }
+  if (!isDeck()) return;
   if (k === 'F5') { e.preventDefault(); e.stopPropagation(); startShow(e.shiftKey ? cur : 0); return; }
-  if (!show) { if (full && k === 'Escape') { e.preventDefault(); e.stopPropagation(); exitFull(); return; } if (I.selObjs().length) return; if (k === 'PageDown' || (k === 'ArrowRight' && !e.altKey) || (k === 'ArrowDown' && !e.altKey)) { e.preventDefault(); e.stopPropagation(); next(); } else if (k === 'PageUp' || (k === 'ArrowLeft' && !e.altKey) || (k === 'ArrowUp' && !e.altKey)) { e.preventDefault(); e.stopPropagation(); prev(); } else if (k === 'Home') { e.preventDefault(); e.stopPropagation(); goSlide(0, true); } else if (k === 'End') { e.preventDefault(); e.stopPropagation(); goSlide(P().deck.slides.length - 1, true); } return; }
+  if (!show) { if (full && k === 'Escape') { e.preventDefault(); e.stopPropagation(); exitFull(); return; } if (I.selObjs().length && k !== 'PageDown' && k !== 'PageUp') return; if (k === 'PageDown' || (k === 'ArrowRight' && !e.altKey) || (k === 'ArrowDown' && !e.altKey)) { e.preventDefault(); e.stopPropagation(); next(); } else if (k === 'PageUp' || (k === 'ArrowLeft' && !e.altKey) || (k === 'ArrowUp' && !e.altKey)) { e.preventDefault(); e.stopPropagation(); prev(); } else if (k === 'Home') { e.preventDefault(); e.stopPropagation(); goSlide(0, true); } else if (k === 'End') { e.preventDefault(); e.stopPropagation(); goSlide(P().deck.slides.length - 1, true); } return; }
   e.stopPropagation(); poke(); if ($('#showEnd') && k !== 'ArrowLeft' && k !== 'PageUp' && k !== 'Backspace') { e.preventDefault(); $('#showEnd').remove(); if (k === 'Escape') endShow(); return; }
   if (blank) { e.preventDefault(); blank.remove(); blank = null; return; }
   if (/^[0-9]$/.test(k)) { typed += k; return; } if (k === 'Enter' && typed) { e.preventDefault(); goSlide(parseInt(typed, 10) - 1, true); typed = ''; return; } typed = '';

@@ -3,7 +3,7 @@
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
-Version **2.6.1** — three ways to run it, all built from the same `app/` source:
+Version **2.7.0** — three ways to run it, all built from the same `app/` source:
 
 | Device | What | Install |
 |---|---|---|
@@ -89,12 +89,17 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 
 ## Tabs
 
-Nine tabs: **Draw** (pens, erase, select, colour, ink magic) · **Shapes** · **Text** (styles, fonts, photo → text) ·
+Ten tabs: **Draw** (pens, erase, select, colour, ink magic) · **Shapes** · **Text** (styles, fonts, photo → text) ·
 **Notes** (rich note-taking kit + note templates and thinking maps) · **Insert** (images, documents, PowerPoint, stamps, screen) ·
 **Science** (Biology, Chemistry, Physics, Lab, Maths, Roots — filter chips at the top) ·
 **Teach** (lesson, timers, wheel and pickers, quiz on the board, assessment, focus tools, water — filter chips) ·
-**Study** (Live class on phones — and student self-study tools; filter chips) · **Page** (page, backgrounds, files, intro setting — filter chips).
-Tab definitions live in `ui.js`: `SRC` holds every tool group, `TABS` assembles the nine tabs from them.
+**Study** (Live class on phones — and student self-study tools; filter chips) · **Collaborate** (ten group-work structures with phase timers, groups and roles, the live sticky wall) · **Page** (page, backgrounds, files, intro setting — filter chips).
+Tab definitions live in `ui.js`: `SRC` holds every tool group, `TABS` assembles the ten tabs from them.
+
+Right-click, the pen's barrel button and a long-press open one radial menu (with Duplicate / Copy / Front / Delete for a
+selection); the browser's own menu appears only in text fields. In the slideshow Space, Enter, PageDown, → and a clicker
+always go to the next step (←, PageUp, Backspace go back), whatever the tool; with a text box open, Esc closes it and
+PageDown/PageUp close it and continue. Press **K** for the on-screen keyboard (English, Arabic, science layers).
 
 ## Live class (Windows app) — Nearpod / ClassPoint-style activities
 
@@ -249,6 +254,14 @@ pasted text**. No AI and no internet are needed (photos need Tesseract once).
   file (PDF, Word, photo or pasted text — e.g. the teacher's guide) and apply it to the questions already imported, with the
   same key formats as an in-file key ("1-B 2-C 3-True", by section, Arabic too).
 - Gamification lesson plan (deferred by Mr. Hany).
+
+## Bubble-sheet exam (like ZipGrade)
+
+Live class → Tests → **Bubble-sheet exam** (`app/sheetexam.js`, phones: `desktop/exam-student.html`). Settings first, then the
+document (shown as it is), then the key (tap, paste "1A 2C", upload a key file, or read from the end of the document). Phones
+show the document beside a bubble sheet, save every tap locally and on the teacher's computer, and record leaving the page.
+Negative marking, KR-20 reliability, integrity flags and a printable A4 bubble sheet. See `CHANGELOG.md` for what is not in
+this release.
 
 ## Concept map details
 

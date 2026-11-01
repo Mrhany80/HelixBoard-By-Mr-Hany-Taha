@@ -1,0 +1,4 @@
+const { chromium } = require('playwright'); const fs = require('fs'); (async () => { const b = await chromium.launch(); const p = await b.newPage(); await p.goto('file:///home/user/helixboard/dist/index.html?nointro=1&accskip=1'); await p.waitForTimeout(1200);
+const b64 = fs.readFileSync(process.argv[2]).toString('base64'); const r = await p.evaluate(async ([b64, pg, word]) => { const lib = await HBIO.loadPdf(); const doc = await lib.getDocument({ data: Uint8Array.from(atob(b64), c => c.charCodeAt(0)) }).promise; const page = await doc.getPage(pg); const tc = await page.getTextContent();
+  const i = tc.items.findIndex(it => it.str.includes(word)); return tc.items.slice(Math.max(0, i - 2), i + 8).map(it => JSON.stringify([it.str, it.transform.map(v => Math.round(v * 10) / 10), Math.round(it.width), it.height])); }, [b64, +process.argv[3], process.argv[4]]);
+console.log(r.join('\n')); await b.close(); })();

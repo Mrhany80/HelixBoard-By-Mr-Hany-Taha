@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('helixDesktop', {
   checkUpdates: () => ipcRenderer.send('update:check'),
   allowFirewall: () => ipcRenderer.invoke('fw:allow'),
   printPdf: name => ipcRenderer.invoke('report:pdf', name),
+  docPdf: html => ipcRenderer.invoke('doc:pdf', html),
   live: {
     start: quiz => ipcRenderer.invoke('live:start', quiz),
     cmd: (cmd, arg) => ipcRenderer.invoke('live:cmd', cmd, arg),

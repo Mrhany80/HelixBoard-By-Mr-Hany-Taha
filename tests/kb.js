@@ -1,0 +1,12 @@
+const { chromium } = require('playwright'); const S = process.argv[2] || __dirname; (async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+await p.goto('file:///home/user/helixboard/dist/index.html?nointro=1&accskip=1'); await p.waitForTimeout(1500);
+await p.evaluate(() => HBK.toggle(true)); await p.waitForTimeout(400);
+const tap = async k => { const el = (await p.$$('#kbd .key')).find(async () => 0); const all = await p.$$('#kbd .key'); for (const x of all) if ((await x.getAttribute('data-k')) === k || (await x.getAttribute('data-i')) === k) { await x.click(); return; } throw new Error('no key ' + k); };
+await tap('{sh}'); for (const k of ['h', 'e', 'l', 'l', 'o']) await tap(k); await tap(' '); for (const k of ['c', 'o', '2', 'x']) await tap(k); await tap('{bs}');
+const t1 = await p.evaluate(() => HBI.editing && HBI.editing.ta.value); console.log('board text:', JSON.stringify(t1));
+const sz = await p.evaluate(() => { const k = document.querySelector('#kbd .key[data-k="q"]').getBoundingClientRect(); return [Math.round(k.width), Math.round(k.height)]; }); console.log('key size', sz);
+await p.screenshot({ path: S + '/kb_en.png' });
+await p.click('#kbd [data-l="ar"]'); await p.waitForTimeout(300); await tap('{sh}'); await p.waitForTimeout(150); await p.screenshot({ path: S + '/kb_ar_shift.png' }); await tap('{sh}');
+for (const k of ['م', 'ر', 'ح', 'ب', 'ا']) await tap(k); console.log('board text:', JSON.stringify(await p.evaluate(() => HBI.editing && HBI.editing.ta.value)));
+await p.click('#kbd [data-l="chem"]'); await p.waitForTimeout(200); await p.screenshot({ path: S + '/kb_chem.png' });
+console.log('errs', errs); await b.close(); })().catch(e => { console.log('FAIL', e.message); process.exit(1); });

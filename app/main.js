@@ -31,12 +31,12 @@ if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d)
 { const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
   const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
     const tests = () => { if (!window.HBLC) return; set.put('lcTab', 'tests'); HBLC.open(); };
-    const items = [['file-check-2', 'Tests from any worksheet', 'Live class → Tests. Upload a PDF, Word file or photo: questions, figures, graphs, equations and the answer key are found automatically.', tests],
-      ['circle-check', 'Marked the moment they hand in', 'Nine question types, instant feedback with explanations, a second try with a hint, time limits and shuffling — in English and Arabic.', tests],
-      ['chart-column-big', 'A results dashboard', 'Score distribution, accuracy by question, misconceptions, a heat map of every answer, your own marks for written answers, Excel export.', tests],
-      ['git-branch-plus', 'Concept maps: branches and sub-branches', 'Drag a branch onto another idea to move it there; drop it anywhere to reorder.', () => window.HBMM && HBMM.open()],
-      ['pen-tool', 'A new look', 'The HelixBoard logo now has its smart pen.', null],
-      ['radio', 'One join for the whole lesson', 'Students scan once: quizzes and tests open on the phones by themselves.', () => window.HBLC && HBLC.open()]];
+    const items = [['scan-line', 'Bubble-sheet exams', 'Live class → Tests: students read your document as it is and answer on a bubble sheet. Marked at once.', tests],
+      ['handshake', 'New Collaborate tab', 'Think–Pair–Share, Jigsaw, Gallery walk and seven more structures, with groups, roles and phase timers.', () => window.HBUI && HBUI.selectTab('collab')],
+      ['presentation', 'Slides keep going', 'After writing on PowerPoint slides, every key, the clicker and ▶ move to the next step at once.', null],
+      ['keyboard', 'A real touch keyboard', 'Big keys, a full English and Arabic layout, science symbols and units. Press K.', () => window.HBK && HBK.toggle(true)],
+      ['mouse-pointer-click', 'One right-click menu', 'Right-click, pen button or long-press opens one menu, never two.', null],
+      ['palette', 'School colours', 'The logo now wears Green Hills green and gold.', null]];
     modal.open('<h2>' + icon('sparkles') + ' What’s new in HelixBoard ' + ver + '</h2><div style="display:grid;gap:8px">' + items.map((it, i) => '<button class="btn" data-wn="' + i + '" style="height:auto;justify-content:flex-start;text-align:left;padding:10px 12px;gap:12px">' + icon(it[0]) + '<span><b>' + it[1] + '</b><br><span class="small muted">' + it[2] + '</span></span></button>').join('') + '</div><div class="foot"><button class="btn primary" data-close>Start teaching</button></div>', sh => {
       sh.querySelectorAll('[data-wn]').forEach(b => b.onclick = () => { const f = items[+b.dataset.wn][3]; modal.close(); if (f) setTimeout(f, 60); }); }); };
   setTimeout(show, 1500); } } }
