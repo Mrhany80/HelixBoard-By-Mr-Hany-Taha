@@ -1,0 +1,5 @@
+*.png
+!qb/cell.png
+out*/
+*.log
+runall.log

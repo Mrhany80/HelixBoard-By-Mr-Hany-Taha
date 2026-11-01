@@ -1,0 +1,12 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path'); const file = process.argv[2], out = process.argv[3] || __dirname + '/out';
+(async () => { fs.mkdirSync(out, { recursive: true }); const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1500, height: 900 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; });
+  const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push('console: ' + m.text().slice(0, 200)); });
+  await p.goto('file:///home/user/helixboard/dist/index.html?nointro=1&accskip=1'); await p.waitForTimeout(1500);
+  const b64 = fs.readFileSync(file).toString('base64'), name = path.basename(file);
+  const r = await p.evaluate(async ([b64, name]) => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const type = name.endsWith('.pdf') ? 'application/pdf' : name.endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : name.endsWith('.png') ? 'image/png' : 'text/plain';
+    const f = new File([bin], name, { type }); const t0 = performance.now(); const r = await HBQI.read([f], (m) => {}, 'en'); const P = HBQP.parse(r.lines, { name });
+    return { ms: Math.round(performance.now() - t0), lines: r.lines.map(l => l.img ? '[FIG ' + l.img.length + ']' : (l.b ? '**' : '') + l.t + (l.cells ? '  ||cells:' + l.cells.length : '')), pages: r.pages.length, title: P.title, stats: P.stats, qs: P.questions.map(q => ({ type: q.type, q: q.q, o: q.o || q.left, right: q.right, a: q.a, img: q.img, pts: q.pts, sec: q.sec })) }; }, [b64, name]);
+  console.log('ms', r.ms, 'pages', r.pages, 'title', r.title, JSON.stringify(r.stats)); console.log('--- lines'); r.lines.forEach(l => console.log('  ', l.slice(0, 110)));
+  console.log('--- questions'); r.qs.forEach((q, i) => { console.log(i + 1, q.type, '|', (q.q || '').replace(/\n/g, ' / ').slice(0, 70), '| o:', JSON.stringify(q.o || ''), q.right ? JSON.stringify(q.right) : '', '| a:', JSON.stringify(q.a), q.pts !== 1 ? 'pts' + q.pts : '', q.img ? '[IMG]' : '');
+    if (q.img) fs.writeFileSync(out + '/q' + (i + 1) + (q.img.startsWith('data:image/png') ? '.png' : '.jpg'), Buffer.from(q.img.split(',')[1], 'base64')); });
+  console.log('errs', errs); await b.close(); })();

@@ -28,7 +28,7 @@ const clipImage = e => { const it = [...((e.clipboardData && e.clipboardData.ite
 const store = {
   async index() { return (await IDB.get('tests:index')) || []; },
   async get(id) { return IDB.get('test:' + id); },
-  async save(t) { t.updated = Date.now(); await IDB.put('test:' + t.id, t); const ix = await store.index(), e = { id: t.id, title: t.title, cls: t.cls || '', n: t.questions.length, lang: t.lang, updated: t.updated, runs: (ix.find(x => x.id === t.id) || {}).runs || [] };
+  async save(t) { t.updated = Date.now(); await IDB.put('test:' + t.id, t); const ix = await store.index(), e = { id: t.id, kind: t.kind || 'test', title: t.title, cls: t.cls || '', n: t.questions.length, lang: t.lang, updated: t.updated, runs: (ix.find(x => x.id === t.id) || {}).runs || [] };
     await IDB.put('tests:index', [e].concat(ix.filter(x => x.id !== t.id))); },
   async remove(id) { const ix = await store.index(), e = ix.find(x => x.id === id); await IDB.put('tests:index', ix.filter(x => x.id !== id)); await IDB.put('test:' + id, null); if (e) for (const r of e.runs || []) await IDB.put('testrun:' + r.id, null); },
   async run(id) { return IDB.get('testrun:' + id); },
@@ -112,18 +112,20 @@ async function renderLib(m) {
   m.innerHTML = '<div class="qb-lib"><div class="lc-hero"><div><h1>Tests</h1><p>Turn a worksheet, a PDF or a Word file into an online test — questions, figures and the answer key are found for you, every paper is marked the moment it is handed in.</p></div></div>' +
     (run ? '<div class="live"><span style="width:10px;height:10px;border-radius:50%;background:#4ADE80;flex:none"></span><b style="flex:1">' + esc(run.title) + ' is running on the phones</b><button class="btn primary" id="qbDash">' + icon('chart-column-big') + 'Open dashboard</button></div>' : '') +
     '<div class="newbig"><button class="lc-card" id="qbNew" style="--tint:#6250d6"><div class="ic">' + icon('file-up') + '</div><b>New test from a worksheet</b><span>PDF, Word, photos of a book page or pasted text. Works in English and Arabic, with no AI and no internet.</span></button>' +
+    '<button class="lc-card" id="qbSheet" style="--tint:#C9971C"><div class="ic">' + icon('scan-line') + '</div><b>Bubble-sheet exam</b><span>Students read your document as it is and answer on a bubble sheet — on phones or on paper. Like ZipGrade.</span></button>' +
     '<button class="lc-card" id="qbBlank" style="--tint:#1baf7a"><div class="ic">' + icon('file-plus-2') + '</div><b>Blank test</b><span>Type the questions yourself, like Microsoft Forms: nine question types, points, explanations and hints.</span></button></div>' +
     (ix.length ? '<h3 style="margin:0 0 10px">Your tests</h3><div class="lib" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">' + ix.map(t => { const r = (t.runs || [])[0];
-      return '<div class="tcard" data-id="' + t.id + '"><b dir="auto">' + esc(t.title) + '</b><div class="m">' + t.n + ' questions' + (t.cls ? ' · ' + esc(t.cls) : '') + (t.lang === 'ar' ? ' · العربية' : '') + '</div>' +
+      return '<div class="tcard" data-id="' + t.id + '"><b dir="auto">' + esc(t.title) + '</b><div class="m">' + (t.kind === 'sheet' ? '▦ Bubble sheet · ' : '') + t.n + ' questions' + (t.cls ? ' · ' + esc(t.cls) : '') + (t.lang === 'ar' ? ' · العربية' : '') + '</div>' +
         (r ? '<div class="m">Last given ' + new Date(r.at).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' · ' + r.n + ' handed in' + (r.avg != null ? ' · average ' + r.avg + '%' : '') + '</div>' : '<div class="m">Not given yet</div>') +
         '<div class="row"><button class="btn sm primary" data-a="start">' + icon('play') + 'Start</button><button class="btn sm" data-a="edit">' + icon('pencil') + 'Edit</button>' + (r ? '<button class="btn sm" data-a="dash">' + icon('chart-column-big') + 'Results</button>' : '') + '<button class="btn sm" data-a="dup" title="Duplicate">' + icon('copy') + '</button><button class="btn sm" data-a="del" title="Delete">' + icon('trash-2') + '</button></div></div>'; }).join('') + '</div>'
       : '<p class="muted">Your tests will appear here.</p>') + '</div>';
   m.querySelector('#qbNew').onclick = () => wizard();
   m.querySelector('#qbBlank').onclick = () => wizard(null, true);
+  m.querySelector('#qbSheet').onclick = () => window.HBSX && HBSX.open();
   const db = m.querySelector('#qbDash'); if (db) db.onclick = () => window.HBTD && HBTD.open(run.testId, run.id, true);
   $$('.tcard', m).forEach(c => c.onclick = async e => { const b = e.target.closest('button'); if (!b) return; const id = c.dataset.id, a = b.dataset.a;
     if (a === 'start') return start(id);
-    if (a === 'edit') { const t = await store.get(id); if (t) wizard(t); }
+    if (a === 'edit') { const t = await store.get(id); if (t) (t.kind === 'sheet' && window.HBSX ? HBSX.open(t) : wizard(t)); }
     if (a === 'dash') { const e2 = (await store.index()).find(x => x.id === id); if (e2 && e2.runs && e2.runs[0]) window.HBTD && HBTD.open(id, e2.runs[0].id, S.open && S.open.id === e2.runs[0].id); }
     if (a === 'dup') { const t = await store.get(id); if (t) { const c2 = JSON.parse(JSON.stringify(t)); c2.id = uid(); c2.title = t.title + ' (copy)'; await store.save(c2); renderLib(m); } }
     if (a === 'del') { if (confirm('Delete this test and its results?')) { await store.remove(id); renderLib(m); toast('Test deleted.'); } } });

@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// stand-in for cloudflared: forwards http://127.0.0.1:9555 to the --url target; like the real tool it prints the address first
+// and only later "Registered tunnel connection". FAKE_DROP=<file>: the first run exits after 8 s (a dropped link), later runs stay up.
+const http=require('http'),fs=require('fs');const target=new URL(process.argv[process.argv.indexOf('--url')+1]);
+if(process.env.FAKE_FAIL){console.error('ERR failed to request quick Tunnel: 429 Too Many Requests');process.exit(1);}
+const n=(()=>{try{return +fs.readFileSync(process.env.FAKE_DROP||'/nonexistent','utf8')}catch(e){return 0}})();
+const host=n?'fake-class-quiz-'+n:'fake-class-quiz';
+const srv=http.createServer((req,res)=>{const p=http.request({host:target.hostname,port:target.port,path:req.url,method:req.method,headers:Object.assign({},req.headers,{'cf-connecting-ip':req.socket.remoteAddress})},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res);});p.on('error',()=>{res.writeHead(502);res.end();});req.pipe(p);});
+srv.listen(9555,()=>{
+ setTimeout(()=>console.error('2026-10-27T10:00:00Z INF +----------------------------+\n2026-10-27T10:00:00Z INF |  https://'+host+'.trycloudflare.com  |'),1500);
+ setTimeout(()=>console.error('2026-10-27T10:00:03Z INF Registered tunnel connection connIndex=0 connection=abc event=0 ip=198.41.200.13 location=JED protocol=http2'),(+process.env.FAKE_REG_DELAY||4000));
+ if(process.env.FAKE_DROP&&!n){setTimeout(()=>{fs.writeFileSync(process.env.FAKE_DROP,'2');process.exit(1)},8000);}
+});
+srv.on('error',e=>{console.error('ERR',e.message);process.exit(1)});

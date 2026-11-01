@@ -1,0 +1,23 @@
+/* Worksheet reading: text (English, Arabic), PDF with figures, Word with chart/shapes/numbering, equations in Word and PDF */
+const { execFileSync } = require('child_process'); const S = process.argv[2] || __dirname; const errs = [];
+const run = (script, ...a) => execFileSync('node', [S + '/qb/' + script, ...a], { encoding: 'utf8', cwd: S + '/qb' });
+const want = (name, out, re) => { const ok = re.test(out.replace(/\s+/g, ' ')); console.log((ok ? 'ok  ' : 'BAD ') + name); if (!ok) errs.push(name); };
+const en = run('t.js', 'ws_en.txt'), ar = run('t.js', 'ws_ar.txt');
+want('English text: 12 questions, all keyed, 9 types', en, /"total":12,"keyed":12,"types":\{"mc":2,"multi":1,"tf":2,"blank":2,"match":1,"order":1,"num":1,"short":1,"long":1\}/);
+want('Arabic text: 6 questions, all keyed', ar, /"total":6,"keyed":6/);
+const pdf = run('imp.js', 'ws.pdf', S + '/qb/out_pdf');
+want('PDF: 9 questions, all keyed, 4 with figures', pdf, /"total":9,"keyed":9,.*"figures":4/); want('PDF: graph shared by Q3-4, matching key', pdf, /3 num.*\[IMG\].*4 long.*\[IMG\].*9 match.*a: \[1,0,2\]/); want('PDF: no page errors', pdf, /errs \[\]/);
+const dx = run('imp.js', 'ws.docx', S + '/qb/out_docx');
+want('Word: numbering, bold key, picture, chart, shapes', dx, /1 mc .*a: 1 .*2 mc .*a: 0 +\[IMG\].*3 short .*\[IMG\].*4 short .*\[IMG\].*5 tf .*a: false/); want('Word: no page errors', dx, /errs \[\]/);
+const eqd = run('imp.js', 'eq.docx', S + '/qb/out_eqd');
+want('Word equations kept as pictures', eqd, /1 num \| Use +⟦m:\w+⟧ +to calculate.*2 mc .*\["⟦m:\w+⟧","⟦m:\w+⟧","⟦m:\w+⟧"\] +\| a: 0/);
+const eqp = run('imp.js', 'eq2.pdf', S + '/qb/out_eq2');
+want('PDF equations: fractions exact, H₂O and x² as text', eqp, /1 num \| ⟦m:\w+⟧ .*2 mc .*\["H₂O","CO₂","O₂"\] +\| a: 0.*3 short \| Simplify x² × x³.*4 num \| ⟦m:\w+⟧/);
+const g10 = run('imp.js', 'g10.pdf', S + '/up/out');
+want('G10 worksheet: 31 questions, all keyed, 4 figures', g10, /"total":31,"keyed":31,.*"figures":4/);
+want('G10: key table letters, T/F table, labels, equation blanks', g10, /1 mc .*a: 3 .*3 mc .*a: 1 .*17 mc .*a: 2 .*18 tf .*a: true .*19 tf .*a: false .*22 blank .*\[\["nuclear pore"\].*26 blank .*\[\["C₆H₁₂O₆"\],\["O₂"\],\["CO₂"\],\["energy"\]\].*30 blank .*"TCA".*31 blank .*intermembrane space/);
+const keys = run('keys.js'); want('13 answer-key layouts', keys, /^(?!.*BAD)/);
+const G = require('/home/user/helixboard/desktop/testgrade.js'); const g = (q, v) => G.grade(q, v).score;
+const marks = [g({ type: 'short', a: ['photosynthesis'] }, 'Photosynthsis'), g({ type: 'short', a: ['الخلية'] }, 'خليه'), g({ type: 'num', a: { v: 9.8, unit: 'm/s²' } }, '9,81'), g({ type: 'num', a: { v: 3e8 } }, '3×10^8'), g({ type: 'multi', a: [0, 1, 3] }, [0, 1]), g({ type: 'match', a: [1, 0, 2] }, [1, 0, 2])];
+want('Marking: spelling, Arabic forms, numbers, partial credit', JSON.stringify(marks), /^\[1,1,1,1,0\.667,1\]$/);
+console.log('errs', errs);

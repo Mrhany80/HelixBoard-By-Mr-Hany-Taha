@@ -15,7 +15,7 @@ D = R + 'dist/'
 # module doesn't stop the whole app
 ORDER = ['core','engine','input','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
          'recog','classtools','notes','smart','mindmap','deck','wheel','timer','water','io','ui',
-         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','collab','quizparse','quizimport','quizbuilder','testdash','videolesson','reports','xp','cards','account','install','lang','intro','main']
+         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','collab','quizparse','quizimport','quizbuilder','sheetexam','testdash','videolesson','reports','xp','cards','account','install','lang','intro','main']
 
 parts = []
 # test marking is shared with the Windows app's class link server (desktop/testgrade.js)
