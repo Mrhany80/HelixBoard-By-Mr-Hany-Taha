@@ -40,7 +40,7 @@ Greek, units, chemistry and biology layers, long-press variants, types into the 
 
 **Logo** — Green Hills colours (green and gold) in the app, the Windows icon, the installer and the web app.
 
-**Tests** — `tests/` is now in the repository (29 suites + fixtures). New: `ppt`, `sx`, `kb`; `mm` follows the in-app
+**Tests** — `tests/` is now in the repository (28 suites + fixtures). New: `ppt`, `sx`, `kb`; `mm` follows the in-app
 linking-words box.
 
 ### Decisions and workarounds
