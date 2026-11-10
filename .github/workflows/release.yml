@@ -1,0 +1,70 @@
+# Builds the Windows app and publishes a GitHub release whenever a version tag (v2.8.0, …) is pushed.
+# The release gets the Setup .exe, the Portable .exe and latest.json (which installed copies read to update themselves).
+# To publish a version: raise "version" in desktop/package.json, add its section to CHANGELOG.md, push, then push the tag.
+name: Windows release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and release (for example v2.8.0)'
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Check that the tag matches desktop/package.json
+        shell: bash
+        run: |
+          V=$(node -p "require('./desktop/package.json').version")
+          if [ "v$V" != "$TAG" ]; then echo "Tag $TAG does not match version $V in desktop/package.json"; exit 1; fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+      - name: Build the web app
+        shell: bash
+        run: |
+          python build.py
+          mkdir -p desktop/app
+          cp dist/index.html desktop/app/index.html
+      - name: Build the installer and the portable app
+        shell: bash
+        working-directory: desktop
+        run: |
+          npm ci
+          npx electron-builder --win nsis portable --x64 --publish never
+          node build/latest-json.js "HelixBoard $VERSION"
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const v=process.env.VERSION;const i=s.indexOf('## '+v);if(i<0){console.log('HelixBoard '+v);process.exit(0)}const r=s.slice(i+('## '+v).length);const j=r.search(/\n## /);console.log((j<0?r:r.slice(0,j)).trim())" > notes.md
+      - name: Publish the release
+        shell: bash
+        run: |
+          S="desktop/release/HelixBoard-By-Mr-Hany-Taha-Setup-$VERSION.exe"
+          P="desktop/release/HelixBoard-By-Mr-Hany-Taha-Portable-$VERSION.exe"
+          J="desktop/release/latest.json"
+          ls -la desktop/release
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$S" "$P" "$J" --clobber
+            gh release edit "$TAG" --notes-file notes.md --latest
+          else
+            gh release create "$TAG" "$S" "$P" "$J" --title "$TAG" --notes-file notes.md --latest
+          fi

@@ -31,13 +31,15 @@ if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d)
 { const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
   const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
     const tests = () => { if (!window.HBLC) return; set.put('lcTab', 'tests'); HBLC.open(); };
-    const items = [['presentation', 'Smooth return while presenting', 'Leave the app during a PDF or PowerPoint share and it answers at once when you come back. Highlighter and Collaborate fixed too.', null],
-      ['scan-line', 'Bubble-sheet exams', 'Live class → Tests: students read your document as it is and answer on a bubble sheet. Marked at once.', tests],
-      ['handshake', 'New Collaborate tab', 'Think–Pair–Share, Jigsaw, Gallery walk and seven more structures, with groups, roles and phase timers.', () => window.HBUI && HBUI.selectTab('collab')],
-      ['presentation', 'Slides keep going', 'After writing on PowerPoint slides, every key, the clicker and ▶ move to the next step at once.', null],
-      ['keyboard', 'A real touch keyboard', 'Big keys, a full English and Arabic layout, science symbols and units. Press K.', () => window.HBK && HBK.toggle(true)],
-      ['mouse-pointer-click', 'One right-click menu', 'Right-click, pen button or long-press opens one menu, never two.', null],
-      ['palette', 'School colours', 'The logo now wears Green Hills green and gold.', null]];
+    const P = (f, ...a) => () => window.HBP && HBP[f](...a), tab = t => () => window.HBUI && HBUI.selectTab(t);
+    const items = [['activity', 'Mini-labs', 'Enzymes, osmosis and predator–prey as predict → observe → explain. Science → Lab.', P('labs')],
+      ['scan-eye', 'Ghost trace', 'Trace a diagram, redraw it from memory, then check it against the model. Draw tab.', tab('draw')],
+      ['text-cursor-input', 'Cloze and Notes → quiz', 'Hide key words of any text, or turn “term - definition” notes into a quiz.', tab('text')],
+      ['ruler', 'Live measure', 'Real lengths, angles and areas from a scale you set. Shapes tab.', P('measure')],
+      ['repeat', 'Due today', 'Every flashcard that is due, from all decks, in one mixed session. Study tab.', () => window.HBL && HBL.dueToday()],
+      ['scale', 'Fair talk and the lesson runway', 'See who has spoken and pick a quiet voice; the lesson flow now runs as a strip on the board.', P('fairTalk')],
+      ['clipboard-list', 'Lesson recap and before / after', 'One page that gathers the lesson; compare two pictures with a slider.', null],
+      ['monitor-smartphone', 'Tablets, phones and no internet', 'The layout now fits small screens, and equations, charts, molecules and sketchy shapes work offline.', null]];
     modal.open('<h2>' + icon('sparkles') + ' What’s new in HelixBoard ' + ver + '</h2><div style="display:grid;gap:8px">' + items.map((it, i) => '<button class="btn" data-wn="' + i + '" style="height:auto;justify-content:flex-start;text-align:left;padding:10px 12px;gap:12px">' + icon(it[0]) + '<span><b>' + it[1] + '</b><br><span class="small muted">' + it[2] + '</span></span></button>').join('') + '</div><div class="foot"><button class="btn primary" data-close>Start teaching</button></div>', sh => {
       sh.querySelectorAll('[data-wn]').forEach(b => b.onclick = () => { const f = items[+b.dataset.wn][3]; modal.close(); if (f) setTimeout(f, 60); }); }); };
   setTimeout(show, 1500); } } }

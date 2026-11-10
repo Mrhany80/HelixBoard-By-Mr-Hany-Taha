@@ -15,7 +15,7 @@ D = R + 'dist/'
 # module doesn't stop the whole app
 ORDER = ['core','engine','input','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
          'recog','classtools','notes','smart','mindmap','deck','wheel','timer','water','io','ui',
-         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','collab','quizparse','quizimport','quizbuilder','sheetexam','testdash','videolesson','reports','xp','cards','account','install','lang','intro','main']
+         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','collab','quizparse','quizimport','quizbuilder','sheetexam','testdash','videolesson','reports','xp','cards','account','plus','install','lang','intro','main']
 
 parts = []
 # test marking is shared with the Windows app's class link server (desktop/testgrade.js)
@@ -73,6 +73,13 @@ LIBS = [
     ('pptx',      'pptx-preview.umd.js',     'pptx-preview 1.0.7 — ISC'),
     ('mammoth',   'mammoth.browser.min.js',  'mammoth 1.8.0 — BSD-2-Clause'),
     ('jspdf',     'jspdf.umd.min.js',        'jsPDF 4.2.1 — MIT'),
+    # 2.8.0: equations, sketchy shapes, charts and molecules no longer need the internet
+    ('rough',     'rough.js',                'Rough.js 4.6.6 — MIT'),
+    ('chart',     'chart.umd.min.js',        'Chart.js 4.5.1 — MIT'),
+    ('smiles',    'smiles-drawer.min.js',    'SmilesDrawer 2.4.1 — MIT'),
+    ('katex',     'katex.min.js',            'KaTeX 0.19.0 — MIT'),
+    ('mhchem',    'katex-mhchem.min.js',     'KaTeX mhchem — MIT'),
+    ('katexcss',  'katex.inline.css',        'KaTeX styles and fonts — MIT / OFL'),
 ]
 emb = ''
 for k, fn, lic in LIBS:

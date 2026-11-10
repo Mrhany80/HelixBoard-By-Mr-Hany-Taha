@@ -40,7 +40,7 @@ function reorder(ids) { const a = page().objs.map(o => o.id); push({ k: 'order',
 function grow() { if (B.mode !== 'scroll') return; const p = page(); let maxY = 0; p.objs.forEach(o => { const b = bbox(o); if (b) maxY = Math.max(maxY, b[1] + b[3]); }); if (maxY > p.H - 500) { p.H = Math.ceil((maxY + 1100) / 1080) * 1080; dirty.bg = true; bus.emit('view'); } }
 let saveT = 0, lastVer = Date.now(), dirtySinceVer = false;
 function changed(silent) { if (page()) page().mod = Date.now(); dirty.main = true; if (B.mode !== 'scroll') dirty.bg = true; dirtySinceVer = true; bus.emit('changed'); clearTimeout(saveT); saveT = setTimeout(saveNow, 800); }
-const serial = () => JSON.stringify({ v: B.v, title: B.title, width: B.width, mode: B.mode, cur: B.cur, pages: B.pages.map(p => ({ id: p.id, name: p.name || undefined, mod: p.mod || undefined, theme: p.theme, contrast: p.contrast, H: p.H, layers: p.layers, deck: p.deck || undefined, objs: p.objs.map(clean) })) });
+const serial = () => JSON.stringify({ v: B.v, title: B.title, width: B.width, mode: B.mode, cur: B.cur, pages: B.pages.map(p => ({ id: p.id, name: p.name || undefined, mod: p.mod || undefined, theme: p.theme, contrast: p.contrast, H: p.H, layers: p.layers, deck: p.deck || undefined, ghost: p.ghost || undefined, sc: p.sc || undefined, objs: p.objs.map(clean) })) });
 async function saveNow() { const s = serial(); await IDB.put('board', s); await IDB.put('assets', B.assets); if (dirtySinceVer && Date.now() - lastVer > 180000) { lastVer = Date.now(); dirtySinceVer = false; IDB.addVersion({ ts: Date.now(), title: B.title, n: B.pages.reduce((a, p) => a + p.objs.length, 0), data: s }); } bus.emit('saved'); }
 function loadBoard(json, assets) { const d = typeof json === 'string' ? JSON.parse(json) : json; B.title = d.title || 'Untitled board'; B.width = d.width || 1920; B.mode = d.mode || 'scroll'; B.pages = (d.pages || []).map(p => Object.assign(newPage(p.theme), p)); if (!B.pages.length) B.pages = [newPage()]; B.cur = clamp(d.cur || 0, 0, B.pages.length - 1); if (assets) B.assets = assets; imgCache.clear(); fitWidth(true); dirty.all(); bus.emit('board-loaded'); bus.emit('changed'); }
 
@@ -156,7 +156,8 @@ function pageDates(p) { const d = new Date(p.mod || Date.now()); return [fmtG.fo
 function drawDates(g, p, screen) { if (!set.get('showDates', true) || p.deck) return; const [gd, ha, he] = pageDates(p), dark = THEMES[p.theme].dark, hmode = set.get('hijriLang', 'both'); g.save(); const ink = dark ? 'rgba(255,255,255,.94)' : 'rgba(22,12,18,.92)', soft = dark ? 'rgba(255,255,255,.72)' : 'rgba(22,12,18,.7)'; g.fillStyle = ink; g.textBaseline = 'top';
   const AR = 'Tajawal, "Noto Kufi Arabic", "Segoe UI", Tahoma, Arial, sans-serif', EN = 'Lexend, "Segoe UI", Arial, sans-serif';
   const right = (x, y, s1, f1, s2, f2) => { g.textAlign = 'right'; if (hmode === 'ar') { g.direction = 'rtl'; g.font = f1.ar; g.fillText(ha, x, y); return; } g.direction = 'ltr'; g.font = f1.en; g.fillText(he, x, y); if (hmode === 'both' && ha) { g.direction = 'rtl'; g.font = f2; g.fillStyle = soft; g.fillText(ha, x, y + s2); g.fillStyle = ink; } };
-  if (screen) { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.font = '700 19px ' + EN; g.textAlign = 'left'; g.direction = 'ltr'; g.fillText(gd, 16, 10); right(SW - 40, 10, 0, { en: '700 19px ' + EN, ar: '700 21px ' + AR }, 26, '600 16px ' + AR); }
+  if (screen && SW < 760) { /* narrow screens (phones, split view): the two dates go on separate lines instead of printing over each other */ g.setTransform(DPR, 0, 0, DPR, 0, 0); g.font = '700 15px ' + EN; g.textAlign = 'left'; g.direction = 'ltr'; g.fillText(gd, 12, 8); right(SW - 40, 28, 0, { en: '600 13px ' + EN, ar: '700 15px ' + AR }, 18, '600 13px ' + AR); }
+  else if (screen) { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.font = '700 19px ' + EN; g.textAlign = 'left'; g.direction = 'ltr'; g.fillText(gd, 16, 10); right(SW - 40, 10, 0, { en: '700 19px ' + EN, ar: '700 21px ' + AR }, 26, '600 16px ' + AR); }
   else if (B.mode === 'scroll') { g.font = '700 32px ' + EN; g.textAlign = 'left'; g.direction = 'ltr'; g.fillText(gd, 30, 18); right(B.width - 60, 18, 0, { en: '700 32px ' + EN, ar: '700 35px ' + AR }, 42, '600 26px ' + AR); }
   g.restore(); }
 function drawScreenOverlayBg(g, p) { if (B.mode !== 'scroll') drawDates(g, p, true); /* screen-space parts of some themes (microscope field, animated plankton) */
@@ -310,7 +311,15 @@ function drawScale(g, o, dark) { const im = o.img && byId(o.img); const L = im ?
 let stepFilter = null; const setStepFilter = f => { stepFilter = f; };
 /* a second filter for audio-note replay: hides ink that had not been written yet at this point of the recording */
 let viewFilter = null; const setViewFilter = f => { viewFilter = f; dirty.all(); };
-function drawObj(g, o, p, opt) { if (o.off) return; if (o.step && stepFilter && stepFilter(o)) return; if (viewFilter && viewFilter(o)) return; if (p && p.deck && p.deck.inkOff && !o.deckBase && (o.layer == null ? 1 : o.layer) >= 1 && !(opt && opt.ink)) return; const dark = isDark(p);
+let ghostCv = null;
+/* Ghost trace (2.8): objects flagged `gh` are a model drawing. The page's ghost mode decides how they show:
+   'faint' = a pale copy to trace over, 'hide' = gone (redraw from memory), 'show' = full strength in the check colour.
+   Drawn through a scratch canvas so every object type fades the same way on every browser. */
+function drawGhost(g, o, p, opt, mode) { const b = bbox(o); if (!b) return; const m = g.getTransform(), pad = 40, sx = m.a, sy = m.d; const w = Math.min(4096, Math.ceil((b[2] + pad * 2) * sx)), h = Math.min(4096, Math.ceil((b[3] + pad * 2) * sy)); if (w < 1 || h < 1 || m.b || m.c) return;
+  ghostCv = ghostCv || document.createElement('canvas'); if (ghostCv.width < w) ghostCv.width = w; if (ghostCv.height < h) ghostCv.height = h; const c = ghostCv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h); c.setTransform(sx, 0, 0, sy, -(b[0] - pad) * sx, -(b[1] - pad) * sy);
+  drawObj(c, o, p, Object.assign({}, opt, { gh: 1 })); if (mode === 'show') { /* tinted green, keeping light fills light and outlines dark, so labels inside shapes stay readable */ c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-atop'; c.globalAlpha = 0.72; c.fillStyle = '#0CA678'; c.fillRect(0, 0, w, h); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = mode === 'show' ? 0.8 : 0.2; g.drawImage(ghostCv, 0, 0, w, h, m.e + (b[0] - pad) * sx, m.f + (b[1] - pad) * sy, w, h); g.restore(); }
+function drawObj(g, o, p, opt) { if (o.off) return; if (o.gh && !(opt && opt.gh)) { const gm = (p && p.ghost) || 'faint'; if (gm === 'hide') return; if (gm !== 'full') return drawGhost(g, o, p, opt, gm); } if (o.step && stepFilter && stepFilter(o)) return; if (viewFilter && viewFilter(o)) return; if (p && p.deck && p.deck.inkOff && !o.deckBase && (o.layer == null ? 1 : o.layer) >= 1 && !(opt && opt.ink)) return; const dark = isDark(p);
   switch (o.t) {
     case 'stroke': drawStroke(g, o, p); break;
     case 'shape': drawShape(g, o); break;

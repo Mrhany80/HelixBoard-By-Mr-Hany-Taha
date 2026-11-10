@@ -16,3 +16,6 @@ paths at the top of a suite to run it elsewhere. Fixtures: `anim.pptx`, `rich.pp
 v2.7.0 suites: `ppt` (slides keep going after writing, 20 advances, 1–2 ms each), `sx` (bubble-sheet exam with two phones,
 offline and reload, negative marking, integrity flags, the key never reaches a phone), `kb` (on-screen keyboard, English and
 Arabic), `mm4` (moving branches), `qimp` (worksheet reading, 13 answer-key layouts).
+
+v2.8.0 suite: `plus` (51 checks with the network blocked: the ten learning tools, the lab models, the offline libraries, the layout at
+768 and 390 px). It finds the build next to the tests folder, so it runs from any checkout.

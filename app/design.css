@@ -121,3 +121,42 @@ body.ar #toast::before{left:auto;right:0;border-radius:4px 0 0 4px}
 #sheet textarea{padding:10px 12px;border:1px solid var(--line2)!important;background:var(--panel2);outline:none}
 #sheet input:focus,#sheet textarea:focus,#sheet select:focus,.inp:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)!important;outline:none}
 #sheet label.small,#sheet .small{color:var(--muted)}
+
+/* ================= 2.8.0 ================= */
+/* touch targets: colour swatches and the page-tab close button were under 28 px */
+.sw{width:28px!important;height:28px!important}
+body.side #toolrow [data-k="colors"]{grid-template-columns:repeat(7,28px)!important;gap:4px!important}
+.ptab .px{width:28px!important;height:28px!important}
+/* the closed drawer sat off-screen to the right and made phones and tablets lay the page out wider than the screen */
+html{overflow:hidden}
+#drawer.closed{visibility:hidden;transition:transform .25s,visibility 0s .25s}
+#drawer{transition:transform .25s,visibility 0s}
+
+/* ---------- tablets in portrait and phones (≤ 860 px): the side-panel styles above were written for wide screens ---------- */
+@media (max-width:860px){
+  #top{min-height:52px!important;padding:5px 8px!important;gap:8px!important}
+  #top .brand svg{width:32px!important;height:32px!important}
+  #top .brand .name{font-size:18px!important}
+  #top .acts{flex:1 1 auto;min-width:0;margin-left:0!important;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;justify-content:flex-start;gap:4px!important;-webkit-overflow-scrolling:touch}
+  #top .acts::-webkit-scrollbar{display:none}
+  #top .acts>*{flex:none}
+  #tabSelect{flex:0 1 150px!important;min-width:104px;height:38px}
+  body.side #toolrow{width:auto!important;max-width:100vw;flex-direction:row!important;align-items:stretch!important;padding:6px 8px!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;border-right:0!important;border-bottom:1px solid var(--line)!important;min-height:0!important;-webkit-overflow-scrolling:touch;grid-column:auto!important;grid-row:auto!important}
+  body.side #toolrow .grp{flex:none!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;padding:6px!important;border-bottom:1px solid var(--line)!important}
+  body.side #toolrow .glab{writing-mode:vertical-rl!important;transform:rotate(180deg)!important;width:auto!important;margin:0 4px 0 0!important;font-size:9px!important;max-height:58px}
+  body.side #toolrow .glab::before{display:none}
+  body.side #toolrow .tb{width:66px!important;min-width:66px!important;height:54px!important}
+  body.side #toolrow .tb.wide{width:auto!important}
+  body.side #toolrow .sel,body.side #toolrow .rng{width:auto!important;min-width:150px}
+  body.side #toolrow [data-k="colors"]{grid-template-columns:repeat(8,28px)!important;grid-auto-flow:row}
+  body.side #toolrow .bgrow{flex-wrap:nowrap!important}
+  body.side #toolrow .grp.subs{position:static!important}
+  body.side #toolrow .subchips{flex-wrap:nowrap}
+  body.side #sidetabs{display:none!important}
+  body.side #dock,body.side.inf #dock,body.deckfull #dock{left:8px!important;right:8px!important;top:auto!important;bottom:44px!important;transform:none!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto!important;overflow-y:hidden!important;max-width:calc(100vw - 16px);scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  body.side #dock::-webkit-scrollbar{display:none}
+  body.side #dock>*{flex:none}
+  .float{max-width:calc(100vw - 12px)}
+  #sheet{max-width:calc(100vw - 16px)!important;padding:16px 14px!important}
+}
+@media (max-width:600px){ #top .brand .name{display:none!important} }

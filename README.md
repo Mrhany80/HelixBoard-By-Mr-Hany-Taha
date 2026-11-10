@@ -3,7 +3,7 @@
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
-Version **2.7.0** — three ways to run it, all built from the same `app/` source:
+Version **2.8.0** — three ways to run it, all built from the same `app/` source:
 
 | Device | What | Install |
 |---|---|---|
@@ -61,6 +61,7 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 | roots.js | Scientific Roots Dictionary (438 roots/prefixes/suffixes) |
 | studio.js | **Teach** and **Study** tabs: lesson plan + objectives card + lesson flow timer, live class quiz with hand tallies and results, show-me boards, confidence check, retrieval starter, question stems (Bloom’s), cold call, command words + answer frames, team points; for students: practice quiz with mistakes log, spaced-repetition flashcards, focus timer, brain dump, explain-it-simply and exam answer planners, progress dashboard. Quiz/flashcard sets are written by the user and shared as `.hbset` files |
 | notekit.js | Notes tab tools: text styles, lists that continue on Enter, callout boxes (key fact, definition, exam tip …), typeable tables, sections/dividers, highlighters, marking stamps, hide & reveal covers, frames (named areas to jump between), read aloud, notes → flashcards, screen capture / annotate screen |
+| plus.js | **2.8 learning tools**, one per tab: Ghost trace, Live measure, Cloze, Notes → quiz, Before / after slider, Mini-labs (enzyme, osmosis, predator–prey), Lesson runway strip, Fair talk, Lesson recap (`window.HBP`) |
 | intro.js | Welcome screen and tap-to-start |
 | main.js | Boot and glue code |
 
@@ -95,6 +96,24 @@ Ten tabs: **Draw** (pens, erase, select, colour, ink magic) · **Shapes** · **T
 **Teach** (lesson, timers, wheel and pickers, quiz on the board, assessment, focus tools, water — filter chips) ·
 **Study** (Live class on phones — and student self-study tools; filter chips) · **Collaborate** (ten group-work structures with phase timers, groups and roles, the live sticky wall) · **Page** (page, backgrounds, files, intro setting — filter chips).
 Tab definitions live in `ui.js`: `SRC` holds every tool group, `TABS` assembles the ten tabs from them.
+
+### Learning tools (2.8)
+
+| Tab | Tool | How it is used |
+|---|---|---|
+| Draw | **Ghost trace** | Select a drawing → Trace (pale copy) → From memory (hidden) → Check (model in green under your ink). |
+| Shapes | **Live measure** | Sizes follow lines and shapes. Select an object of known size, type its real length → **Set scale**. |
+| Text | **Cloze** | Select a text box → choose or suggest key words → tap the text with any tool except Select to open a blank. |
+| Notes | **Notes → quiz** | “term - definition” lines (selection, page or whole board) → multiple-choice quiz set. |
+| Insert | **Before / after** | Select two pictures → slider or fade. |
+| Science → Lab | **Mini-labs** | Predict → observe → explain: enzyme activity, osmosis, predator–prey. Graph and sentence starters go to the board. |
+| Teach | **Lesson flow** | Phase timers, now with a runway strip on the board and an automatic next phase. |
+| Study | **Due today** | All due flashcards from every deck in one mixed session. |
+| Collaborate | **Fair talk** | Tap names as students contribute; pick from those who have spoken least. |
+| Page | **Lesson recap** | A last page with headings, key ideas and questions from the whole board. |
+
+Objects carry small flags for these: `gh` (ghost model), `cz` (cloze: original text, hidden and opened word indexes), `ms`
+(a written measurement); pages carry `ghost` (`faint` / `hide` / `show`) and `sc` (scale: pixels per unit, unit).
 
 Right-click, the pen's barrel button and a long-press open one radial menu (with Duplicate / Copy / Front / Delete for a
 selection); the browser's own menu appears only in text fields. In the slideshow Space, Enter, PageDown, → and a clicker
@@ -386,9 +405,12 @@ The installed app checks `https://github.com/Mrhany80/HelixBoard-By-Mr-Hany-Taha
 a few seconds after start and every 6 hours (also Page tab → **Check for updates**). When the version there is newer it
 offers **Update now**, downloads the Setup `.exe`, checks its SHA-256 and runs it.
 
-1. Raise `version` in `desktop/package.json` (e.g. 2.2.1).
-2. `cd desktop && npm run dist` — also writes `release/latest.json`.
-3. On GitHub: **Releases → Draft a new release**, tag `v2.2.1`, attach the Setup `.exe`, the Portable `.exe` and `latest.json`, **Publish**.
+1. Raise `version` in `desktop/package.json` (and `version` in `app/account.js`), and add a `## <version>` section to `CHANGELOG.md`.
+2. Push to `main`, then push the tag: `git tag v2.8.1 && git push origin v2.8.1`.
+3. `.github/workflows/release.yml` builds the Setup and Portable `.exe` on a Windows runner, writes `latest.json` and publishes
+   the release with the notes from `CHANGELOG.md`. To rebuild an existing tag: **Actions → Windows release → Run workflow**.
+
+By hand (as before 2.8): `cd desktop && npm run dist`, then attach the two `.exe` files and `release/latest.json` to a release named `v<version>`.
 
 The tablet web app updates itself whenever `main` changes (`.github/workflows/pages.yml` rebuilds and publishes it).
 
@@ -402,6 +424,8 @@ The tablet web app updates itself whenever `main` changes (`.github/workflows/pa
 
 ## Known limits
 
+- Photo → text and handwriting → text still download their libraries the first time; everything else works with no internet.
+- The mini-lab questions and explanations are in English only.
 - Arabic handwriting recognition is not offered (the interface itself is fully Arabic: the ع button).
 - The iPad version is a web app (no App Store build — that needs a Mac and an Apple developer account).
 - The Windows installer is not code-signed, so SmartScreen warns on first install.
