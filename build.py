@@ -5,6 +5,9 @@ Usage:  python3 build.py            → writes dist/index.html
         python3 build.py out.html   → writes to that path too
 """
 import json, sys, os, re
+# Windows consoles default to cp1252, which cannot print the arrow in the last line
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception: pass
 
 R = os.path.dirname(os.path.abspath(__file__)) + '/'
 A = R + 'app/'
