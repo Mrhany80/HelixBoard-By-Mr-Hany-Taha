@@ -37,8 +37,9 @@ The tool row now spans the screen and scrolls sideways, the dock and top bar sta
 their own names for screen readers.
 
 ### Releases
-`.github/workflows/release.yml` — pushing a tag `vX.Y.Z` builds the Setup and Portable `.exe` on a Windows runner, writes
-`latest.json` and publishes the GitHub release with the notes from this file. The tag must match `desktop/package.json`.
+`.github/workflows/release.yml` — when `main` changes and `desktop/package.json` holds a version with no release yet, a Windows
+runner builds the Setup and Portable `.exe`, writes `latest.json`, creates the tag and publishes the GitHub release with the notes
+from this file. Publishing a version is now: raise the version, add its section here, push to `main`.
 
 ### Tests
 `tests/plus.js` (51 checks, no network): every new tool, the three lab models, the offline libraries, and the layout at 768 and 390 px.

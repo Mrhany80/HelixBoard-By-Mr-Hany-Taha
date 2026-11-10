@@ -1,30 +1,48 @@
-# Builds the Windows app and publishes a GitHub release whenever a version tag (v2.8.0, …) is pushed.
-# The release gets the Setup .exe, the Portable .exe and latest.json (which installed copies read to update themselves).
-# To publish a version: raise "version" in desktop/package.json, add its section to CHANGELOG.md, push, then push the tag.
+# Publishes a Windows release by itself.
+# Whenever main changes, this checks the version in desktop/package.json. If there is no GitHub release for it yet,
+# it builds the Setup .exe and the Portable .exe on a Windows runner, writes latest.json (which installed copies read
+# to update themselves), creates the tag v<version> and publishes the release with the notes from CHANGELOG.md.
+#
+# To publish a version: raise "version" in desktop/package.json (and in app/account.js), add a "## <version>" section
+# to CHANGELOG.md, and push to main. Nothing else.
+# To rebuild a release that already exists: Actions → Windows release → Run workflow.
 name: Windows release
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing tag to build and release (for example v2.8.0)'
-        required: true
 permissions:
   contents: write
 concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  group: windows-release
   cancel-in-progress: false
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(node -p "require('./desktop/package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "build=true" >> "$GITHUB_OUTPUT"; echo "Rebuilding v$V on request"; exit 0; fi
+          N=$(gh release view "v$V" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length' 2>/dev/null || echo 0)
+          if [ "$N" -ge 3 ]; then echo "build=false" >> "$GITHUB_OUTPUT"; echo "v$V is already released ($N files) — nothing to do"; else echo "build=true" >> "$GITHUB_OUTPUT"; echo "v$V has no release yet — building"; fi
   windows:
+    needs: check
+    if: needs.check.outputs.build == 'true'
     runs-on: windows-latest
     env:
-      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -33,12 +51,6 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: desktop/package-lock.json
-      - name: Check that the tag matches desktop/package.json
-        shell: bash
-        run: |
-          V=$(node -p "require('./desktop/package.json').version")
-          if [ "v$V" != "$TAG" ]; then echo "Tag $TAG does not match version $V in desktop/package.json"; exit 1; fi
-          echo "VERSION=$V" >> "$GITHUB_ENV"
       - name: Build the web app
         shell: bash
         run: |
@@ -66,5 +78,5 @@ jobs:
             gh release upload "$TAG" "$S" "$P" "$J" --clobber
             gh release edit "$TAG" --notes-file notes.md --latest
           else
-            gh release create "$TAG" "$S" "$P" "$J" --title "$TAG" --notes-file notes.md --latest
+            gh release create "$TAG" "$S" "$P" "$J" --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md --latest
           fi

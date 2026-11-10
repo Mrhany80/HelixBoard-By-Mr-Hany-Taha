@@ -406,9 +406,10 @@ a few seconds after start and every 6 hours (also Page tab → **Check for updat
 offers **Update now**, downloads the Setup `.exe`, checks its SHA-256 and runs it.
 
 1. Raise `version` in `desktop/package.json` (and `version` in `app/account.js`), and add a `## <version>` section to `CHANGELOG.md`.
-2. Push to `main`, then push the tag: `git tag v2.8.1 && git push origin v2.8.1`.
-3. `.github/workflows/release.yml` builds the Setup and Portable `.exe` on a Windows runner, writes `latest.json` and publishes
-   the release with the notes from `CHANGELOG.md`. To rebuild an existing tag: **Actions → Windows release → Run workflow**.
+2. Push to `main`.
+3. `.github/workflows/release.yml` sees a version with no release, builds the Setup and Portable `.exe` on a Windows runner,
+   writes `latest.json`, creates the tag `v<version>` and publishes the release with the notes from `CHANGELOG.md`
+   (about 10 minutes). To rebuild a release that exists: **Actions → Windows release → Run workflow**.
 
 By hand (as before 2.8): `cd desktop && npm run dist`, then attach the two `.exe` files and `release/latest.json` to a release named `v<version>`.
 
