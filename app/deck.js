@@ -187,7 +187,7 @@ function updUI() { updPill(); updAsk(); if (!rail || !isDeck() || show) { updSho
 /* thumbnails show the slide with your ink on it */
 let thT = 0, dirtyAll = true;
 function drawThumbs(all) { if (!isDeck() || !thumbs.length) return; const p = P(), R = rects(p); const list = all ? R.map((_, i) => i) : [cur]; list.forEach(i => { const t = thumbs[i]; if (!t) return; const c = $('canvas', t), r = R[i], sc = 136 * 1.5 / r[2]; try { const img = E.renderToCanvas(p, r, sc, { bg: false, ink: true }); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); } catch (e) {} }); }
-bus.on('changed', () => { if (!isDeck() || show) return; clearTimeout(thT); thT = setTimeout(() => { if (!isDeck() || show) return; if (thumbs.length !== P().deck.slides.length) rebuild(); else drawThumbs(thumbs.length <= 40); }, 450); });
+const thLater = window.HB.later(() => { if (!isDeck() || show) return; if (thumbs.length !== P().deck.slides.length) rebuild(); else drawThumbs(thumbs.length <= 40); }, 450); bus.on('changed', () => { if (!isDeck() || show) return; thLater(); });
 bus.on('img-loaded', () => { if (isDeck()) { clearTimeout(thT); thT = setTimeout(() => drawThumbs(true), 300); } });
 bus.on('page', () => { setTimeout(() => { rebuild(); if (isDeck()) goSlide(P().deck.cur || 0, false); }, 30); });
 /* full-screen writing: the slide fills the screen, every writing tool stays available (pen tray, eraser, text, select) */

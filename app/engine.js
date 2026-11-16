@@ -28,7 +28,7 @@ function applyOp(op, dir) { const P = page().objs;
 let txOps = null; const addHooks = [];
 function push(op) { if (txOps) { txOps.push(op); return; } const h = H(); h.u.push(op); if (h.u.length > 300) h.u.shift(); h.r = []; changed(); }
 const tx = fn => { const outer = txOps; txOps = []; try { fn(); } finally { const ops = txOps; txOps = outer; if (ops.length) push(ops.length === 1 ? ops[0] : { k: 'tx', ops }); } };
-function add(objs, layer) { objs = [].concat(objs); const P = page().objs; const items = []; objs.forEach(o => { o.id = o.id || uid(); o.ts = o.ts || Date.now(); if (o.layer == null) o.layer = layer != null ? layer : (o.t === 'stroke' && o.pen === 'hi' ? 2 : 1); addHooks.forEach(h => { try { h(o); } catch (e) { console.warn(e); } }); P.push(o); items.push({ o: clean(o), i: P.length - 1 }); }); push({ k: 'add', items }); grow(); return objs; }
+function add(objs, layer) { objs = [].concat(objs); const P = page().objs; const items = []; fastObj = objs.length === 1 && objs[0].t === 'stroke' && !txOps ? objs[0] : null; objs.forEach(o => { o.id = o.id || uid(); o.ts = o.ts || Date.now(); if (o.layer == null) o.layer = layer != null ? layer : (o.t === 'stroke' && o.pen === 'hi' ? 2 : 1); addHooks.forEach(h => { try { h(o); } catch (e) { console.warn(e); } }); P.push(o); items.push({ o: clean(o), i: P.length - 1 }); }); push({ k: 'add', items }); fastObj = null; grow(objs); return objs; }
 function del(objs) { objs = [].concat(objs).filter(Boolean); const P = page().objs; const items = objs.map(o => ({ o: clean(o), i: P.indexOf(o) })).filter(it => it.i >= 0); items.sort((a, b) => b.i - a.i).forEach(it => P.splice(it.i, 1)); if (items.length) push({ k: 'del', items }); }
 function mod(objs, fn) { objs = [].concat(objs).filter(Boolean); const items = objs.map(o => ({ id: o.id, a: clean(o) })); objs.forEach(o => { fn(o); invalidate(o); }); items.forEach((it, k) => it.b = clean(objs[k])); push({ k: 'mod', items }); }
 /* several steps (add an idea, type in it, tidy the map) become one Undo step; drop: forget them entirely */
@@ -37,16 +37,31 @@ function squash(from, drop) { const h = H(); if (from == null || from > h.u.leng
 function undo() { const h = H(), op = h.u.pop(); if (!op) return; applyOp(op, -1); h.r.push(op); page().objs.forEach(invalidate); changed(true); bus.emit('selection-clear'); }
 function redo() { const h = H(), op = h.r.pop(); if (!op) return; applyOp(op, 1); h.u.push(op); page().objs.forEach(invalidate); changed(true); bus.emit('selection-clear'); }
 function reorder(ids) { const a = page().objs.map(o => o.id); push({ k: 'order', a, b: ids }); applyOp({ k: 'order', a, b: ids }, 1); dirty.main = true; }
-function grow() { if (B.mode !== 'scroll') return; const p = page(); let maxY = 0; p.objs.forEach(o => { const b = bbox(o); if (b) maxY = Math.max(maxY, b[1] + b[3]); }); if (maxY > p.H - 500) { p.H = Math.ceil((maxY + 1100) / 1080) * 1080; dirty.bg = true; bus.emit('view'); } }
-let saveT = 0, lastVer = Date.now(), dirtySinceVer = false;
-function changed(silent) { if (page()) page().mod = Date.now(); dirty.main = true; if (B.mode !== 'scroll') dirty.bg = true; dirtySinceVer = true; bus.emit('changed'); clearTimeout(saveT); saveT = setTimeout(saveNow, 800); }
-const serial = () => JSON.stringify({ v: B.v, title: B.title, width: B.width, mode: B.mode, cur: B.cur, pages: B.pages.map(p => ({ id: p.id, name: p.name || undefined, mod: p.mod || undefined, theme: p.theme, contrast: p.contrast, H: p.H, layers: p.layers, deck: p.deck || undefined, ghost: p.ghost || undefined, sc: p.sc || undefined, objs: p.objs.map(clean) })) });
-async function saveNow() { const s = serial(); await IDB.put('board', s); await IDB.put('assets', B.assets); if (dirtySinceVer && Date.now() - lastVer > 180000) { lastVer = Date.now(); dirtySinceVer = false; IDB.addVersion({ ts: Date.now(), title: B.title, n: B.pages.reduce((a, p) => a + p.objs.length, 0), data: s }); } bus.emit('saved'); }
+function grow(only) { if (B.mode !== 'scroll') return; const p = page(); let maxY = 0; (only || p.objs).forEach(o => { const b = bbox(o); if (b) maxY = Math.max(maxY, b[1] + b[3]); }); if (maxY > p.H - 500) { p.H = Math.ceil((maxY + 1100) / 1080) * 1080; dirty.bg = true; bus.emit('view'); } }
+let saveT = 0, lastVer = Date.now(), dirtySinceVer = false, fastObj = null, unsavedAt = 0, assetSig = null;
+/* A finished pen stroke is painted straight onto the board picture; everything else redraws the page. Redrawing 2,000 strokes
+   after each letter is what made writing fall behind on a full board. */
+function paintFast(o) { const p = page(); if (dirty.main || hidden.size || !p || p.objs[p.objs.length - 1] !== o) return false; const L = o.layer == null ? 1 : o.layer; if (p.layers && p.layers[L] && !p.layers[L].show) return false;
+  const b = bbox(o); if (!b) return false; for (const q of p.objs) { if ((q.layer == null ? 1 : q.layer) > L) { const c = bbox(q); if (c && inter(b, c)) return false; } }
+  const g = gMain; g.save(); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); if (B.mode === 'scroll') { g.beginPath(); g.rect(0, 0, B.width, p.H); g.clip(); }
+  try { drawObj(g, o, p); } catch (er) { g.restore(); return false; } g.restore(); mainSnap = null; return true; }
+function changed(silent) { if (page()) page().mod = Date.now(); const fast = fastObj && paintFast(fastObj); if (!fast) { dirty.main = true; if (B.mode !== 'scroll') dirty.bg = true; } dirtySinceVer = true; bus.emit('changed'); if (!unsavedAt) unsavedAt = Date.now(); clearTimeout(saveT); saveT = setTimeout(saveSoon, 1500); }
+/* saving waits for a pause in the writing (never more than 20 s), then runs when the browser is idle */
+function saveSoon() { clearTimeout(saveT); if (window.HB.ink.busy() && Date.now() - unsavedAt < 20000) { saveT = setTimeout(saveSoon, 400); return; } if (window.requestIdleCallback) requestIdleCallback(() => saveNow(), { timeout: 1200 }); else saveNow(); }
+/* the saved copy leaves out working data (keys that start with '_'); one pass, no stringify-parse-stringify per object */
+const strip = v => { if (v === null || typeof v !== 'object') return v; if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (v[i] !== null && typeof v[i] === 'object') return v.map(strip); return v; } if (typeof v.toJSON === 'function') return v; const r = {}; for (const k in v) if (k.charCodeAt(0) !== 95 && Object.prototype.hasOwnProperty.call(v, k)) r[k] = strip(v[k]); return r; };
+const serial = () => JSON.stringify({ v: B.v, title: B.title, width: B.width, mode: B.mode, cur: B.cur, pages: B.pages.map(p => ({ id: p.id, name: p.name || undefined, mod: p.mod || undefined, theme: p.theme, contrast: p.contrast, H: p.H, layers: p.layers, deck: p.deck || undefined, ghost: p.ghost || undefined, sc: p.sc || undefined, objs: p.objs.map(strip) })) });
+const assetsSig = () => { const A = B.assets, ks = Object.keys(A); let n = 0; for (const k of ks) { const v = A[k]; n += (v && (v.length || v.size)) || 0; } return ks.length + ':' + n + ':' + (ks[0] || '') + ':' + (ks[ks.length - 1] || ''); };
+async function saveNow() { clearTimeout(saveT); unsavedAt = 0; const s = serial(); await IDB.put('board', s); const sig = assetsSig(); if (sig !== assetSig) { await IDB.put('assets', B.assets); assetSig = sig; } if (dirtySinceVer && Date.now() - lastVer > 180000) { lastVer = Date.now(); dirtySinceVer = false; IDB.addVersion({ ts: Date.now(), title: B.title, n: B.pages.reduce((a, p) => a + p.objs.length, 0), data: s }); } bus.emit('saved'); }
+/* leaving the app or closing the window: save at once */
+addEventListener('pagehide', () => { if (unsavedAt) saveNow(); }); document.addEventListener('visibilitychange', () => { if (document.hidden && unsavedAt) saveNow(); });
 function loadBoard(json, assets) { const d = typeof json === 'string' ? JSON.parse(json) : json; B.title = d.title || 'Untitled board'; B.width = d.width || 1920; B.mode = d.mode || 'scroll'; B.pages = (d.pages || []).map(p => Object.assign(newPage(p.theme), p)); if (!B.pages.length) B.pages = [newPage()]; B.cur = clamp(d.cur || 0, 0, B.pages.length - 1); if (assets) B.assets = assets; imgCache.clear(); fitWidth(true); dirty.all(); bus.emit('board-loaded'); bus.emit('changed'); }
 
 /* ---------- view ---------- */
 const V = { s: 1, x: 0, y: 0 };
-const toB = (cx, cy) => { const r = stage.getBoundingClientRect(); return [(cx - r.left - V.x) / V.s, (cy - r.top - V.y) / V.s]; };
+/* the stage's place on screen is measured at most five times a second, not for every pen sample */
+let sRect = null, sRectAt = 0; const stageRect = () => { const n = performance.now(); if (!sRect || n - sRectAt > 200) { sRect = stage.getBoundingClientRect(); sRectAt = n; } return sRect; };
+const toB = (cx, cy) => { const r = stageRect(); return [(cx - r.left - V.x) / V.s, (cy - r.top - V.y) / V.s]; };
 const toS = (x, y) => [x * V.s + V.x, y * V.s + V.y];
 function clampView() { if (B.mode !== 'scroll' || (page() && page().deck)) return; const W = B.width * V.s, Hh = page().H * V.s;
   /* the page fills the board edge to edge: no dark margins, and it can never be dragged off the screen */
@@ -66,7 +81,7 @@ function bound(x, y) { if (page() && page().deck) return [x, y];
   return [-bx * s, -by * s]; }
 function scrollTo(x, y) { const [a, b] = bound(x, y); setView(V.s, a, b); }
 function contentBox(p) { p = p || page(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; p.objs.forEach(o => { const b = bbox(o); if (!b) return; x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[0] + b[2]); y1 = Math.max(y1, b[1] + b[3]); }); return x0 > x1 ? null : [x0, y0, x1 - x0, y1 - y0]; }
-function resize() { const r = stage.getBoundingClientRect(); SW = Math.max(100, r.width); SH = Math.max(100, r.height); DPR = Math.min(2, window.devicePixelRatio || 1); [cvBg, cvMain, cvLive].forEach(c => { c.width = Math.round(SW * DPR); c.height = Math.round(SH * DPR); }); clampView(); dirty.all(); bus.emit('view'); }
+function resize() { sRect = null; const r = stage.getBoundingClientRect(); SW = Math.max(100, r.width); SH = Math.max(100, r.height); DPR = Math.min(2, window.devicePixelRatio || 1); /* never more than a 4K picture per layer (three layers): beyond that the board gets slower, not sharper */ if (SW * SH * DPR * DPR > 9e6) DPR = Math.max(0.75, Math.sqrt(9e6 / (SW * SH))); [cvBg, cvMain, cvLive].forEach(c => { c.width = Math.round(SW * DPR); c.height = Math.round(SH * DPR); }); clampView(); dirty.all(); bus.emit('view'); }
 
 /* ---------- themes: every background is drawn in code ---------- */
 const THEMES = {
@@ -338,7 +353,7 @@ function renderPage(g, p, vr, s, opts) { opts = opts || {}; for (let L = 0; L < 
 
 /* ---------- frame loop with dirty flags ---------- */
 const dirty = { bg: true, main: true, live: true, all() { this.bg = this.main = this.live = true; } };
-let mainSnap = null, fullT = 0;
+let mainSnap = null, fullT = 0, lastDraw = null;
 const liveDrawers = []; let hidden = new Set();
 function drawFrame() { const p = page(), vr = viewRect();
   if (dirty.bg || (p.theme === 'deepsea' && animBg())) { dirty.bg = false; const g = gBg; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = B.mode === 'scroll' ? THEMES[p.theme].bg : '#0d0710'; g.fillRect(0, 0, cvBg.width, cvBg.height); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y);
@@ -357,7 +372,7 @@ function drawFrame() { const p = page(), vr = viewRect();
       clearTimeout(fullT); fullT = setTimeout(() => { mainSnap = null; dirty.main = true; }, 140); }
     else { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); if (B.mode === 'scroll') { g.save(); g.beginPath(); g.rect(0, 0, B.width, p.H); g.clip(); } renderPage(g, p, vr, V.s, { skip: hidden }); if (B.mode === 'scroll') g.restore(); drawDates(g, p, false);
       /* keep a copy for the next pan (only on big boards, where it pays off) */
-      if (p.objs.length > 150) { const c = sn && sn.c.width === W && sn.c.height === H ? sn.c : Object.assign(document.createElement('canvas'), { width: W, height: H }); const sg = c.getContext('2d'); sg.clearRect(0, 0, W, H); sg.drawImage(cvMain, 0, 0); mainSnap = { c, s: V.s, x: V.x, y: V.y, p }; } else mainSnap = null; } }
+      if (p.objs.length > 150 && lastDraw && lastDraw.p === p && lastDraw.s === V.s && (lastDraw.x !== V.x || lastDraw.y !== V.y)) { const c = sn && sn.c.width === W && sn.c.height === H ? sn.c : Object.assign(document.createElement('canvas'), { width: W, height: H }); const sg = c.getContext('2d'); sg.clearRect(0, 0, W, H); sg.drawImage(cvMain, 0, 0); mainSnap = { c, s: V.s, x: V.x, y: V.y, p }; } else mainSnap = null; lastDraw = { p, s: V.s, x: V.x, y: V.y }; } }
   if (dirty.live || liveDrawers.some(d => d.active && d.active())) { dirty.live = false; const g = gLive; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvLive.width, cvLive.height); g.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.x, DPR * V.y); liveDrawers.forEach(d => { g.save(); try { d.draw(g, V); } catch (e) { console.error(e); } g.restore(); }); }
   requestAnimationFrame(drawFrame); }
 
@@ -368,6 +383,6 @@ function renderToCanvas(p, rect, scale, opt) { opt = opt || {}; const c = docume
 const pageRect = p => { p = p || page(); if (B.mode === 'scroll') { const cb = contentBox(p); const h = cb ? Math.min(p.H, Math.max(1080, cb[1] + cb[3] + 80)) : 1080; return [0, 0, B.width, h]; } const cb = contentBox(p); return cb ? [cb[0] - 60, cb[1] - 60, cb[2] + 120, cb[3] + 120] : [0, 0, 1920, 1080]; };
 
 new ResizeObserver(resize).observe(stage);
-window.HBE = { PEN, SENS, setStepFilter, setViewFilter, histLen, squash, bound, scrollTo, addHooks, pageDates, B, V, page, byId, newPage, add, del, mod, tx, undo, redo, reorder, push, changed, saveNow, serial, loadBoard, clean, invalidate, toB, toS, setView, zoomAt, fitWidth, fitPage, viewRect, contentBox, resize, THEMES, PALETTE, isDark, drawObj, drawBackground, renderPage, renderToCanvas, pageRect, bbox, inter, strokePath, textLayout, ptsOf, connPts, dirty, liveDrawers, imageFor, imgCache, quizReveal, get hidden() { return hidden; }, set hidden(h) { hidden = h; dirty.main = true; }, get SW() { return SW; }, get SH() { return SH; }, get DPR() { return DPR; }, cvLive, gLive, cvMain, drawFrame, grow, H, roughFor, shapePath, arrowHead, hexRgb, edgePoint, rnd };
+window.HBE = { saveSoon, strip, PEN, SENS, setStepFilter, setViewFilter, histLen, squash, bound, scrollTo, addHooks, pageDates, B, V, page, byId, newPage, add, del, mod, tx, undo, redo, reorder, push, changed, saveNow, serial, loadBoard, clean, invalidate, toB, toS, setView, zoomAt, fitWidth, fitPage, viewRect, contentBox, resize, THEMES, PALETTE, isDark, drawObj, drawBackground, renderPage, renderToCanvas, pageRect, bbox, inter, strokePath, textLayout, ptsOf, connPts, dirty, liveDrawers, imageFor, imgCache, quizReveal, get hidden() { return hidden; }, set hidden(h) { hidden = h; dirty.main = true; }, get SW() { return SW; }, get SH() { return SH; }, get DPR() { return DPR; }, cvLive, gLive, cvMain, drawFrame, grow, H, roughFor, shapePath, arrowHead, hexRgb, edgePoint, rnd };
 })();
 

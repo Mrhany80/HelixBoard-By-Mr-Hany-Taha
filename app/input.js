@@ -3,7 +3,7 @@
 'use strict';
 const { $, $$, clamp, uid, set, bus, toast, SND, fontStack, loadFont, REDUCE } = window.HB;
 const E = window.HBE; const { B, V, page, byId, add, del, mod, tx, toB, toS, bbox, dirty, liveDrawers, strokePath } = E;
-const cv = E.cvLive, overlay = $('#overlay'), stage = $('#stage');
+const INK = window.HB.ink; const cv = E.cvLive, overlay = $('#overlay'), stage = $('#stage');
 
 /* ---------- tool state ---------- */
 /* the eraser removes writing only — never template boxes, slide pictures or the editable text of an opened PDF / PowerPoint */
@@ -32,7 +32,7 @@ const setSize = s => { T.size = clamp(s, 1, 60); set.put('size', T.size); if (se
 
 /* ---------- selection ---------- */
 const sel = new Set();
-const selObjs = () => page().objs.filter(o => sel.has(o.id));
+const selObjs = () => sel.size ? page().objs.filter(o => sel.has(o.id)) : [];
 const layerLocked = o => { const L = page().layers[o.layer == null ? 1 : o.layer]; return L && (L.lock || !L.show); };
 function selBox() { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; selObjs().forEach(o => { const b = bbox(o); if (!b) return; x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[0] + b[2]); y1 = Math.max(y1, b[1] + b[3]); }); return x0 > x1 ? null : [x0, y0, x1 - x0, y1 - y0]; }
 function select(objs, addTo, only) { if (!addTo) sel.clear(); [].concat(objs).forEach(o => { if (!o) return; sel.add(o.id); if (o.g && !only && !page().objs.some(q => q.g === o.g && q.locked)) page().objs.forEach(q => { if (q.g === o.g) sel.add(q.id); }); }); dirty.live = true; bus.emit('selection', selObjs()); }
@@ -84,7 +84,7 @@ document.addEventListener('contextmenu', e => { const t = e.target; if (t && t.c
 const deckBack = () => document.body.classList.contains('deckshow') && T.tool === 'laser';
 /* the board area must never scroll as a web page (a long text box would push everything sideways); the canvas view does the moving */
 stage.addEventListener('scroll', () => { if (stage.scrollLeft || stage.scrollTop) { stage.scrollLeft = 0; stage.scrollTop = 0; } });
-cv.addEventListener('pointerdown', e => { e.preventDefault(); if (!editing) cv.focus({ preventScroll: true });
+cv.addEventListener('pointerdown', e => { e.preventDefault(); INK.down = true; INK.at = performance.now(); if (!editing) cv.focus({ preventScroll: true });
   /* smartboards often lose 'pointerup' (ghost or dropped touches); a new primary contact means nothing else is really down, so stale pointers can never block writing */
   if (e.isPrimary) { ptrs.clear(); if (act && (act.k === 'pinch' || act.k === 'pan')) act = null; }
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: e.pointerType }); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
@@ -101,7 +101,7 @@ cv.addEventListener('pointerdown', e => { e.preventDefault(); if (!editing) cv.f
   activeId = e.pointerId;
   const [x, y] = evPos(e); if (window.HBInst && HBInst.down(x, y, e)) { act = { k: 'inst' }; return; }
   const h = TOOLS[T.tool]; if (h && h.down) h.down(x, y, e); });
-cv.addEventListener('pointermove', e => { const p = ptrs.get(e.pointerId); if (p) { if (!p.moved && p.sx != null && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) { p.moved = true; clearTimeout(longT); } p.x = e.clientX; p.y = e.clientY; }
+cv.addEventListener('pointermove', e => { if (INK.down) INK.at = performance.now(); const p = ptrs.get(e.pointerId); if (p) { if (!p.moved && p.sx != null && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 8) { p.moved = true; clearTimeout(longT); } p.x = e.clientX; p.y = e.clientY; }
   if (act && act.k !== 'pinch' && activeId != null && e.pointerId !== activeId) return; /* only the contact that started the stroke can move it (palms and second fingers cannot scribble into it) */
   const [x, y] = evPos(e); cursor = [x, y, e.pointerType]; if (T.tool === 'erase' || T.tool === 'laser' || (window.HBR && HBR.loupeOn)) dirty.live = true;
   if (!act) { const h = TOOLS[T.tool]; if (h && h.hover) h.hover(x, y, e); return; }
@@ -115,6 +115,7 @@ const RAW = 'onpointerrawupdate' in window;
 if (RAW) cv.addEventListener('pointerrawupdate', e => { if (!act || act.k !== 'draw' || e.pointerId !== activeId) return; act.raw = true; const h = TOOLS[T.tool]; if (!h || !h.move) return;
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; (evs.length ? evs : [e]).forEach(ev => h.move(...evPos(ev), ev)); });
 const up = e => { clearTimeout(longT); ptrs.delete(e.pointerId); if (act && act.k !== 'pinch' && activeId != null && e.pointerId !== activeId) return; if (e.pointerId === activeId) activeId = null; if (!act) return; if (act.k === 'pan') { act = null; cv.style.cursor = T.tool === 'hand' ? 'grab' : ''; setTool(T.tool); return; } if (act.k === 'pinch') { if (!ptrs.size) act = null; return; } if (act.k === 'inst') { HBInst.up(e); act = null; return; } const h = TOOLS[T.tool]; if (h && h.up) h.up(...evPos(e), e); };
+const inkUp = () => { INK.down = false; INK.at = performance.now(); }; cv.addEventListener('pointerup', inkUp, true); cv.addEventListener('pointercancel', inkUp, true); window.addEventListener('blur', inkUp);
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 cv.addEventListener('lostpointercapture', e => { if (ptrs.has(e.pointerId)) up(e); });
 /* leaving the app (Alt+Tab, Win key, another window) mid-gesture: finish every open pointer so nothing is left "held down" on return */

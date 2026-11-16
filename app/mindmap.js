@@ -189,7 +189,7 @@ function reparent(n, t) { const root = rootOf(n.mm), lay = (root && root.lay) ||
     if (t.col) E.mod(t, q => { q.col = undefined; }); });
   layout(n.mm, root); snd('pop'); toast('Moved under “' + String(t.s || 'Main idea').slice(0, 40) + '”.'); }
 /* while a branch is dragged with the selection tool, the idea it would join lights up */
-addEventListener('pointermove', e => { if (e.buttons !== 1 || I.editing) return; const sel = I.selObjs(); if (sel.length !== 1 || !isNode(sel[0]) || sel[0].root) return dropMark(null); const n = sel[0]; if (n.mx == null || (n.x === n.mx && n.y === n.my)) return dropMark(null);
+addEventListener('pointermove', e => { if (e.buttons !== 1 || I.editing || I.T.tool !== 'select') return; const sel = I.selObjs(); if (sel.length !== 1 || !isNode(sel[0]) || sel[0].root) return dropMark(null); const n = sel[0]; if (n.mx == null || (n.x === n.mx && n.y === n.my)) return dropMark(null);
   const t = dropTarget(n); dropMark(t && t.id !== n.par ? t : null); }, { passive: true });
 addEventListener('pointerup', () => setTimeout(() => dropMark(null), 50), true);
 

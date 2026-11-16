@@ -199,6 +199,11 @@ const SND = (() => {
   return api;
 })();
 
-window.HB = { ask, $, $$, clamp, lerp, REDUCE, uid, esc, icon, set, IDB, bus, toast, modal, floatPanel, floats, need, needESM, CDN, FONTS, loadFont, fontStack, fontLoaded, toSub, toSup, unSubSup, SUB, SUP, isRTL, isolate, MathP, fmtNum, SND };
+/* ---------- ink first: side work (thumbnails, minimap, saving) waits until the pen has rested ----------
+   HB.ink.down / HB.ink.at are kept by input.js. later(fn, wait) returns a debounced trigger: fn runs 'wait' ms after the last call,
+   and never while a pen or finger is writing or within 'rest' ms of the last sample. */
+const ink = { down: false, at: -1e9, rest: 1200, busy() { const d = performance.now() - ink.at; /* a lost pointer-up (ghost touches) must not hold work back for ever */ return (ink.down && d < 5000) || d < ink.rest; } };
+const later = (fn, wait) => { let t = 0; const go = () => { if (ink.busy()) { t = setTimeout(go, 350); return; } t = 0; fn(); }; const f = () => { clearTimeout(t); t = setTimeout(go, wait || 0); }; f.cancel = () => { clearTimeout(t); t = 0; }; f.now = () => { clearTimeout(t); t = 0; fn(); }; return f; };
+window.HB = { ink, later, ask, $, $$, clamp, lerp, REDUCE, uid, esc, icon, set, IDB, bus, toast, modal, floatPanel, floats, need, needESM, CDN, FONTS, loadFont, fontStack, fontLoaded, toSub, toSup, unSubSup, SUB, SUP, isRTL, isolate, MathP, fmtNum, SND };
 })();
 

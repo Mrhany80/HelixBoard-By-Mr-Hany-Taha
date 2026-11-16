@@ -63,7 +63,7 @@ function info() { modal.open('<h2>What recognition can do</h2><table class="t"><
 
 /* ---------- loupe (magnifier) ---------- */
 let loupeOn = false, mouse = null; const stage = $('#stage');
-stage.addEventListener('pointermove', e => { const r = stage.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; if (loupeOn) E.dirty.live = true; });
+stage.addEventListener('pointermove', e => { if (!loupeOn) return; const r = stage.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; E.dirty.live = true; });
 function loupe() { loupeOn = !loupeOn; E.dirty.live = true; toast(loupeOn ? 'Loupe on: move over the board to magnify (×3).' : 'Loupe off'); window.HBUI && HBUI.refresh(); }
 E.liveDrawers.push({ active: () => loupeOn, draw(g) { if (!loupeOn || !mouse) return; const D = E.DPR, R = 110, z = 3; g.setTransform(D, 0, 0, D, 0, 0); g.save(); g.beginPath(); g.arc(mouse[0], mouse[1], R, 0, 7); g.clip(); const sx = (mouse[0] - R / z) * D, sy = (mouse[1] - R / z) * D, sw = 2 * R / z * D; ['#cvBg', '#cvMain'].forEach(s => g.drawImage($(s), sx, sy, sw, sw, mouse[0] - R, mouse[1] - R, 2 * R, 2 * R)); g.restore(); g.strokeStyle = '#22D3EE'; g.lineWidth = 4; g.beginPath(); g.arc(mouse[0], mouse[1], R, 0, 7); g.stroke(); g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1; g.beginPath(); g.arc(mouse[0], mouse[1], R + 3, 0, 7); g.stroke(); } });
 

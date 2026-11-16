@@ -160,3 +160,12 @@ html{overflow:hidden}
   #sheet{max-width:calc(100vw - 16px)!important;padding:16px 14px!important}
 }
 @media (max-width:600px){ #top .brand .name{display:none!important} }
+
+/* ---------- 3.0 ink first ----------
+   Panels that sit on top of the board no longer blur what is behind them: a blurred panel has to be recomputed for every frame
+   of ink drawn under it, which is slow on smartboard PCs. They are a little more solid instead. The title no longer pulses:
+   an animated glow repaints the top bar for ever. */
+:root{--glass:rgba(24,17,29,.94)}
+:root[data-ui="light"]{--glass:rgba(255,255,255,.96)}
+#dock,#drawer,#scrollBtns,#vbar,#hbar,#dockShow,#radial .rsz,#kbd,#toast,#mini,.float{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+#top .brand .name{animation:none!important}
