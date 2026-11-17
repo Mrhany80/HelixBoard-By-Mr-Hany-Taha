@@ -1,7 +1,7 @@
 {
   "name": "helixboard",
   "productName": "HelixBoard By Mr. Hany Taha",
-  "version": "2.8.0",
+  "version": "3.0.0",
   "description": "HelixBoard By Mr. Hany Taha — the Science Slate. Interactive whiteboard for science teaching and study.",
   "author": "Mr. Hany Taha — Green Hills International School",
   "license": "UNLICENSED",
@@ -27,16 +27,8 @@
       "app/index.html",
       "build/icon.ico",
       "build/icon.png",
-      "live.js",
-      "live-student.html",
       "overlay.html",
       "overlay-preload.js",
-      "tunnel.js",
-      "classlink.js",
-      "classlink-student.html",
-      "test-student.html",
-      "exam-student.html",
-      "testgrade.js",
       "updater.js"
     ],
     "afterPack": "./build/after-pack.js",
@@ -52,20 +44,6 @@
         "ext": "hbset",
         "name": "HelixBoard quiz / flashcard set",
         "description": "HelixBoard quiz or flashcard set",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": "hbhw",
-        "name": "HelixBoard homework",
-        "description": "HelixBoard homework",
-        "icon": "build/icon.ico",
-        "role": "Editor"
-      },
-      {
-        "ext": "hbres",
-        "name": "HelixBoard homework results",
-        "description": "HelixBoard homework results",
         "icon": "build/icon.ico",
         "role": "Editor"
       }

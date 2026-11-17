@@ -12,11 +12,11 @@ const fails = []; const ok = (name, cond, info) => { console.log((cond ? 'ok   '
   ok('app starts with no module errors', await p.evaluate(() => !(window.__hbErr || []).length), await p.evaluate(() => window.__hbErr || []));
 
   /* the pen: pointer events on the board, as a smartboard pen sends them */
-  await p.evaluate(() => { const cv = document.getElementById('cvLive'); window.pen = (t, x, y, type) => cv.dispatchEvent(new PointerEvent(t, { pointerId: 5, pointerType: type || 'pen', isPrimary: true, clientX: x, clientY: y, pressure: 0.5, buttons: t === 'pointerup' ? 0 : 1, button: 0, bubbles: true, cancelable: true }));
+  const helpers = () => p.evaluate(() => { const cv = document.getElementById('cvLive'); window.pen = (t, x, y, type) => cv.dispatchEvent(new PointerEvent(t, { pointerId: 5, pointerType: type || 'pen', isPrimary: true, clientX: x, clientY: y, pressure: 0.5, buttons: t === 'pointerup' ? 0 : 1, button: 0, bubbles: true, cancelable: true }));
     window.write = (x0, y0, type) => { pen('pointerdown', x0, y0, type); for (let i = 1; i <= 30; i++) pen('pointermove', x0 + i * 6, y0 + Math.sin(i / 3) * 30, type); pen('pointerup', x0 + 180, y0, type); };
     window.shot = () => { const c = HBE.cvMain; return c.getContext('2d').getImageData(0, 0, c.width, c.height).data; };
     window.diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) + Math.abs(a[i + 3] - b[i + 3]) > 24) n++; return n; };
-    window.frames = n => new Promise(r => { const f = () => (n-- > 0 ? requestAnimationFrame(f) : r()); f(); }); });
+    window.frames = n => new Promise(r => { const f = () => (n-- > 0 ? requestAnimationFrame(f) : r()); f(); }); }); await helpers();
 
   /* 1. fast commit paints exactly what a full redraw paints, for every pen */
   const PENS = ['pen', 'pencil', 'marker', 'chalk', 'glow', 'dash', 'calli', 'hi'];
@@ -42,6 +42,14 @@ const fails = []; const ok = (name, cond, info) => { console.log((cond ? 'ok   '
   await p.waitForTimeout(700); await p.reload(); await p.waitForFunction(() => window.HBE && window.HBI); await p.waitForTimeout(1500);
   ok('a stroke written just before closing is there after reopening', await p.evaluate(() => HBE.page().objs.length) === n1, n1);
 
+  await helpers();
+  /* 4b. boards saved by 2.8, with things the lean version no longer has, still open */
+  const old = await p.evaluate(async () => { const board = { v: 1, title: 'From 2.8', width: 1920, mode: 'scroll', cur: 0, pages: [{ id: 'p1', theme: 'notebook', H: 3240, ghost: 'show', audio: [{ t: 3 }], layers: [{ show: true, lock: true }, { show: true, lock: false }, { show: true, lock: false }],
+      deck: undefined, objs: [{ id: 'a', t: 'stroke', pen: 'pen', c: '#000', w: 4, pts: [100, 100, 0.5, 300, 160, 0.5, 500, 100, 0.5] }, { id: 'b', t: 'note', x: 600, y: 200, w: 220, h: 160, s: 'Live sticky wall', c: '#FFE066', lc: 'u7' },
+        { id: 'c', t: 'livepoll', x: 100, y: 400, w: 300, h: 200, votes: [3, 4] }, { id: 'd', t: 'text', x: 100, y: 700, w: 400, h: 60, s: 'Recorded lesson 12:04', rec: 'r1', at: 4200 }] }] };
+    HBE.loadBoard(JSON.stringify(board), {}); await frames(4); HBI.setTool('select'); const r = document.getElementById('stage').getBoundingClientRect(), q = HBE.toS(250, 500); pen('pointerdown', q[0] + r.left, q[1] + r.top, 'mouse'); pen('pointerup', q[0] + r.left, q[1] + r.top, 'mouse'); await frames(3);
+    HBI.setTool('draw', 'pen'); write(700, 600); await frames(3); const back = JSON.parse(HBE.serial()); return { objs: HBE.page().objs.length, kept: back.pages[0].objs.some(o => o.t === 'livepoll') }; });
+  ok('a 2.8 board with an unknown object opens, can be written on, and keeps that object when saved', old.objs === 5 && old.kept, old);
   /* 5. side work waits for the pen */
   ok('HB.later holds work back while the pen is down and runs it afterwards', await p.evaluate(async () => { let ran = 0; const f = HB.later(() => ran++, 50); HB.ink.down = true; HB.ink.at = performance.now(); f(); await new Promise(r => setTimeout(r, 600)); const held = ran === 0; HB.ink.down = false; HB.ink.at = performance.now() - 5000; await new Promise(r => setTimeout(r, 700)); return held && ran === 1; }));
   ok('a lost pointer-up cannot hold work back for ever', await p.evaluate(() => { HB.ink.down = true; HB.ink.at = performance.now() - 6000; const r = !HB.ink.busy(); HB.ink.down = false; return r; }));

@@ -17,13 +17,10 @@ D = R + 'dist/'
 # source modules, loaded in this order; wrap each in try/catch so one broken
 # module doesn't stop the whole app
 ORDER = ['core','engine','input','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
-         'recog','classtools','notes','smart','mindmap','deck','wheel','timer','water','io','ui',
-         'fullscreen','toolsize','roots','studio','notekit','notes2','classlink','liveclass','collab','quizparse','quizimport','quizbuilder','sheetexam','testdash','videolesson','reports','xp','cards','account','plus','install','lang','intro','main']
+         'recog','classtools','notes','smart','mindmap','deck','wheel','timer','io','ui',
+         'fullscreen','toolsize','roots','studio','notekit','account','plus','install','lang','intro','main']
 
 parts = []
-# test marking is shared with the Windows app's class link server (desktop/testgrade.js)
-_tg = R + 'desktop/testgrade.js'
-if os.path.exists(_tg): parts.append('/* ==== testgrade.js ==== */\n' + open(_tg, encoding='utf-8').read())
 for m in ORDER:
     f = A + m + '.js'
     if not os.path.exists(f):
@@ -110,7 +107,7 @@ manifest = {
   'orientation': 'any', 'background_color': '#120A14', 'theme_color': '#120A14', 'lang': 'en', 'dir': 'auto', 'categories': ['education', 'productivity'],
   'icons': [{'src': 'icons/icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
             {'src': 'icons/maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}],
-  'file_handlers': [{'action': './', 'accept': {'application/octet-stream': ['.helix', '.hbset', '.hbhw', '.hbres']}}],
+  'file_handlers': [{'action': './', 'accept': {'application/octet-stream': ['.helix', '.hbset']}}],
 }
 open(D + 'manifest.webmanifest', 'w', encoding='utf-8').write(json.dumps(manifest, indent=1))
 os.makedirs(D + 'icons', exist_ok=True)

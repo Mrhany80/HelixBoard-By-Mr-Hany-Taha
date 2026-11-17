@@ -26,20 +26,15 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !wind
 /* Windows desktop app (Electron): files opened from Explorer, and a working prompt() */
 if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d) => D.prompt(String(m == null ? '' : m), String(d == null ? '' : d));
   D.onOpenFile(({ name, data }) => { const f = new File([data], name), ext = (name.split('.').pop() || '').toLowerCase();
-    if (ext === 'helix') window.HBIO.readHelix(f); else if (ext === 'hbset') window.HBL.importFiles([f]); else if (ext === 'hbhw') window.HBL.importHomework([f]); else if (ext === 'hbres') window.HBL.importResults([f]); else window.HBIO.openDoc(f); }); if (D.onInsertImage) D.onInsertImage(url => { window.HBI.insertImage(url); toast('Screen picture added to the board.'); }); D.ready(); }
+    if (ext === 'helix') window.HBIO.readHelix(f); else if (ext === 'hbset') window.HBL.importFiles([f]); else window.HBIO.openDoc(f); }); if (D.onInsertImage) D.onInsertImage(url => { window.HBI.insertImage(url); toast('Screen picture added to the board.'); }); D.ready(); }
 /* after an update: a short "What's new" card, once (not on a first install) */
 { const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
   const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
-    const tests = () => { if (!window.HBLC) return; set.put('lcTab', 'tests'); HBLC.open(); };
-    const P = (f, ...a) => () => window.HBP && HBP[f](...a), tab = t => () => window.HBUI && HBUI.selectTab(t);
-    const items = [['activity', 'Mini-labs', 'Enzymes, osmosis and predator–prey as predict → observe → explain. Science → Lab.', P('labs')],
-      ['scan-eye', 'Ghost trace', 'Trace a diagram, redraw it from memory, then check it against the model. Draw tab.', tab('draw')],
-      ['text-cursor-input', 'Cloze and Notes → quiz', 'Hide key words of any text, or turn “term - definition” notes into a quiz.', tab('text')],
-      ['ruler', 'Live measure', 'Real lengths, angles and areas from a scale you set. Shapes tab.', P('measure')],
-      ['repeat', 'Due today', 'Every flashcard that is due, from all decks, in one mixed session. Study tab.', () => window.HBL && HBL.dueToday()],
-      ['scale', 'Fair talk and the lesson runway', 'See who has spoken and pick a quiet voice; the lesson flow now runs as a strip on the board.', P('fairTalk')],
-      ['clipboard-list', 'Lesson recap and before / after', 'One page that gathers the lesson; compare two pictures with a slider.', null],
-      ['monitor-smartphone', 'Tablets, phones and no internet', 'The layout now fits small screens, and equations, charts, molecules and sketchy shapes work offline.', null]];
+    const tab = t => () => window.HBUI && HBUI.selectTab(t);
+    const items = [['pencil', 'Writing keeps up with the pen', 'A finished stroke is painted at once instead of redrawing the whole page, and saving waits until you pause. A full board writes like an empty one.', tab('draw')],
+      ['layout-grid', 'A lighter board: 304 tools instead of 368', 'Live class on phones, reports, tests and exams, video lessons, paper cards, lesson recording and the water reminder are gone. Your saved boards open as before.', null],
+      ['graduation-cap', 'Flashcards, groups and Fair talk are in Teach', 'Teach → Assess has the flashcards; Teach → Pick has Make groups and Fair talk.', tab('teach')],
+      ['save', 'Nothing is lost on closing', 'The board is saved the moment you leave or close the app.', null]];
     modal.open('<h2>' + icon('sparkles') + ' What’s new in HelixBoard ' + ver + '</h2><div style="display:grid;gap:8px">' + items.map((it, i) => '<button class="btn" data-wn="' + i + '" style="height:auto;justify-content:flex-start;text-align:left;padding:10px 12px;gap:12px">' + icon(it[0]) + '<span><b>' + it[1] + '</b><br><span class="small muted">' + it[2] + '</span></span></button>').join('') + '</div><div class="foot"><button class="btn primary" data-close>Start teaching</button></div>', sh => {
       sh.querySelectorAll('[data-wn]').forEach(b => b.onclick = () => { const f = items[+b.dataset.wn][3]; modal.close(); if (f) setTimeout(f, 60); }); }); };
   setTimeout(show, 1500); } } }

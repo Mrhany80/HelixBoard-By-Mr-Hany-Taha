@@ -2,14 +2,11 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, Menu, screen, desktopCapturer, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { LiveQuiz, lanAddresses } = require('./live');
-const { ClassLink } = require('./classlink');
-const { Tunnel } = require('./tunnel');
 const { createUpdater } = require('./updater');
 
 app.setAppUserModelId('com.ghis.helixboard');
 
-const OPENABLE = /\.(helix|hbset|hbhw|hbres|pdf|docx|pptx|txt|md)$/i;
+const OPENABLE = /\.(helix|hbset|pdf|docx|pptx|txt|md)$/i;
 let win = null;
 let rendererReady = false;
 const pending = [];
@@ -153,122 +150,7 @@ ipcMain.handle('overlay:snap', async e => {
   return !!url;
 });
 
-/* ---------- phone quiz server (classroom Wi-Fi) ---------- */
-const live = new LiveQuiz(snap => { if (win && !win.isDestroyed()) win.webContents.send('live:update', snap); });
-/* the internet link: students on any network join through a public https address that forwards here.
-   Shared by the phone quiz and the class link: the address is shown only once it really works, and a dropped link reopens by itself
-   (up to 4 times in 10 minutes) with a new QR code; the same-Wi-Fi addresses always work alongside it. */
-function linkKeeper(srv, getTunnel) {
-  let drops = [];
-  const open = async () => {
-    if (!srv.server) return; const t = getTunnel();
-    t.onDrop = () => { if (!srv.server) return; drops = drops.filter(x => Date.now() - x < 600000); drops.push(Date.now());
-      if (drops.length <= 4) { srv.tunnel = { state: 'connecting', msg: 'The internet link dropped — reopening it (scan the new QR code)…' }; srv.update(); setTimeout(open, 1500); }
-      else { srv.tunnel = { state: 'failed', error: 'The internet link keeps dropping on this network. Phones on the same Wi-Fi can still join.' }; srv.update(); } };
-    const status = msg => { if (srv.server) { srv.tunnel = { state: 'connecting', msg }; srv.update(); } };
-    status('Opening the internet link…');
-    try { const r = await t.open(srv.port, status); if (srv.server) { srv.tunnel = { state: 'ready', url: r.url + '/?pin=' + srv.pin, checked: r.checked }; srv.update(); } else t.close(); }
-    catch (er) { if (er.message === 'cancelled') return; if (srv.server) { srv.tunnel = { state: 'failed', error: er.message + ' Phones on the same Wi-Fi can still join.' }; srv.update(); } }
-  };
-  return open;
-}
-let tunnel = null;
-const openLink = linkKeeper(live, () => (tunnel = tunnel || new Tunnel(app.getPath('userData'), (url, o) => net.fetch(url, o))));
-ipcMain.handle('live:start', async (e, quiz) => {
-  try { if (quiz.attached && cl.server) { const info = await live.start(quiz, { attached: true, port: cl.port }); cl.setQuiz(live); return info; }
-    const info = await live.start(quiz); if (quiz.internet !== false) openLink(); return info; }
-  catch (er) { return { error: er.code === 'EADDRINUSE' ? 'The quiz port is busy — close other quiz windows and try again.' : er.message }; }
-});
-ipcMain.handle('live:cmd', (e, cmd, arg) => {
-  if (cmd === 'question') live.question(arg.qi, arg.secs, arg.pace);
-  else if (cmd === 'opts') live.setOpts(arg);
-  else if (cmd === 'reveal') live.reveal();
-  else if (cmd === 'board') live.board();
-  else if (cmd === 'end') live.end();
-  else if (cmd === 'results') return live.results();
-  else if (cmd === 'link') { if (live.attached) openClLink(); else openLink(); }
-  else if (cmd === 'stop') { const att = live.attached; return live.stop().then(() => { if (att) cl.setQuiz(null); else if (tunnel) tunnel.close(); return true; }); }
-  return live.on ? live.snapshot() : null;
-});
-/* ---------- Class link: live board, student pens, shared files and homework for phones ---------- */
-const cl = new ClassLink((type, data, snap) => { if (win && !win.isDestroyed()) win.webContents.send('cl:event', type, data, snap); });
-let clTunnel = null;
-const openClLink = linkKeeper(cl, () => (clTunnel = clTunnel || new Tunnel(app.getPath('userData'), (url, o) => net.fetch(url, o))));
-const fromMain = e => win && e.sender === win.webContents;
-ipcMain.handle('cl:start', async (e, opts) => {
-  if (!fromMain(e)) return null;
-  try { const r = await cl.start(opts || {}); if (!opts || opts.internet !== false) openClLink(); return Object.assign(r, { urls: lanAddresses().map(a => 'http://' + a + ':' + r.port + '/?pin=' + r.pin) }); }
-  catch (er) { return { error: er.message }; }
-});
-ipcMain.handle('cl:cmd', async (e, cmd, a) => {
-  if (!fromMain(e) || !cl.server) return null;
-  if (cmd === 'board') cl.setBoard(Buffer.from(a.jpeg), a.view);
-  else if (cmd === 'options') cl.setOptions(a);
-  else if (cmd === 'addFile') { if (a.path && !fs.existsSync(a.path)) return null; return cl.addFile({ name: a.name, kind: a.kind, path: a.path, data: a.data ? Buffer.from(a.data) : null, type: a.type, size: a.size || (a.data ? a.data.byteLength : fs.statSync(a.path).size) }); }
-  else if (cmd === 'removeFile') cl.removeFile(a);
-  else if (cmd === 'addHomework') cl.addHomework(a);
-  else if (cmd === 'removeHomework') cl.removeHomework(a);
-  else if (cmd === 'activity') { const id = cl.setActivity(a && a.bg ? Object.assign({}, a, { bg: Buffer.from(a.bg) }) : a); return id ? cl.responses() : { error: 'That activity could not start.' }; }
-  else if (cmd === 'actOptions') { cl.actOptions(a || {}); return cl.responses(); }
-  else if (cmd === 'endActivity') cl.endActivity();
-  else if (cmd === 'responses') return cl.responses();
-  else if (cmd === 'share') cl.share(a || null);
-  else if (cmd === 'removeResponse') cl.removeResponse(a && a.pid, a && a.idx);
-  else if (cmd === 'award') cl.award(a && a.pid, a && a.n);
-  else if (cmd === 'lock') cl.setLock(a);
-  else if (cmd === 'xp') cl.setXp(a);
-  else if (cmd === 'lowerHand') cl.lowerHand(a || null);
-  else if (cmd === 'clearQuestions') cl.clearQuestions();
-  else if (cmd === 'testStart') return cl.testStart(a);
-  else if (cmd === 'testOpen') cl.testOpen(a);
-  else if (cmd === 'testEnd') cl.testEnd();
-  else if (cmd === 'testOver') cl.testOver(a);
-  else if (cmd === 'testSettings') cl.testSettings(a);
-  else if (cmd === 'testResults') return cl.testResults();
-  else if (cmd === 'link') openClLink();
-  else if (cmd === 'stop') { if (live.attached && live.on) await live.stop(); cl.setQuiz(null); await cl.stop(); if (clTunnel) clTunnel.close(); return true; }
-  return cl.snapshot();
-});
-/* Reports → PDF: the page switches to its print layout, Chromium prints it, the teacher picks where to save */
-/* a Word document (as HTML) → PDF, so an exam document looks the same on every phone; also used for printable bubble sheets */
-ipcMain.handle('doc:pdf', async (e, html) => {
-  const os = require('os'), fs2 = require('fs'), f = path.join(os.tmpdir(), 'hb-doc-' + Date.now() + '.html'); fs2.writeFileSync(f, String(html || ''));
-  const w = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
-  try { await w.loadFile(f); return await w.webContents.printToPDF({ pageSize: 'A4', printBackground: true }); }
-  finally { w.destroy(); try { fs2.unlinkSync(f); } catch (er) {} }
-});
-ipcMain.handle('report:pdf', async (e, name) => {
-  if (!fromMain(e)) return null;
-  const r = await dialog.showSaveDialog(win, { title: 'Save the report as PDF', defaultPath: path.join(app.getPath('documents'), String(name || 'HelixBoard report.pdf').replace(/[\\/:*?"<>|]+/g, '-')), filters: [{ name: 'PDF', extensions: ['pdf'] }] });
-  if (r.canceled || !r.filePath) return { ok: false };
-  const pdf = await win.webContents.printToPDF({ printBackground: true, landscape: true, pageSize: 'A4', margins: { marginType: 'none' } });
-  fs.writeFileSync(r.filePath, pdf); shell.showItemInFolder(r.filePath); return { ok: true, file: r.filePath };
-});
-/* school Wi-Fi is often a "Public" network, and the first-run firewall question only allows "Private" ones, so phones on the Wi-Fi are
-   silently blocked. This adds one inbound rule for HelixBoard itself (all network types), after the usual Windows administrator prompt. */
-ipcMain.handle('fw:allow', async e => {
-  if (!fromMain(e) || process.platform !== 'win32') return { ok: false, error: 'Only needed on Windows.' };
-  /* the elevated command is passed base64-encoded, so no path or quote can break it; one rule for this program, one for the class ports
-     (the portable copy runs from a temporary folder, so the port rule is what keeps it working) */
-  const exe = process.execPath.replace(/[`$"]/g, '`$&');
-  const inner = 'netsh advfirewall firewall delete rule name="HelixBoard phones" | Out-Null\r\n' +
-    'netsh advfirewall firewall add rule name="HelixBoard phones" dir=in action=allow program="' + exe + '" enable=yes profile=any | Out-Null\r\n' +
-    'netsh advfirewall firewall add rule name="HelixBoard phones" dir=in action=allow protocol=TCP localport=8320-8333 enable=yes profile=any | Out-Null';
-  const b64 = Buffer.from(inner, 'utf16le').toString('base64');
-  const cmd = "Start-Process -FilePath powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','" + b64 + "'";
-  return new Promise(resolve => require('child_process').execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { windowsHide: true, timeout: 120000 },
-    err => resolve(err ? { ok: false, error: /cancel|1223/i.test(String(err.message)) ? 'Windows did not get permission (the prompt was cancelled).' : 'Windows could not add the rule: ' + err.message } : { ok: true })));
-});
-/* lesson recordings are written to Documents\HelixBoard\Recordings, so they can be shared without copying them through memory again */
-ipcMain.handle('rec:save', async (e, name, bytes) => {
-  if (!fromMain(e)) return null;
-  const dir = path.join(app.getPath('documents'), 'HelixBoard', 'Recordings'); fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, String(name).replace(/[\\/:*?"<>|]+/g, '_'));
-  fs.writeFileSync(file, Buffer.from(bytes)); return file;
-});
 ipcMain.on('show-file', (e, file) => { if (fromMain(e) && typeof file === 'string' && fs.existsSync(file)) shell.showItemInFolder(file); });
-
-app.on('before-quit', () => { if (tunnel) tunnel.close(); if (clTunnel) clTunnel.close(); live.stop(); cl.stop(); });
 
 app.whenReady().then(() => {
   createWindow();
