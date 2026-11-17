@@ -1,8 +1,8 @@
 /* HelixBoard test runner: every suite in a fresh, empty profile; a summary table at the end.  node runall.js [names…] */
 const { spawnSync } = require('child_process'), fs = require('fs'), os = require('os'), path = require('path');
 const S = __dirname;
-const ELECTRON = ['once', 'lc', 'rp', 'vl', 'cl', 'link', 'phone2', 'self', 'gm', 'po', 'xp', 'end', 'sq', 'join1', 'crawl3', 'tq', 'tqar', 'sx'];
-const BROWSER = ['ink', 'mm', 'mm3', 'mm4', 'anim', 'tr2', 'nx', 'pc2', 'qimp', 'ppt', 'kb', 'plus'];
+const ELECTRON = ['crawl3'];
+const BROWSER = ['ink', 'sweep', 'mm', 'mm3', 'mm4', 'anim', 'tr2', 'ppt', 'kb', 'plus'];
 const pick = process.argv.slice(2), all = ELECTRON.concat(BROWSER).filter(n => !pick.length || pick.includes(n));
 const rows = [];
 for (const n of all) { const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'hbprof-')), t0 = Date.now();

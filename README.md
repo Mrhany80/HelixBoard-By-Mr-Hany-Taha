@@ -1,5 +1,10 @@
 # HelixBoard By Mr. Hany Taha — the Science Slate
 
+> **Version 3.0 "Lean".** Writing speed first: a finished stroke is painted at once and saving waits for a pause. Live class on phones,
+> reports, tests and exams, video lessons, paper cards, recording and the water reminder were removed (368 → 304 tools).
+> See `docs/3.0-removed-tools.md`. The full 2.8 version is on the branch `archive/full-2.8`. Sections below that mention a removed
+> feature describe 2.8.
+
 Single-file interactive whiteboard for biology and science lessons.
 Designed by Mr. Hany Taha for Green Hills International School (GHIS), Jeddah.
 
@@ -46,14 +51,10 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 | classtools.js | Timer, stopwatch, groups, dice, spotlight, curtain, traffic light, noise |
 | notes.js | 26 note templates (Cornell, KWL, Frayer, Venn, mind-map, fishbone, CER, POE, lab report …) |
 | smart.js | Smart templates: zones, auto-fit, Fit/Fill screen, 8-direction resize, handwriting-only |
-| notes2.js | Expert notes (`HBNX`): lesson audio recorded with the ink (replay, tap ink to jump), find/outline/tags across pages (Ctrl+F), export to Word/Markdown, date stamp |
-| xp.js | Classes and session names, Class XP levels and badges from Reports, Redemption quiz (`HBX`) |
-| cards.js | Paper answer cards like Plickers (`HBPC`): printable coded cards, webcam scanning, roster per class |
 | mindmap.js | Miro-style concept maps (`HBMM`): idea nodes, curved coloured branches, Tab/Enter, fold, layouts, cross-links, templates, outline → map |
 | deck.js | PDF / PowerPoint one-tab decks: slide panel, slideshow, transitions, sorter, blank slides, export |
 | wheel.js | Wheel of Names |
 | timer.js | Lesson timer |
-| water.js | Hydration reminder with glass of water |
 | io.js | Save/open `.helix`, PDF/PPTX/DOCX/TXT import, camera, PNG/PDF export, replay, record |
 | ui.js | Tab bar (helix ribbon + side rail), tool panel, dock, pen tray, dialogs, drawer, settings |
 | fullscreen.js | Full-screen mode for any page, left-side zoom+pen panel, collapse |
@@ -120,94 +121,6 @@ selection); the browser's own menu appears only in text fields. In the slideshow
 always go to the next step (←, PageUp, Backspace go back), whatever the tool; with a text box open, Esc closes it and
 PageDown/PageUp close it and continue. Press **K** for the on-screen keyboard (English, Arabic, science layers).
 
-## Live class (Windows app) — Nearpod / ClassPoint-style activities
-
-**Study → Live class** (or the gradient **Live class** button in the top bar) opens one dashboard for the whole lesson. Students
-scan one QR code (the class link) and their phones switch to whatever the teacher sends:
-
-| Activity | On the phone | On the board |
-|---|---|---|
-| **Draw it** | a canvas (blank, grid, lines, graph axes, or the teacher's board) with colours, sizes, eraser, undo | every drawing side by side **by name** — 2 to 6 per row (split screen), live as they draw |
-| **Quick poll** | A–F, True/False, Yes/No, agree scale; can change until answers close | live bars, who voted, **Reveal answer** turns phones green/red |
-| **Word cloud** | up to 3 words | a live word cloud (repeats grow) |
-| **Short answer** | a text box | every answer as a card |
-| **Photo** | camera or gallery (compressed on the phone) | a photo gallery |
-| **Collaborate board** | up to 6 sticky notes in 6 colours | a wall of notes with names |
-
-For every activity: optional time limit (phones show a countdown), **Hide names** (anonymous on screen), **spotlight** one
-answer full screen (← → to move), **Share with class** (it appears on every phone), **Give a star** (ClassPoint-style;
-students see their stars, **Stars** shows a podium), **Remove** an unsuitable answer, **Put on board** (the whole gallery or
-one answer becomes a picture on the board), **Excel (.csv)**. Also: raised hands ✋ and private questions **?** from phones,
-**Eyes on board** (locks every phone), plus **Write on my board** (students write on the live board) and the **Quiz game**.
-Server side: `desktop/classlink.js` (`setActivity`, `/answer`, `/hand`; every answer is validated by type and size and rate
-limited); phone page: `desktop/classlink-student.html`; dashboard: `app/liveclass.js` (`HBLC`).
-
-### Submit once and deadlines
-
-Activities default to **Submit once** (Nearpod/ClassPoint style): students work on a private draft, press **Submit**, and the
-answer locks (a second answer is refused by the server). With a **time limit** (up to 30 min) every phone shows a countdown bar
-that turns red in the last 10 s; when time is up, unsent drafts are **handed in automatically** (marked ⏰) and late answers are
-refused. The teacher sees ✓ submitted / ✎ working / ⏱ not started, can add a minute or reopen, and **Remove · let them redo**
-allows one student to answer again. **Live** mode (answers stream in and can change) remains for brainstorming; word clouds and
-collaborate boards default to it.
-
-### Running the session
-
-**Eyes on board** pauses every phone; the phones show the teacher's live board (shared just for the pause if *Show my board*
-was off) with "Look at the board". Starting a new activity unlocks the phones automatically. **Pick** spins the names of
-connected students and lands on one (nobody twice until everyone has been; give a star from there). **Reactions** lets students
-tap 👍 ❤️ 😂 😮 🤔 👏 on their phone; the emojis float up over whatever is on screen (one per student every 1.2 s, can be
-turned off). With the dashboard hidden, a small pill (top right) shows what is running, with Eyes on board, End and minimise; it
-hides itself during the slideshow, video lessons, reports and the big QR code. **End session** (dashboard, pill or
-Study → End live session) saves the activity to Reports, closes the link so phones show "The live session has ended", and can
-open the lesson's report.
-
-### Session names, full names, more activities
-
-Starting a live session asks for the **class** and the **lesson name** (phones, Reports and Class XP use them; "Ask me every
-time" can be turned off). Students must type a **full name** (two words) to join — on the class link and the phone quiz. The
-**Live** button in the top bar turns red while a session runs (green while an activity is open) and shows how many phones are
-connected. New activities: **Tap the picture** (heat map or dots, mark the right spot to score it, reveal it on the phones) and
-**Put in order** (drag cards; % in each position, most common order, reveal). Students who answered see their level (Class XP).
-
-### Question buttons on slides (like ClassPoint)
-
-In a deck, **Question** adds a live question to the current slide (`deck.slides[i].q`). In the slideshow a ❓ button sits on
-that slide: one click sends it to the phones; **Back to slides** returns to the same slide (the button shows **Show answers**
-while it runs).
-
-### Class XP and Redemption
-
-**Study → Class XP** adds up every saved report of a class: +5 per lesson attended, +10 per answer, +15 per right answer, +20
-per star (+score/200 in quizzes). Levels: Cell → Tissue → Organ → Organ system → Organism → Population → Community → Ecosystem →
-Biosphere; badges: On a roll, Sharpshooter, Star collector, Most improved, Always on time, Perfect lesson, Every voice.
-**Redemption quiz** gathers the questions the class got under 60% right in its last 3 lessons into a quiz set.
-
-### Paper answer cards (like Plickers)
-
-**Study → Paper cards**: card owners per class, **Print cards** (PDF, 2 per A4 page; 100 unique codes), **Quick scan**. Each
-card is a 7×7-cell code (5×5 data bits, each code distinct in all four turns); the side at the top is the answer. In **Live
-quiz**, **Scan cards** reads the room with the webcam (adaptive threshold → blobs → corners → projective sampling → code
-match), fills in the counts and saves a report with names.
-
-## Reports (like Wayground/Quizizz reports, Power BI-ready)
-
-Every Live class activity and every phone quiz is saved automatically (IndexedDB on this computer), one report per lesson.
-**Study → Reports** (or **Reports** in the Live class dashboard) shows: headline cards (students, activities, participation,
-accuracy, on time, stars), participation and accuracy charts, class accuracy bands, who needs attention, top students, a
-colour-coded student grid (✓ ✗ ● ⏰ —, sortable, click a name for all their answers) and per-activity detail (answer bars,
-word lists, written answers, drawing and photo thumbnails). Exports: **Excel (.xlsx)** with Summary, Students, Activities and
-Responses sheets (written by a small built-in zip writer), **CSV for Power BI** (one tidy row per student per activity),
-**PDF report** (all views, printed by Chromium) and a shareable **.hbreport** file (`app/reports.js`, `HBRP`).
-
-## Video lessons (split by questions, like Nearpod)
-
-**Study → Video lesson**: open an MP4/WebM, pause anywhere and **Add question here** (quick poll with a right answer, short
-answer, word cloud, or **Draw it on the paused video frame**). The timeline shows each stop and the side panel lists the parts.
-In **Teach** mode the video stops by itself at every question: with phones connected the question goes to Live class and a
-**Continue video** button plays on; without phones the question shows big on the screen (with **Reveal answer**).
-Questions are remembered per video on this computer and can be saved/loaded as `.hbvid` files (`app/videolesson.js`, `HBVL`).
-
 ## PowerPoint animations
 
 Slides are drawn at up to **4K** (Quality: Standard / High / Premium 4K, the default) with high-quality image smoothing.
@@ -223,64 +136,6 @@ Motion paths, emphasis effects and videos are not reproduced; animated slides im
 Draw → Options → **Sensitivity** (1–10, default 8): higher follows the pen more tightly (less smoothing lag), shows light
 pressure more strongly and records smaller movements. Ink uses `pointerrawupdate` where available, so samples arrive as soon
 as the digitiser sends them.
-
-## One join for the whole lesson
-
-The phone quiz runs **inside the class link** when the Windows app is used: one QR code and PIN for the lesson. `live.js`
-starts in *attached* mode (no server of its own); `classlink.js` serves it under `/quiz/` and tells the phones a quiz is on;
-`classlink-student.html` moves each phone to `quiz/?pin=…&name=…&auto=1&back=…`, `live-student.html` joins with that name and
-returns to the class when the quiz closes. The quiz page is in Arabic when the app is (`__LANG__`). Load test: 40 phones
-answering at once — all in, slowest answer 61 ms.
-
-## Tests from worksheets (like Microsoft Forms and Wayground)
-
-Live class → **Tests**. Settings come first (test name, class, phone language, feedback straight away / after handing in /
-none, a second try with a hint, time limit, pass mark, shuffling, going back, showing the score and the corrected copy,
-forgiving small spelling slips). Then the worksheet: **PDF, Word (.docx), photos or scans (Tesseract, English + Arabic), or
-pasted text**. No AI and no internet are needed (photos need Tesseract once).
-
-- `app/quizimport.js` turns the file into lines. PDF: text with position and boldness; every **figure, drawn shape, graph and
-  diagram** is found as whatever ink on the page is not text, cropped with its labels and placed between the questions
-  (tables of questions, frames round text and grids are left as text). Word: Word's own list numbering is written into the
-  text, bold/underlined options, pictures, **charts drawn again from the chart data**, drawn shapes and groups (boxes,
-  arrows, text-box labels on a picture, SmartArt). **Equations are kept exactly as they look**: Word equations (OMML →
-  MathML → picture), and in PDFs any line with math fonts, sub/superscripts or stacked fractions, and small vector formulas,
-  are cropped as pictures inside the text (`⟦m:id⟧`, pictures in `q.media`).
-- `app/quizparse.js` finds numbered questions (1. / Q1 / ١- / س١), options (a) / A. / أ)), options on one line, sections and
-  their type ("True or False", "Fill in the blanks", "Match", "Arrange", "Explain", Arabic too), marks, "Answer:" lines,
-  explanations, hints, "use the graph to answer questions 3–5" (the graph goes on all of them) and the **answer key**: a key
-  page ("1-B 2-C 3-True", by section too), "Answer: B" under a question, or the right option marked with ✓ / * / bold /
-  underline. Key layouts read: one or several per line ("1. B 2. C"), "1-b, 2-a", "Q1: B", "1. (b)", option words instead
-  of letters, a key table (number | answer, several column pairs, answers wrapping onto two lines), a row of numbers with the
-  answers below, a list at the end with no heading, marks after answers "(1)", and alternatives "citric acid (also: TCA)".
-  Options may be written "A ribosome   B vesicle"; "Label the figure" lines (A ____ … O ____) become one blank per letter,
-  answered from "A nuclear pore · B nucleus …"; a fill-in equation is answered from the full equation in the key. Nine types: multiple choice, several answers, true/false, short answer, number (tolerance, units), fill in the
-  blanks, matching, put in order, written answer (key words).
-- The review screen is Forms-style cards: edit anything, change the type, crop a figure from the page, or **copy a figure or
-  equation anywhere and press Ctrl+V** on a question (as its figure) or inside its text (in place).
-- `desktop/testgrade.js` marks every answer — shared by the class link server and the app: spelling slips forgiven on longer
-  words, Arabic letter forms and diacritics ignored, numbers with tolerance, partial credit, a second try at half points.
-  The key never leaves the teacher's computer. Phones get `desktop/test-student.html` (one question at a time, instant
-  feedback, question map, timer, corrected copy, Arabic right-to-left) through the class link they already joined.
-- `app/testdash.js` — the dashboard: key numbers, score distribution, insights in plain language, accuracy by question and
-  by type, performance bands, item analysis (difficulty, discrimination, most common wrong answer, drill-down), a heat map of
-  every answer, the teacher's own marks for written answers (sent back to the phones), Excel export. Results are saved with
-  the test (IndexedDB) for every time it is given.
-
-### Planned for the next update
-
-- **Optional answer-key upload (AK):** on the review screen, an "Upload answer key" button to read the key from a separate
-  file (PDF, Word, photo or pasted text — e.g. the teacher's guide) and apply it to the questions already imported, with the
-  same key formats as an in-file key ("1-B 2-C 3-True", by section, Arabic too).
-- Gamification lesson plan (deferred by Mr. Hany).
-
-## Bubble-sheet exam (like ZipGrade)
-
-Live class → Tests → **Bubble-sheet exam** (`app/sheetexam.js`, phones: `desktop/exam-student.html`). Settings first, then the
-document (shown as it is), then the key (tap, paste "1A 2C", upload a key file, or read from the end of the document). Phones
-show the document beside a bubble sheet, save every tap locally and on the teacher's computer, and record leaving the page.
-Negative marking, KR-20 reliability, integrity flags and a printable A4 bubble sheet. See `CHANGELOG.md` for what is not in
-this release.
 
 ## Concept map details
 
@@ -300,36 +155,10 @@ empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/
 
 ## Tests
 
-The test scripts (Playwright) run through one runner that gives every suite a fresh, empty profile: the Windows app reads
-`HB_USER_DATA` (test mode also skips the opening titles and the sign-in screen). Suites cover Live class, activities, reports,
-video lessons, class link, internet link, phone quiz (teams, boss, power-ups, confidence, ghost), one join with a 40-phone
-load, concept maps (keyboard, mouse, pen, moving branches), tests from PDF / Word / equations / Arabic with phones and
-the dashboard, PowerPoint animations and transitions, notes, paper cards and a crawl that clicks
-every tool in every tab and checks it visibly does something.
-
-## Phone quiz game modes
-
-In the lobby: **Classic**, **Teams** (2–4 teams, team score = average of members, tug-of-war or race bars) or **Boss battle**
-(the class damages a virus with every point; if most of the class misses a question it heals 8%). **Power-ups** (every second
-right answer in a row: double points, 50/50, time freeze, streak shield), **How sure?** (sure ×1.25 / guess ×0.75, sure and
-wrong −150, and the teacher sees "Sure but wrong" names — a misconception alert) and **Ghost** (race an earlier run of the same
-quiz, per class). Quiz sets accept **Order:** questions (items written in the right order; phones drag them).
-
-## Phone quiz (Windows app)
-
-**Study → Quiz game** runs a quiz the way Wayground/Quizizz does: students scan the QR code on the board,
-type their name and the 6-digit game PIN, and answer on their phones; faster correct answers score more, streaks earn a bonus,
-and the board shows answer bars, a leaderboard and a podium; results export to Excel (.csv).
-
-- **Any network (default):** the app opens a free Cloudflare quick tunnel (`https://<random>.trycloudflare.com`, no account)
-  so students can join on mobile data, home Wi-Fi or any other network. `desktop/tunnel.js` downloads Cloudflare's
-  `cloudflared.exe` once (≈60 MB) from its official GitHub release and keeps it only if Windows confirms a valid
-  Cloudflare code signature or its SHA-256 matches the checksum in the release notes. Quick tunnels are a free Cloudflare
-  service without uptime guarantees; some school web filters block `trycloudflare.com` — mobile data then still works.
-- **Same Wi-Fi:** if the internet link can't open (or “Let phones join from any network” is switched off), phones on the same
-  Wi-Fi join directly (`desktop/live.js`, port 8320–8324). The first time, Windows asks to allow HelixBoard on private networks.
-- Phones use long-polling (one open request each), which works through tunnels and school proxies; wrong PINs are limited
-  to 15 tries per device per 10 minutes; answers stay on the teacher's computer until each reveal.
+`python3 build.py && cd tests && node runall.js` runs 11 suites: `ink` (20 checks on the ink path and saving), `sweep` (every tool
+button tapped with touch at 3840x2160 and 1366x768), `crawl3` (the same inside the Windows app shell), `mm`, `mm3`, `mm4` (concept maps),
+`anim`, `tr2`, `ppt` (PowerPoint), `kb` (keyboard) and `plus` (the 2.8 learning tools). `node tests/inkbench.js` measures writing speed
+on a full board; results are in `docs/perf-baseline.md` and `docs/perf-after.md`.
 
 ## Quiz and flashcard sets
 

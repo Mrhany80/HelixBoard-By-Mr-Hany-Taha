@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.0.0
+
+"Lean": writing speed first, and fewer tools. Measured on a full board (2,000 strokes, 10 pictures, 4K, CPU slowed 4x):
+stroke commit 846 ms → 9.6 ms, time lost in long tasks 15.8 s → 1.7 s in 20 s of writing. See `docs/perf-after.md`.
+
+### Faster ink
+- A finished stroke is painted straight onto the board picture; the page is redrawn only for undo, erase, move, zoom and layers.
+- Saving waits for a pause in the writing (never more than 20 s), runs when the browser is idle, writes pictures only when they
+  change, and happens at once when the app is left or closed.
+- The saved copy is made in one pass (same file format as 2.8).
+- Minimap, page tabs, slide thumbnails and tool-button states wait until the pen has rested (`HB.later`, `HB.ink`).
+- No per-sample work outside the pen: the concept-map drop check and the magnifier no longer run for every pen sample.
+- Panels over the board no longer blur their backdrop; the title glow no longer animates. Canvas layers are capped at 4K.
+
+### Removed (368 → 304 tools) — `docs/3.0-removed-tools.md`
+Live class on phones, class link, phone quiz, tests from worksheets, bubble-sheet exam, reports, Class XP, paper cards, video
+lessons, the Collaborate structures, lesson audio and video recording, replay, Ink → text, Photo → text, homework files,
+student study tools, the water reminder, question buttons on slides. The Windows app no longer starts a phone server.
+Flashcards, Make groups and Fair talk moved to the Teach tab. Boards saved by 2.8 open unchanged.
+
+### Fixed
+- A stroke written just before closing could be lost. - The minimap threw an error when a page had no size yet.
+
+### Tests
+11 suites pass (`ink` and `sweep` are new). Not tested: touch feel on a real smartboard, the Windows installer, sound.
+
 ## 2.8.0
 
 One learning tool for each tab, four fixes, and Windows releases that build themselves.
