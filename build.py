@@ -16,7 +16,7 @@ D = R + 'dist/'
 
 # source modules, loaded in this order; wrap each in try/catch so one broken
 # module doesn't stop the whole app
-ORDER = ['core','engine','input','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
+ORDER = ['core','engine','input','inktrail','stamps','sci_bio','sci_chem','sci_phys','calc','keyboard',
          'recog','classtools','notes','smart','mindmap','deck','wheel','timer','io','ui',
          'fullscreen','toolsize','roots','studio','notekit','account','plus','install','lang','intro','main']
 

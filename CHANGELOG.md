@@ -1,5 +1,40 @@
 # Changelog
 
+## 3.1.0
+
+Pen feel on the real smartboard. 3.0 made the board's own ink path fast; this version hands the very tip of the
+stroke to the operating system, and adds a meter so the delay can be measured on the panel in the classroom
+instead of guessed at.
+
+### OS ink trail (`app/inktrail.js`)
+- The board already reads pen samples the fast way (`pointerrawupdate`, `getCoalescedEvents()`,
+  `getPredictedEvents()`, a `desynchronized` canvas). What was left was the browser itself: every sample had to
+  travel through the JavaScript event loop before any of it reached the screen.
+- The Ink API (`navigator.ink`) now draws the leading piece of the stroke — the short tail between the last
+  painted point and where the pen is right now — in the operating system's compositor, without waiting for
+  JavaScript. This is the web form of the native Windows Ink path that desktop smartboard software uses.
+- The board still draws the real stroke exactly as before; the trail only covers the gap, so nothing about the
+  saved file, the pens or the undo history changes.
+- Offered for the three flat pens (pen, marker, highlighter). Chalk, pencil, glow, calligraphy and dashed keep a
+  texture, a shadow or a nib angle that a plain trail would not match, so they are left alone on purpose.
+- Chromium and Edge offer the API today. Where it is missing — or where the browser refuses the presenter — the
+  board falls back to the 3.0 path silently. Switch: **Board → Input → OS ink**.
+- Honest note: this cannot be measured by `tests/inkbench.js`, which drives the board with scripted events on a
+  machine with no graphics card. Scripted events are not trusted events, so the trail never runs there. The gain
+  is in what the hand feels on the panel, which is why the meter below ships with it.
+
+### Pen delay meter (Alt+L, or Board → Input → Pen delay)
+- A small overlay showing, for this panel: pen samples per second, how long a sample waits for a frame, frame
+  time, and how long a finished stroke takes to commit — each as median and 95th percentile.
+- Costs nothing while it is closed; the per-sample timing only runs when the overlay is open.
+- `docs/perf-after.md` admits the cloud numbers are not the touch delay of a real smartboard. This is the tool
+  that answers that question.
+
+### Unchanged
+File format, tools, tabs and keyboard shortcuts are the same as 3.0.0. `node tests/ink.js` (21 checks),
+`node tests/sweep.js` (386 tool buttons at two screen sizes) and `node tests/inkbench.js` all pass with no
+regression.
+
 ## 3.0.0
 
 "Lean": writing speed first, and fewer tools. Measured on a full board (2,000 strokes, 10 pictures, 4K, CPU slowed 4x):

@@ -41,6 +41,7 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 | core.js | HB global: `set` (localStorage), IDB, `bus`, modals, toast, `need()` library loader, SND |
 | engine.js | Canvas, viewport (`V`), themes, pages, dates, Hijri formatter, draw/render, undo/redo |
 | input.js | Pointer events, pen tray, tools: draw / shape / text / erase / select / lasso / hand / laser, radial menu, pen presets, DNA cursor |
+| inktrail.js | OS ink trail (Ink API) for the tip of the stroke, and the Alt+L pen delay meter |
 | stamps.js | Shape and stamp libraries |
 | sci_bio.js | Biology stamps, templates, Punnett, pedigree, food-web, cell cycle |
 | sci_chem.js | Chemistry equations, molecules, periodic table, shells, dot & cross |
@@ -151,6 +152,10 @@ empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/
   140 ms after the movement stops. Boards over 150 objects only.
 - Pictures over 4.2 megapixels (4K slides) are drawn from a screen-sized `ImageBitmap`; the full picture is decoded only when
   zoomed in past it, and at most three stay decoded.
+- The tip of the stroke is handed to the operating system's compositor (Ink API, `app/inktrail.js`) for pen, marker and
+  highlighter, so it appears without waiting for the JavaScript event loop. Chromium and Edge only; falls back silently.
+  Switch in Board → Input → OS ink. Alt+L opens the pen delay meter, which measures the real panel — scripted tests cannot,
+  because the API ignores untrusted events.
 - Startup: interactive after about 0.6 s plus 0.25 s to open the board. A 60-round lesson simulation shows no memory growth.
 
 ## Tests

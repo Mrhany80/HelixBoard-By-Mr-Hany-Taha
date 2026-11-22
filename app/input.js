@@ -136,13 +136,13 @@ const TOOLS = {
   draw: { coalesce: true,
     down(x, y, e) { const sp = !(e.pointerType === 'pen' && e.pressure > 0 && e.pressure !== 0.5); live = { t: 'stroke', pen: T.pen, c: T.color, w: T.size * (T.pen === 'hi' ? 1 : 1), a: T.alpha, pts: [x, y, pressureOf(e)], tm: [0], sp, t0: performance.now(), _live: true }; if (T.board && e.pointerType === 'touch') live.sb = 1; if (T.pen === 'calli') live.ang = T.nib;
       if (window.HBInst) { const sn = HBInst.snapStart(x, y); if (sn) live.snap = sn; }
-      act = { k: 'draw', o: live, last: [x, y, performance.now()], minMove: E.SENS().minMove }; SND.writeStart(T.pen === 'chalk' || E.THEMES[page().theme].chalk ? 'chalk' : null); still = { x, y, t: performance.now(), done: false }; dirty.live = true; },
+      act = { k: 'draw', o: live, last: [x, y, performance.now()], minMove: E.SENS().minMove }; SND.writeStart(T.pen === 'chalk' || E.THEMES[page().theme].chalk ? 'chalk' : null); still = { x, y, t: performance.now(), done: false }; bus.emit('ink-start', live); dirty.live = true; },
     move(x, y, e) { if (!act || act.k !== 'draw') return; const o = act.o; if (o.snap) [x, y] = HBInst.snapPoint(o.snap, x, y); const n = o.pts.length; if (Math.hypot(x - o.pts[n - 3], y - o.pts[n - 2]) < (act.minMove || 0.6) / V.s) return; o.pts.push(Math.round(x * 10) / 10, Math.round(y * 10) / 10, pressureOf(e)); o.tm.push(Math.round(performance.now() - o.t0)); delete o._p; delete o._b;
       const now = performance.now(), dt = Math.max(1, now - act.last[2]), sp = Math.hypot(x - act.last[0], y - act.last[1]) * V.s / dt; SND.writeMove(sp, Math.atan2(y - act.last[1], x - act.last[0])); act.last = [x, y, now];
       if ((o.pen === 'chalk' || E.THEMES[page().theme].chalk) && Math.random() < 0.35) dust.push({ x, y, vx: (Math.random() - 0.5) * 0.4, vy: 0.3 + Math.random() * 0.6, t: now, c: o.c });
       if (Math.hypot(x - still.x, y - still.y) > 4 / V.s) { still.x = x; still.y = y; still.t = now; }
       if (o.preview) { o.preview = null; } dirty.live = true; },
-    up() { if (!act || act.k !== 'draw') return; const o = act.o; act = null; SND.writeStop(); live = null; dirty.live = true;
+    up() { if (!act || act.k !== 'draw') return; const o = act.o; act = null; SND.writeStop(); live = null; dirty.live = true; bus.emit('ink-end', o);
       if (o.preview) { const s = o.preview; s.c = o.c; s.sw = Math.max(2, o.w * 0.8); add(s); return; }
       delete o.t0; delete o.snap; delete o.preview; delete o._live; delete o._lc; delete o._p; act && (act.pred = null); add(o); bus.emit('stroke-added', o); } },
   erase: { coalesce: true,
