@@ -160,9 +160,10 @@ empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/
 
 ## Tests
 
-`python3 build.py && cd tests && node runall.js` runs 11 suites: `ink` (20 checks on the ink path and saving), `sweep` (every tool
+`python3 build.py && cd tests && node runall.js` runs 12 suites: `ink` (20 checks on the ink path and saving), `sweep` (every tool
 button tapped with touch at 3840x2160 and 1366x768), `crawl3` (the same inside the Windows app shell), `mm`, `mm3`, `mm4` (concept maps),
-`anim`, `tr2`, `ppt` (PowerPoint), `kb` (keyboard) and `plus` (the 2.8 learning tools). `node tests/inkbench.js` measures writing speed
+`anim`, `tr2`, `ppt` (PowerPoint), `kb` (keyboard), `plus` (the 2.8 learning tools) and `doc` (PDF/Word import: codec,
+resolution, Arabic reading order, Mark and return). `node tests/inkbench.js` measures writing speed
 on a full board; results are in `docs/perf-baseline.md` and `docs/perf-after.md`.
 
 ## Quiz and flashcard sets
@@ -265,4 +266,7 @@ The tablet web app updates itself whenever `main` changes (`.github/workflows/pa
 - The iPad version is a web app (no App Store build — that needs a Mac and an Apple developer account).
 - The Windows installer is not code-signed, so SmartScreen warns on first install.
 - PowerPoint animations and videos aren't captured; the slide shows its final look.
+- Imported PDF/Word pages are all drawn at import time, so about 20 pages at a time keeps the board fast.
+- "Original look" pages are pictures: the words in them cannot be searched or copied (use "Editable text" for that).
+- Pages that the PDF itself turns sideways are left out of "Mark and return" rather than marked crooked.
 - Floating panels, the wheel screen and the on-screen keyboard are not captured in recordings.

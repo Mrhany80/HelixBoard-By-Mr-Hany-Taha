@@ -1,5 +1,51 @@
 # Changelog
 
+## 3.2.0
+
+Opening a PDF or a Word document, done properly. The import path was read line by line and seven faults came
+out of it; four were quality, one was an Arabic bug, and one was a missing feature teachers actually need.
+
+### Sharper pages
+- A PDF page was always drawn 1800 px wide. On a 4K smartboard that picture is stretched more than twice and
+  the worksheet text goes soft. The page is now drawn for the screen it will be shown on (up to 4096 px,
+  capped at about 12 megapixels a page so the board stays fast).
+- Page pictures were saved as JPEG, which is built for photographs and leaves a grey halo round every letter —
+  worst on thin Arabic script. They are now WebP, which keeps the edges clean and is usually the smaller file.
+  JPEG remains the fallback for any browser without WebP. Word pages and PowerPoint slides get the same.
+- Word tables were drawn at 56% of their width and then stretched back up. They are now drawn at full width.
+
+### Arabic PDFs read correctly
+- "Editable text" on an Arabic PDF used to come out with the words backwards, and often broke one line into
+  several text boxes. pdf.js hands over the pieces of a line in the order the file stores them, which for
+  Arabic runs right to left; the old code appended them one after another and only accepted a piece whose x
+  was further right. Pieces are now gathered into rows by their height on the page first, and only then put
+  in reading order — left to right for Latin, right to left for Arabic.
+
+### Mark and return (new, `Board → Export PDF`)
+- The old PDF export redrew every board page as a 16:9 picture. For a worksheet that is the wrong answer: the
+  printed text stops being text, the file swells and the page size changes.
+- "Mark and return" takes the PDF that was imported, keeps it exactly as it was — real text, real page size,
+  still selectable and searchable — and stamps only your writing on top, page by page. A marked worksheet
+  goes straight back to the class as a normal PDF.
+- The original file is kept inside the board so this stays possible later. A board holding a PDF of 20 MB or
+  more says so when it is imported, since the saved board grows by about that much.
+- Pages that the PDF itself turns sideways are left out rather than marked crooked, and the message says how
+  many. Uses pdf-lib 1.17.1 (MIT), built in, so it works with no internet.
+
+### Tests
+- New suite `tests/doc.js` (12 checks): it builds its own PDF in the browser, imports it, and checks the
+  codec, the resolution, the kept original, the saved `.helix`, Arabic reading order and a real marked PDF
+  coming back out. `node tests/runall.js` now runs 12 suites.
+
+### Still to do, said plainly
+- Pages are all drawn at import, so the "about 20 pages at a time" advice stands. Rendering pages only when
+  they are looked at is the next step.
+- A hidden text layer under the page picture (so "Original look" pages would also be searchable) is not in
+  this version: without a page search in the board it would be dead weight. It comes with that.
+- `.doc` and `.ppt` from before 2007 stay refused — no browser library is reliable enough, and a silently
+  mangled worksheet is worse than a clear refusal. Scanned PDFs still have no text to rebuild; OCR would
+  need a 15 MB download and break the offline promise.
+
 ## 3.1.0
 
 Pen feel on the real smartboard. 3.0 made the board's own ink path fast; this version hands the very tip of the

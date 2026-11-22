@@ -73,6 +73,8 @@ LIBS = [
     ('pptx',      'pptx-preview.umd.js',     'pptx-preview 1.0.7 — ISC'),
     ('mammoth',   'mammoth.browser.min.js',  'mammoth 1.8.0 — BSD-2-Clause'),
     ('jspdf',     'jspdf.umd.min.js',        'jsPDF 4.2.1 — MIT'),
+    # 3.2.0: "Mark and return" stamps the writing onto the original PDF, offline
+    ('pdflib',    'pdf-lib.min.js',          'pdf-lib 1.17.1 — MIT'),
     # 2.8.0: equations, sketchy shapes, charts and molecules no longer need the internet
     ('rough',     'rough.js',                'Rough.js 4.6.6 — MIT'),
     ('chart',     'chart.umd.min.js',        'Chart.js 4.5.1 — MIT'),

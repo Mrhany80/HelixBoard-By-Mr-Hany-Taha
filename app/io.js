@@ -33,6 +33,28 @@ function placeAsset(src, w, h, layer) { const id = 'a' + window.HB.uid(); B.asse
 
 /* ---------- PDF pages → board pages ---------- */
 let pdfLib = null;
+/* ---------- document picture quality (3.2.0) ----------
+   A page of a worksheet is mostly black text on white paper. JPEG is built for photographs and puts a grey
+   halo round every letter — worst on thin Arabic script — so document pages are kept as WebP, which holds
+   the edges clean and is usually the smaller file as well. JPEG stays as the fallback. */
+let webpOK = null;
+function encodePage(c, q) {
+  if (webpOK === null) { try { webpOK = c.toDataURL('image/webp', 0.9).slice(0, 15) === 'data:image/webp'; } catch (e) { webpOK = false; } }
+  return webpOK ? c.toDataURL('image/webp', q == null ? 0.92 : q) : c.toDataURL('image/jpeg', q == null ? 0.92 : Math.min(0.95, q));
+}
+/* The page is drawn for the screen it will be shown on. 1800 px wide was fine for a laptop; on a 4K
+   smartboard the same picture is stretched more than twice and the text goes soft. Capped so one page
+   never passes about 12 megapixels, which is what the board can hold without slowing down. */
+function docScale(w, h) {
+  const panel = Math.round(Math.max(screen.width || 0, screen.height || 0) * (window.devicePixelRatio || 1)) || 1920;
+  const want = Math.max(1800, Math.min(4096, panel));
+  let s = Math.min(4, want / w);
+  if (w * s * h * s > 12e6) s = Math.sqrt(12e6 / (w * h));
+  return Math.max(1, s);
+}
+/* data: URL → bytes, for handing a file to pdf-lib */
+function dataBytes(u) { const b = atob(String(u).slice(String(u).indexOf(',') + 1)); const a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+const fileData = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
 /* pdf.js 6 uses Map.getOrInsertComputed (2026 JavaScript); older browsers get a tiny polyfill, in the page and in the worker */
 const POLY = "for (const C of [Map, WeakMap]) { const P = C.prototype; if (!P.getOrInsert) P.getOrInsert = function (k, v) { if (!this.has(k)) this.set(k, v); return this.get(k); }; if (!P.getOrInsertComputed) P.getOrInsertComputed = function (k, f) { if (!this.has(k)) this.set(k, f(k)); return this.get(k); }; }";
 async function loadPdf() { if (pdfLib) return pdfLib; (0, eval)(POLY); const eM = document.getElementById('hblib-pdfjs'), eW = document.getElementById('hblib-pdfworker'); if (eM && eW) { const blob = t => URL.createObjectURL(new Blob([t], { type: 'text/javascript' })); const m = await import(blob(eM.textContent)); m.GlobalWorkerOptions.workerSrc = blob(POLY + ';\n' + eW.textContent); /* opened straight from disk (file://) Chrome refuses module workers from blob: URLs and pdf.js falls back to the slow main thread — run the worker as a classic script instead */ if (location.protocol === 'file:') { try { m.GlobalWorkerOptions.workerPort = new Worker(blob(POLY + ';\n' + eW.textContent.replace(/export\s*\{\s*WorkerMessageHandler\s*\};?/, 'globalThis.pdfjsWorker = { WorkerMessageHandler };').replace(/import\.meta\.url/g, 'self.location.href'))); } catch (e) { console.warn(e); } } return pdfLib = m; } const m = await needESM(PDFJS + 'pdf.min.mjs'); const wurl = new URL(libURL(PDFJS + 'pdf.worker.min.mjs'), location.href).href; m.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([POLY + ';\nawait import(' + JSON.stringify(wurl) + ');'], { type: 'text/javascript' })); return pdfLib = m; }
@@ -43,14 +65,18 @@ async function importPdf(file) {
   try { lib = await loadPdf(); } catch (e) { toast('Could not load the PDF reader — check the internet connection.'); console.warn(e); return; }
   let doc; try { doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise; } catch (e) { toast('That PDF could not be opened (' + e.message + ').'); return; }
   const n = doc.numPages;
-  modal.open('<h2>Import PDF pages</h2><p><b>' + esc(file.name) + '</b> has ' + n + ' page' + (n > 1 ? 's' : '') + '. Each PDF page becomes a new board page, placed on the locked background layer so your ink never moves it.</p><label>Pages <input id="pdfR" class="inp" value="' + (n <= 20 ? '1-' + n : '1-20') + '" style="width:160px"></label> <span class="small muted">e.g. 1-5, 8, 10-12</span><div class="row" style="gap:14px;flex-wrap:wrap;margin:10px 0"><label><input type="radio" name="pdfM" value="pic" checked> <b>Original look</b> — pages as pictures, write on top</label><label><input type="radio" name="pdfM" value="txt"> <b>Editable text</b> — rebuild the words as text boxes you can change</label></div><p class="small muted">Large PDFs: about 20 pages at a time keeps the board fast. Editable text works best for typed PDFs; scanned pages have no text to rebuild.</p><div class="foot"><button class="btn primary" id="pdfGo">Import</button></div>', s => { $('#pdfGo', s).onclick = () => { const pages = parseRange($('#pdfR', s).value, n), mode = $('input[name=pdfM]:checked', s).value; modal.close(); if (!pages.length) { toast('No valid pages chosen.'); return; } if (mode === 'txt') pdfEditable(doc, pages, file.name); else renderPdf(doc, pages, file.name); }; }); }
-async function renderPdf(doc, pages, name) { const out = [];
+  modal.open('<h2>Import PDF pages</h2><p><b>' + esc(file.name) + '</b> has ' + n + ' page' + (n > 1 ? 's' : '') + '. Each PDF page becomes a new board page, placed on the locked background layer so your ink never moves it.</p><label>Pages <input id="pdfR" class="inp" value="' + (n <= 20 ? '1-' + n : '1-20') + '" style="width:160px"></label> <span class="small muted">e.g. 1-5, 8, 10-12</span><div class="row" style="gap:14px;flex-wrap:wrap;margin:10px 0"><label><input type="radio" name="pdfM" value="pic" checked> <b>Original look</b> — pages as pictures, write on top</label><label><input type="radio" name="pdfM" value="txt"> <b>Editable text</b> — rebuild the words as text boxes you can change</label></div><p class="small muted">Large PDFs: about 20 pages at a time keeps the board fast. Editable text works best for typed PDFs; scanned pages have no text to rebuild.</p><div class="foot"><button class="btn primary" id="pdfGo">Import</button></div>', s => { $('#pdfGo', s).onclick = () => { const pages = parseRange($('#pdfR', s).value, n), mode = $('input[name=pdfM]:checked', s).value; modal.close(); if (!pages.length) { toast('No valid pages chosen.'); return; } if (mode === 'txt') pdfEditable(doc, pages, file.name); else renderPdf(doc, pages, file.name, file); }; }); }
+async function renderPdf(doc, pages, name, file) { const out = [];
   for (let k = 0; k < pages.length; k++) { toast('Reading page ' + pages[k] + ' (' + (k + 1) + ' of ' + pages.length + ')…');
-    try { const pg = await doc.getPage(pages[k]); const vp0 = pg.getViewport({ scale: 1 }); const sc = Math.min(3, 1800 / vp0.width); const vp = pg.getViewport({ scale: sc });
+    try { const pg = await doc.getPage(pages[k]); const vp0 = pg.getViewport({ scale: 1 }); const sc = docScale(vp0.width, vp0.height); const vp = pg.getViewport({ scale: sc });
       const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
-      await pg.render({ canvasContext: g, canvas: c, viewport: vp }).promise; const id = 'a' + window.HB.uid(); B.assets[id] = c.toDataURL('image/jpeg', 0.86); out.push({ asset: id, w: c.width, h: c.height }); pg.cleanup && pg.cleanup();
+      await pg.render({ canvasContext: g, canvas: c, viewport: vp }).promise; const id = 'a' + window.HB.uid(); B.assets[id] = encodePage(c); out.push({ asset: id, w: c.width, h: c.height, pn: pages[k] }); pg.cleanup && pg.cleanup();
     } catch (e) { console.warn(e); toast('Page ' + pages[k] + ' failed: ' + e.message); } }
-  if (out.length) { window.HBA && HBA.log('import', { type: 'pdf', pages: out.length }); window.HBD.create(name, out); toast('Opened ' + out.length + ' page' + (out.length > 1 ? 's' : '') + ' of ' + name + ' in one tab — use the slide panel, arrows or F5 for the slideshow.'); } }
+  if (out.length) { window.HBA && HBA.log('import', { type: 'pdf', pages: out.length }); const np = window.HBD.create(name, out);
+    /* the original file is kept inside the board so "Mark and return" can put the writing back on it later */
+    if (np && file) { try { const sid = 's' + window.HB.uid(); B.assets[sid] = await fileData(file); np.deck.pdfSrc = { asset: sid, name: file.name, pages: out.map(o => o.pn) };
+      const mb = Math.round(file.size / 1048576); if (mb >= 20) toast('The original PDF (' + mb + ' MB) is kept inside this board so you can export the marked worksheet as a real PDF. That makes the saved board about ' + mb + ' MB bigger — delete the tab if you do not need it.', 6000); } catch (e) { console.warn(e); } }
+    toast('Opened ' + out.length + ' page' + (out.length > 1 ? 's' : '') + ' of ' + name + ' in one tab — use the slide panel, arrows or F5 for the slideshow.'); } }
 bus.on('import-pdf', f => importPdf(f));
 
 /* ---------- Documents: open PDF / Word / text, write and edit on them, save and export ---------- */
@@ -100,7 +126,7 @@ async function buildEditable(blocks, name) { if (!blocks.length) { toast('Nothin
     if (SZ[bl.k]) { y += bl.k === 'h1' ? 18 : 12; text(bl.s, { size: SZ[bl.k], b: true, c: bl.k === 'h1' ? (E.isDark(np) ? '#FFC9DE' : '#8E1F4F') : ink }); y += 14; continue; }
     if (bl.k === 'p') { text(bl.s, { b: !!bl.b }); y += 16; continue; }
     if (bl.k === 'li') { const ind = 34 + (bl.depth || 0) * 40, rtl = window.HB.isRTL(bl.s); const t = text((bl.n ? bl.n + '. ' : '• ') + bl.s, { x: rtl ? mx : mx + ind, w: cw - ind }); y += 8; continue; }
-    if (bl.k === 'img' || bl.k === 'table') { try { const im = bl.k === 'img' ? await loadImg(bl.src) : await htmlToCanvas(bl.html, Math.round(cw / 1.8)); const src = bl.k === 'img' ? bl.src : im.toDataURL('image/png'); const nw = im.naturalWidth || im.width, nh = im.naturalHeight || im.height; let w = bl.k === 'img' ? Math.min(cw, nw) : cw, h = w * nh / nw; const id = 'a' + uidH(); B.assets[id] = src; np.objs.push({ id: uidH(), ts: Date.now(), t: 'img', asset: id, x: mx, y, w, h, layer: 1, doc: name }); y += h + 20; } catch (e) { console.warn(e); } } }
+    if (bl.k === 'img' || bl.k === 'table') { try { const im = bl.k === 'img' ? await loadImg(bl.src) : await htmlToCanvas(bl.html, Math.round(cw)); const src = bl.k === 'img' ? bl.src : im.toDataURL('image/png'); const nw = im.naturalWidth || im.width, nh = im.naturalHeight || im.height; let w = bl.k === 'img' ? Math.min(cw, nw) : cw, h = w * nh / nw; const id = 'a' + uidH(); B.assets[id] = src; np.objs.push({ id: uidH(), ts: Date.now(), t: 'img', asset: id, x: mx, y, w, h, layer: 1, doc: name }); y += h + 20; } catch (e) { console.warn(e); } } }
   fitH(np, y); B.pages.splice(B.cur + 1, 0, np); window.HBUI && HBUI.goPage(B.cur + 1); E.changed(); SND.page();
   toast('Opened ' + name + ' as editable text — double-click any paragraph to change it.'); }
 const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
@@ -127,7 +153,7 @@ async function docxPictures(html, name) { const A4W = 794, A4H = 1123, PAD = 64,
     const probe = stageDiv(A4W); probe.box.style.padding = '0'; probe.box.appendChild(inner.cloneNode(true)); const h = Math.max(A4H, probe.box.scrollHeight); probe.done();
     try { const c = await svgToCanvas(xhtml(inner), A4W, h, 2); imagePage(c, name + ' p.' + (k + 1), theme, W, k); } catch (e) { console.warn(e); toast('Page ' + (k + 1) + ' failed: ' + e.message); } k++; }
   window.HBUI && HBUI.goPage(B.cur + 1); SND.page(); E.changed(); toast('Opened ' + groups.length + ' page' + (groups.length > 1 ? 's' : '') + ' of ' + name + '. Write on them freely — they sit on the locked background layer.'); }
-function imagePage(c, label, theme, W, k) { const id = 'a' + uidH(); B.assets[id] = c.toDataURL('image/jpeg', 0.9); const w = Math.min(W - 120, 1400), h = w * c.height / c.width; const np = E.newPage(theme); np.name = label.slice(0, 40); fitH(np, h + 60);
+function imagePage(c, label, theme, W, k) { const id = 'a' + uidH(); B.assets[id] = encodePage(c, 0.93); const w = Math.min(W - 120, 1400), h = w * c.height / c.width; const np = E.newPage(theme); np.name = label.slice(0, 40); fitH(np, h + 60);
   np.objs.push({ id: uidH(), ts: Date.now(), t: 'img', asset: id, x: (W - w) / 2, y: 70, w, h, layer: 0, pdf: label }); B.pages.splice(B.cur + 1 + k, 0, np); }
 
 /* PowerPoint → board pages. Slides are drawn by pptx-preview, then each one becomes a page: either an exact picture,
@@ -213,7 +239,7 @@ async function slidesToPages(slides, pages, name, edit, opts) { opts = opts || {
         out.push({ asset: ids[0], w: sw, h: sh, texts: [], steps: ids.slice(1), tr: opts.trans && opts.trans[pn - 1] || null }); if (live()) $('#ppBar').style.width = ((k + 1) / pages.length * 100) + '%'; await new Promise(r => requestAnimationFrame(r)); continue; }
       if (edit) { const r0 = sl.getBoundingClientRect(); sl.querySelectorAll('.text-wrapper p').forEach(p => { if (p.closest('table')) return; const t = p.innerText.replace(/ /g, ' ').replace(/\s+$/, ''); if (!t.trim()) return; const r = p.getBoundingClientRect(); const sp = p.querySelector('span') || p; const cs = getComputedStyle(sp), pcs = getComputedStyle(p); const size = parseFloat(cs.fontSize) || 18, rtl = window.HB.isRTL(t); const o = { t: 'text', x: r.left - r0.left, y: r.top - r0.top - size * 0.12, w: Math.max(30, r.width + 4), s: t, size, font: rtl ? 'Tajawal' : 'Lexend', c: rgbHex(cs.color), b: +cs.fontWeight >= 600 || cs.fontWeight === 'bold', i: cs.fontStyle === 'italic', doc: name }; if (pcs.textAlign === 'center') o.align = 'center'; else if (pcs.textAlign === 'right' || pcs.textAlign === 'end') o.align = 'right'; window.HB.loadFont(o.font); texts.push(o); }); }
       const clone = sl.cloneNode(true); clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml'); clone.style.margin = '0'; if (edit) clone.querySelectorAll('.text-wrapper').forEach(t => { if (!t.closest('table')) t.style.visibility = 'hidden'; });
-      const c = await svgToCanvas(xhtml(clone), sw, sh, scale); const url = c.toDataURL('image/jpeg', qual); const id = 'a' + uidH(); B.assets[id] = url; out.push({ asset: id, w: sw, h: sh, texts, tr: opts.trans && opts.trans[pn - 1] || null });
+      const c = await svgToCanvas(xhtml(clone), sw, sh, scale); const url = encodePage(c, qual); const id = 'a' + uidH(); B.assets[id] = url; out.push({ asset: id, w: sw, h: sh, texts, tr: opts.trans && opts.trans[pn - 1] || null });
       if (live()) { $('#ppImg').src = url; $('#ppBar').style.width = ((k + 1) / pages.length * 100) + '%'; }
     } catch (e) { console.warn(e); toast('Slide ' + pn + ' failed: ' + e.message); }
     await new Promise(r => requestAnimationFrame(r)); }
@@ -225,13 +251,34 @@ const rgbHex = c => { const m = String(c).match(/\d+(\.\d+)?/g); if (!m || m.len
 async function pdfEditable(doc, pages, name) { const out = [];
   for (const pn of pages) { toast('Reading text on page ' + pn + '…');
     try { const pg = await doc.getPage(pn); const vp = pg.getViewport({ scale: 1 }); const tc = await pg.getTextContent(); const lines = [];
-      tc.items.forEach(it => { if (!it.str || !it.str.trim()) return; const x = it.transform[4], y = vp.height - it.transform[5], fs = Math.hypot(it.transform[2], it.transform[3]) || 12; let L = lines.find(l => Math.abs(l.y - y) < fs * 0.45 && x - l.x2 < fs * 2.5 && x >= l.x - 2); if (L) { L.s += (x - L.x2 > fs * 0.15 && !/\s$/.test(L.s) ? ' ' : '') + it.str; L.x2 = x + it.width; } else lines.push({ x, x2: x + it.width, y, fs, s: it.str }); });
-      const texts = lines.map(l => { const rtl = window.HB.isRTL(l.s); const o = { t: 'text', x: l.x, y: l.y - l.fs, w: 0, s: l.s.trim(), font: rtl ? 'Tajawal' : 'Lexend', size: Math.max(5, l.fs), c: '#1E1419', doc: name }; window.HB.loadFont(o.font); return o; });
+      /* 3.2.0 — Arabic worksheets used to come out with the words backwards. pdf.js hands over the pieces of
+         a line in the order the file stores them, which for Arabic runs right to left, so appending them one
+         after another (and only accepting a piece whose x was further right) reversed the words and broke the
+         line into fragments. Pieces are now collected into rows by their height on the page first, and only
+         then put in reading order: left to right for Latin, right to left for Arabic. */
+      const rows = [];
+      tc.items.forEach(it => { if (!it.str || !it.str.trim()) return;
+        const x = it.transform[4], y = vp.height - it.transform[5], fs = Math.hypot(it.transform[2], it.transform[3]) || 12;
+        let R = rows.find(r => Math.abs(r.y - y) < Math.max(r.fs, fs) * 0.5);
+        if (!R) { R = { y, fs, it: [] }; rows.push(R); }
+        R.fs = Math.max(R.fs, fs); R.it.push({ x, w: it.width || 0, fs, s: it.str }); });
+      rows.forEach(R => {
+        const rtl = window.HB.isRTL(R.it.map(p2 => p2.s).join(''));
+        R.it.sort((a2, b2) => rtl ? (b2.x + b2.w) - (a2.x + a2.w) : a2.x - b2.x);
+        let s2 = '';
+        R.it.forEach((p2, i) => { if (i) { const prev = R.it[i - 1];
+            const gap = rtl ? prev.x - (p2.x + p2.w) : p2.x - (prev.x + prev.w);
+            if (gap > p2.fs * 0.15 && !/\s$/.test(s2)) s2 += ' '; }
+          s2 += p2.s; });
+        const x0 = Math.min(...R.it.map(p2 => p2.x)), x1 = Math.max(...R.it.map(p2 => p2.x + p2.w));
+        if (s2.trim()) lines.push({ x: x0, w: Math.max(10, x1 - x0), y: R.y, fs: R.fs, s: s2, rtl });
+      });
+      const texts = lines.map(l => { const o = { t: 'text', x: l.x, y: l.y - l.fs, w: l.w, s: l.s.trim(), font: l.rtl ? 'Tajawal' : 'Lexend', size: Math.max(5, l.fs), c: '#1E1419', doc: name }; window.HB.loadFont(o.font); return o; });
       out.push({ w: vp.width, h: vp.height, texts }); pg.cleanup && pg.cleanup();
     } catch (e) { console.warn(e); toast('Page ' + pn + ' failed: ' + e.message); } }
   if (out.length) { window.HBD.create(name, out); toast('Rebuilt the text of ' + out.length + ' page' + (out.length > 1 ? 's' : '') + ' in one tab — double-click any line to edit it. Pictures in the PDF are not included in this mode.'); } }
 /* ---------- .helix files ---------- */
-function usedAssets() { const used = {}; B.pages.forEach(p => p.objs.forEach(o => { if (o.asset && B.assets[o.asset]) used[o.asset] = B.assets[o.asset]; if (o.t === 'scalebar' && o.img) { const im = p.objs.find(q => q.id === o.img); if (im && im.asset) used[im.asset] = B.assets[im.asset]; } })); return used; }
+function usedAssets() { const used = {}; B.pages.forEach(p => { if (p.deck && p.deck.pdfSrc && B.assets[p.deck.pdfSrc.asset]) used[p.deck.pdfSrc.asset] = B.assets[p.deck.pdfSrc.asset]; }); B.pages.forEach(p => p.objs.forEach(o => { if (o.asset && B.assets[o.asset]) used[o.asset] = B.assets[o.asset]; if (o.t === 'scalebar' && o.img) { const im = p.objs.find(q => q.id === o.img); if (im && im.asset) used[im.asset] = B.assets[im.asset]; } })); return used; }
 function saveFile() { const data = { app: 'HelixBoard', format: 1, saved: new Date().toISOString(), board: JSON.parse(E.serial()), assets: usedAssets() };
   download(new Blob([JSON.stringify(data)], { type: 'application/json' }), safeName() + '_' + stamp() + '.helix'); SND.done && SND.done(); toast('Saved ' + safeName() + '.helix to your downloads'); }
 async function openFile() { const fs = await pick('.helix,application/json'); if (fs[0]) readHelix(fs[0]); }
@@ -247,7 +294,52 @@ async function snapshot(label) { try { await IDB.addVersion({ ts: Date.now(), ti
 /* ---------- PNG / PDF export ---------- */
 function renderPageImage(p, maxPx) { const r = E.pageRect(p); let sc = 2; const area = r[2] * r[3]; if (area * sc * sc > maxPx) sc = Math.sqrt(maxPx / area); return E.renderToCanvas(p, r, sc, { all: false }); }
 function exportPNG() { window.HBA && HBA.log('export', { type: 'png' }); const p = E.page(); toast('Rendering PNG…'); setTimeout(() => { const c = renderPageImage(p, 36e6); c.toBlob(b => { if (!b) { toast('The page was too large to export as one image — try PDF.'); return; } download(b, safeName() + '_page' + (B.cur + 1) + '_' + stamp() + '.png'); SND.done && SND.done(); toast('PNG saved (' + c.width + ' × ' + c.height + ' px)'); }, 'image/png'); }, 30); }
-function exportPDF() { modal.open('<h2>Export PDF</h2><p>Long notebook pages are cut into 16:9 slides so every part is readable when printed or projected.</p><div class="row" style="gap:8px;flex-wrap:wrap"><label><input type="radio" name="pdfW" value="cur" checked> This page</label><label><input type="radio" name="pdfW" value="all"> All ' + B.pages.length + ' pages</label></div><p><label><input type="checkbox" id="pdfBg" checked> Include the background theme</label><br><label><input type="checkbox" id="pdfNum" checked> Number the slides and add the board title</label></p><div class="foot"><button class="btn primary" id="pdfX">Create PDF</button></div>', s => { $('#pdfX', s).onclick = () => { const all = $('input[name=pdfW]:checked', s).value === 'all', bg = $('#pdfBg', s).checked, num = $('#pdfNum', s).checked; modal.close(); makePDF(all ? B.pages : [E.page()], bg, num); }; }); }
+/* ---------- Mark and return (3.2.0) ----------
+   The old PDF export redrew every board page as a 16:9 picture. For a worksheet that is the wrong answer: the
+   printed text stops being text, the file swells, and the page size changes. This instead takes the original
+   PDF that was imported, keeps it exactly as it was — real text, real page size, still selectable and
+   searchable — and stamps only the writing on top of it, page by page. A marked worksheet can go straight
+   back to the class as a normal PDF. */
+async function markReturn() {
+  const p = E.page(), S = p.deck, src = S && S.pdfSrc;
+  if (!src || !B.assets[src.asset]) { toast('This tab did not come from a PDF, so there is no original to write back onto.'); return; }
+  let lib; toast('Opening the original PDF…');
+  try { lib = await need('pdflib'); } catch (e) { toast(e.message); return; }
+  let doc;
+  try { doc = await lib.PDFDocument.load(dataBytes(B.assets[src.asset]), { ignoreEncryption: true }); }
+  catch (e) { toast('The original PDF could not be reopened (' + e.message + '). Export as pictures instead.'); return; }
+  const base = new Set(p.objs.filter(o => o.deckBase).map(o => o.id));
+  const pdfPages = doc.getPages();
+  let y = S.top, marked = 0, turned = 0, blank = 0;
+  for (let i = 0; i < S.slides.length; i++) {
+    const h = S.slides[i].h, rect = [S.x0, y, S.w, h], pn = src.pages[i];
+    y += h + S.gap;
+    const pg = pn ? pdfPages[pn - 1] : null; if (!pg) continue;
+    /* only what was written on top counts; the page picture itself is already in the PDF */
+    const ink = p.objs.filter(o => !o.deckBase && !o.off && E.inter(E.bbox(o) || [0, 0, 0, 0], rect));
+    if (!ink.length) { blank++; continue; }
+    /* a page the PDF itself turns sideways would need the writing turned with it; left alone rather than put on crooked */
+    const rot = pg.getRotation && pg.getRotation().angle; if (rot) { turned++; continue; }
+    toast('Marking page ' + pn + '…');
+    const sc = Math.min(3, 2200 / Math.max(1, S.w));
+    const c = E.renderToCanvas(p, rect, sc, { bg: false, skip: base });
+    try { const im = await doc.embedPng(dataBytes(c.toDataURL('image/png')));
+      const sz = pg.getSize(); pg.drawImage(im, { x: 0, y: 0, width: sz.width, height: sz.height }); marked++;
+    } catch (e) { console.warn(e); }
+  }
+  if (!marked) { toast(turned ? 'Nothing was written on the pages that could be marked (' + turned + ' sideways page' + (turned > 1 ? 's' : '') + ' were left out).' : 'Nothing is written on this worksheet yet.'); return; }
+  const bytes = await doc.save();
+  window.HBA && HBA.log('export', { type: 'pdf-mark', pages: marked });
+  download(new Blob([bytes], { type: 'application/pdf' }), src.name.replace(/\.pdf$/i, '') + '_marked_' + stamp() + '.pdf');
+  SND.done && SND.done();
+  toast('Saved the original PDF with your writing on ' + marked + ' page' + (marked > 1 ? 's' : '') + '. The printed text is untouched and still selectable.' +
+    (turned ? ' ' + turned + ' sideways page' + (turned > 1 ? 's were' : ' was') + ' left out.' : '') + (blank ? ' ' + blank + ' page' + (blank > 1 ? 's had' : ' had') + ' no writing.' : ''), 5200);
+}
+
+function exportPDF() { modal.open('<h2>Export PDF</h2><p>Long notebook pages are cut into 16:9 slides so every part is readable when printed or projected.</p><div class="row" style="gap:8px;flex-wrap:wrap"><label><input type="radio" name="pdfW" value="cur" checked> This page</label><label><input type="radio" name="pdfW" value="all"> All ' + B.pages.length + ' pages</label></div><p><label><input type="checkbox" id="pdfBg" checked> Include the background theme</label><br><label><input type="checkbox" id="pdfNum" checked> Number the slides and add the board title</label></p><div class="foot"><button class="btn primary" id="pdfX">Create PDF</button></div>' +
+  (E.page().deck && E.page().deck.pdfSrc ? '<hr><div class="docopt"><button class="btn" id="pdfMark">' + window.HB.icon('file-pen-line') + ' Mark and return</button><span class="small muted">Puts your writing onto <b>' + esc(E.page().deck.pdfSrc.name) + '</b> itself. The original page size and printed text are kept, so it stays small and the words can still be selected — best for handing a marked worksheet back.</span></div>' : ''),
+  s => { if ($('#pdfMark', s)) $('#pdfMark', s).onclick = () => { modal.close(); markReturn(); };
+    $('#pdfX', s).onclick = () => { const all = $('input[name=pdfW]:checked', s).value === 'all', bg = $('#pdfBg', s).checked, num = $('#pdfNum', s).checked; modal.close(); makePDF(all ? B.pages : [E.page()], bg, num); }; }); }
 async function makePDF(pages, bg, num) { window.HBA && HBA.log('export', { type: 'pdf', pages: pages.length }); let jsp; toast('Preparing PDF…'); try { jsp = await need('jspdf'); } catch (e) { toast(e.message); return; }
   const { jsPDF } = jsp; let pdf = null, count = 0; const slides = [];
   pages.forEach(p => { const r = E.pageRect(p); if (B.mode === 'scroll') { const sh = Math.round(r[2] * 9 / 16); for (let y = 0; y < r[3] - 20; y += sh) slides.push([p, [0, y, r[2], sh]]); } else slides.push([p, r]); });
@@ -276,6 +368,6 @@ function newBoard() { modal.open('<h2>Start a new board?</h2><p>The current boar
 document.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey) || e.altKey) return; const k = e.key.toLowerCase(); const tg = e.target.tagName; if (k === 's') { e.preventDefault(); if (e.shiftKey) exportPDF(); else saveFile(); } else if (k === 'o' && tg !== 'TEXTAREA' && tg !== 'INPUT') { e.preventDefault(); openFile(); } else if (k === 'e' && e.shiftKey) { e.preventDefault(); exportPNG(); } });
 setTimeout(() => { if (!window.HBUI || !HBUI.cmd) return; [['Save board file (.helix)', saveFile, 'download keep ctrl+s', 'save'], ['Open board file', openFile, 'load .helix', 'folder-open'], ['Export page as PNG', exportPNG, 'image picture', 'image-down'], ['Export PDF', exportPDF, 'print slides', 'file-down'], ['Versions', versions, 'history undo restore backup', 'history'], ['New board', newBoard, 'clear blank start', 'square-pen'], ['Import PDF pages', pickPdf, 'worksheet slides', 'file-text'], ['Insert image', pickImage, 'photo picture', 'image'], ['Document camera', camera, 'webcam visualiser', 'camera']].forEach(([n, run, kw, ic]) => HBUI.cmd({ n, k: 'Board', kw, ic, run })); }, 0);
 
-window.HBIO = { loadPdf, pickImage, camera, pickPdf, importPdf, openDocument, openDoc, importDocx, importPptx, saveFile, openFile, readHelix, exportPNG, exportPDF, makePDF, versions, newBoard, snapshot };
+window.HBIO = { loadPdf, pickImage, camera, pickPdf, importPdf, openDocument, openDoc, importDocx, importPptx, saveFile, openFile, readHelix, exportPNG, exportPDF, makePDF, markReturn, usedAssets, versions, newBoard, snapshot, encodePage, docScale };
 })();
 
