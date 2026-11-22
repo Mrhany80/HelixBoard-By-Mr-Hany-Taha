@@ -159,3 +159,18 @@ html{overflow:hidden}
 :root[data-ui="light"]{--glass:rgba(255,255,255,.96)}
 #dock,#drawer,#scrollBtns,#vbar,#hbar,#dockShow,#radial .rsz,#kbd,#toast,#mini,.float{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 #top .brand .name{animation:none!important}
+
+
+/* ---------- finger-sized controls on touch screens (3.2.1) ----------
+   The tool grid was already held to 40 px, but the bars around it never were: the top bar sat at 38 px,
+   the dock pens at 36 px wide and the colour chips at 28 px. On a smartboard those are all pressed with a
+   finger. Raised only where the pointer is coarse, so a laptop with a mouse keeps the compact bars.
+   The small x on a page tab is deliberately left small: a finger-sized close button on a tab makes closing
+   a page by accident far too easy, and the page menu already offers a safer way. */
+@media (pointer: coarse) {
+  #top button:not(.x){min-width:40px!important;min-height:40px!important}
+  #dock button{min-width:40px!important;min-height:40px!important}
+  #toolrow .sw,#toolrow .tb,#toolrow button:not(.x),#toolrow select{min-width:40px!important;min-height:40px!important}
+  #toolrow input[type=range]{height:40px!important}
+  #pagetabs .ptab{min-height:40px!important} #ptAdd{min-width:40px!important;min-height:40px!important}
+}

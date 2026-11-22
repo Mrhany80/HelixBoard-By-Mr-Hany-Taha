@@ -160,10 +160,11 @@ empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/
 
 ## Tests
 
-`python3 build.py && cd tests && node runall.js` runs 12 suites: `ink` (20 checks on the ink path and saving), `sweep` (every tool
+`python3 build.py && cd tests && node runall.js` runs 13 suites: `ink` (20 checks on the ink path and saving), `sweep` (every tool
 button tapped with touch at 3840x2160 and 1366x768), `crawl3` (the same inside the Windows app shell), `mm`, `mm3`, `mm4` (concept maps),
-`anim`, `tr2`, `ppt` (PowerPoint), `kb` (keyboard), `plus` (the 2.8 learning tools) and `doc` (PDF/Word import: codec,
-resolution, Arabic reading order, Mark and return). `node tests/inkbench.js` measures writing speed
+`anim`, `tr2`, `ppt` (PowerPoint), `kb` (keyboard), `plus` (the 2.8 learning tools), `doc` (PDF/Word import: codec,
+resolution, Arabic reading order, Mark and return) and `menus` (every control in every bar: reachable, named, 40 px,
+at three screen sizes). `node tests/inkbench.js` measures writing speed
 on a full board; results are in `docs/perf-baseline.md` and `docs/perf-after.md`.
 
 ## Quiz and flashcard sets

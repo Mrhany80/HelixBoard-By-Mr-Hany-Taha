@@ -29,7 +29,11 @@ function create(name, slides, opts) { opts = opts || {}; const W = pageW(), w = 
 /* ---------- view ---------- */
 let cur = 0, show = false, railW = 0;
 let full = false; const barMin = () => document.body.classList.contains('deckbar-min');
-const area = () => show ? { x: 0, y: 0, w: E.SW, h: E.SH } : full ? { x: 8, y: barMin() ? 40 : 52, w: E.SW - 40, h: E.SH - (barMin() ? 40 : 52) - 86 } : { x: railW + 10, y: barMin() ? 40 : 58, w: E.SW - railW - 50, h: E.SH - (barMin() ? 40 : 58) - 96 };
+/* How much room the bar really takes. It used to be guessed at 52 px; a bar that wraps onto a second row
+   on a narrower window is taller than that, and the slide ended up underneath it. Measured instead. */
+function barH(fallback) { if (barMin()) return 40; const b = document.getElementById('deckBar');
+  const h = b && !b.hidden ? Math.round(b.getBoundingClientRect().height) : 0; return Math.max(fallback, h ? h + 14 : fallback); }
+const area = () => show ? { x: 0, y: 0, w: E.SW, h: E.SH } : full ? { x: 8, y: barH(52), w: E.SW - 40, h: E.SH - barH(52) - 86 } : { x: railW + 10, y: barH(58), w: E.SW - railW - 50, h: E.SH - barH(58) - 96 };
 function fitTo(i) { const r = rects()[i]; if (!r) return null; const a = area(), pad = show ? 1 : 0.97; const s = Math.min(a.w * pad / r[2], a.h * pad / r[3]); return { s, x: a.x + (a.w - r[2] * s) / 2 - r[0] * s, y: a.y + (a.h - r[3] * s) / 2 - r[1] * s }; }
 function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; const back = i < prev; cur = i; P().deck.cur = i; let tr = null;
   /* "As in PowerPoint": the transition stored with the slide being entered, with its own direction and speed */
@@ -113,7 +117,7 @@ function css() { if ($('#deckCss')) return; const s = document.createElement('st
 #deckRail .th .tools button:hover{background:rgba(255,255,255,.18)} #deckRail .th .tools svg{width:13px;height:13px}
 #deckRail .df{padding:8px 10px;border-top:1px solid var(--line);display:flex;gap:6px}
 #deckRail .df button{flex:1}
-#deckBar{position:absolute;left:calc(184px + (100% - 184px)/2);top:8px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:3px;padding:5px;border-radius:14px;background:linear-gradient(135deg,rgba(40,16,48,.95),rgba(22,10,30,.96));border:1px solid rgba(255,120,190,.4);box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 22px rgba(255,80,160,.22);white-space:nowrap;max-width:calc(100% - 210px);overflow-x:auto;scrollbar-width:none}
+#deckBar{position:absolute;left:calc(184px + (100% - 184px)/2);top:8px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:3px;padding:5px;border-radius:14px;background:linear-gradient(135deg,rgba(40,16,48,.95),rgba(22,10,30,.96));border:1px solid rgba(255,120,190,.4);box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 22px rgba(255,80,160,.22);flex-wrap:wrap;justify-content:center;max-width:calc(100% - 210px);overflow:visible;row-gap:4px}
 #deckBar button{display:flex;align-items:center;gap:5px;border:0;background:transparent;color:#FBE9F3;font:600 12.5px var(--ui);padding:7px 9px;border-radius:10px;cursor:pointer}
 #deckBar button:hover{background:rgba(255,255,255,.12)} #deckBar button.on{background:#FF4FA0;color:#fff} #deckBar button.go{background:linear-gradient(135deg,#FF4FA0,#B0124F);color:#fff;box-shadow:0 0 14px rgba(255,79,160,.5)}
 #deckBar svg{width:16px;height:16px} #deckBar .sep{width:1px;height:22px;background:rgba(255,255,255,.18);margin:0 2px}
@@ -128,6 +132,16 @@ body.deckfull #dock{left:50%!important}
 body.deckbar-min #deckBar{display:none!important}
 #deckPill{display:none;position:absolute;left:calc(184px + (100% - 184px)/2);top:6px;transform:translateX(-50%);z-index:8;align-items:center;gap:6px;padding:5px 14px;border-radius:999px;border:1px solid rgba(255,120,190,.5);background:linear-gradient(135deg,rgba(40,16,48,.92),rgba(22,10,30,.94));color:#FBE9F3;font:700 12px var(--ui);cursor:pointer;box-shadow:0 0 18px rgba(255,80,160,.35)}
 #deckPill svg{width:15px;height:15px}
+/* On a smartboard every one of these is pressed with a finger, not a mouse. The tool grid was already held
+   to 40 px; the bars around it were not — the slide panel's buttons were 22 px. Raised for touch screens
+   only, so a laptop with a mouse keeps the compact bars. */
+@media (pointer: coarse) {
+  #deckBar button,#deckBar select,#deckBar input{min-height:40px;min-width:40px} #deckBar button{padding:9px 11px} #deckBar input{width:52px}
+  /* five finger-sized buttons do not fit a 184 px rail, so the rail widens with them */
+  #deckRail{width:232px} #deckRail .th .tools{flex-wrap:wrap;max-width:210px}
+  #deckRail .th .tools button{width:40px;height:40px} #deckRail .th .tools svg{width:18px;height:18px}
+  #deckRail .dh .ib,#deckRail .df button{width:40px!important;min-width:40px!important;min-height:40px!important;flex:0 0 auto!important} #deckPill{min-height:40px;padding:8px 16px}
+}
 body.deckon.deckbar-min #deckPill{display:flex} body.deckrail-off #deckPill,body.deckfull #deckPill{left:50%}
 body.deckshow #deckPill{display:none!important}
 body.deckrail-off #deckRail{display:none} body.deckrail-off #deckBar{left:50%;max-width:calc(100% - 30px)}
@@ -148,7 +162,7 @@ const bt = (ic, label, fn, title, cls) => { const b = document.createElement('bu
 const sep = () => { const d = document.createElement('i'); d.className = 'sep'; return d; };
 function mount() { css(); const st = $('#stage'); if (!rail) { rail = document.createElement('div'); rail.id = 'deckRail'; st.appendChild(rail); ['pointerdown', 'wheel', 'dblclick'].forEach(ev => rail.addEventListener(ev, e => e.stopPropagation(), { passive: true })); }
   if (!bar) { bar = document.createElement('div'); bar.id = 'deckBar'; st.appendChild(bar); ['pointerdown', 'dblclick'].forEach(ev => bar.addEventListener(ev, e => e.stopPropagation())); } }
-function rebuild() { mount(); const on = isDeck() && !show; document.body.classList.toggle('deckon', on); rail.hidden = bar.hidden = !on; railW = on && !full && !document.body.classList.contains('deckrail-off') ? 184 : 0; if (!on) return; const d = P().deck, n = d.slides.length; cur = clamp(d.cur || 0, 0, n - 1);
+function rebuild() { mount(); const on = isDeck() && !show; document.body.classList.toggle('deckon', on); rail.hidden = bar.hidden = !on; railW = on && !full && !document.body.classList.contains('deckrail-off') ? (rail.getBoundingClientRect().width || 184) : 0; if (!on) return; const d = P().deck, n = d.slides.length; cur = clamp(d.cur || 0, 0, n - 1);
   rail.innerHTML = '<div class="dh">' + icon('presentation') + '<b title="' + esc(d.src || '') + '">' + esc(P().name || 'Deck') + '</b>' + n + '<button class="ib" id="dkClose" title="Hide the slide panel" style="width:26px;height:26px;min-width:0;padding:0">' + icon('panel-left') + '</button></div><div class="dl"></div><div class="df"><button class="btn sm" id="dkAdd">' + icon('plus') + 'Blank</button><button class="btn sm" id="dkSort">' + icon('layout-grid') + 'Sorter</button></div>';
   const L = $('.dl', rail); thumbs = d.slides.map((s, i) => { const t = document.createElement('div'); t.className = 'th' + (i === cur ? ' on' : '') + (s.hid ? ' hid' : ''); t.draggable = true; t.dataset.i = i; t.innerHTML = '<span class="no">' + (i + 1) + '</span>' + (s.q ? '<span class="qb" title="This slide has a live question">?</span>' : '') + '<canvas></canvas><div class="tools"></div>';
     const tl = $('.tools', t); tl.append(bt('arrow-up', '', () => move(i, i - 1), 'Move up'), bt('arrow-down', '', () => move(i, i + 1), 'Move down'), bt('copy', '', () => dup(i), 'Duplicate'), bt(s.hid ? 'eye' : 'eye-off', '', () => hide(i), s.hid ? 'Show in slideshow' : 'Hide in slideshow'), bt('trash-2', '', () => del(i), 'Delete slide'));
@@ -176,6 +190,8 @@ bus.on('page', () => { setTimeout(() => { rebuild(); if (isDeck()) goSlide(P().d
 function enterFull() { if (!isDeck()) return; full = true; document.body.classList.add('deckfull'); const fs = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen().catch(() => {}) : Promise.resolve(); Promise.resolve(fs).then(() => setTimeout(() => { E.resize && E.resize(); rebuild(); goSlide(cur, false); E.dirty.all(); }, 180)); toast('Full screen: write, type and edit on the slides. Esc or “Exit full screen” to leave.'); SND.whoosh && SND.whoosh(); }
 function exitFull() { if (!full) return; full = false; document.body.classList.remove('deckfull'); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); setTimeout(() => { E.resize && E.resize(); rebuild(); goSlide(cur, false); E.dirty.all(); }, 180); }
 document.addEventListener('fullscreenchange', () => { if (full && !document.fullscreenElement) exitFull(); });
+/* the bar can wrap to a second row when the window narrows: refit the slide so it is never covered */
+try { new ResizeObserver(() => { if (isDeck() && !show) goSlide(cur, false); }).observe(bar); } catch (e) {}
 bus.on('page', () => { if (full && !isDeck()) exitFull(); });
 /* the deck bar can shrink to a small tab */
 function barToggle(on) { document.body.classList.toggle('deckbar-min', on); set.put('deckBarMin', on); let pill = document.getElementById('deckPill'); if (!pill) { pill = document.createElement('button'); pill.id = 'deckPill'; pill.title = 'Show the slide bar'; pill.onclick = () => barToggle(false); ['pointerdown', 'dblclick'].forEach(ev => pill.addEventListener(ev, e => e.stopPropagation())); $('#stage').appendChild(pill); } updPill(); goSlide(cur, true); }

@@ -1,5 +1,40 @@
 # Changelog
 
+## 3.2.1
+
+Menus and toolbars. Reported: the slide bar over an opened document cannot be minimised. The button was there
+all along, and an audit found what else was out of reach.
+
+### Why the slide bar could not be minimised
+- The bar is a single no-wrap strip capped at `calc(100% - 210px)` with `overflow-x:auto` and the scrollbar
+  hidden. On anything narrower than a very wide window its last controls — the transition list, Export and
+  the Hide-bar button itself — were scrolled off the right end, with nothing on screen to say the bar
+  scrolled at all. The button existed; it could not be seen or reached.
+- The bar now wraps onto a second row instead of scrolling, so no control is ever cut off.
+- The room the bar takes was a guessed 52 px. A wrapped bar is taller than that and the slide ended up
+  underneath it, which is why the document text was partly hidden behind the bar. The height is measured
+  now, and the slide is refitted whenever the bar changes shape.
+
+### Finger-sized controls on touch screens
+- The tool grid was already held to 40 px; the bars around it never were. The top bar sat at 38 px, the dock
+  pens at 36 px wide, the colour chips at 28 px, and the slide panel's move, duplicate and delete buttons at
+  22 px — all pressed with a finger on a smartboard.
+- Raised to at least 40 px, but only where the pointer is coarse, so a laptop with a mouse keeps the compact
+  bars. The slide panel widens from 184 px to 232 px on touch to fit them, and the board knows it has.
+- The small x that closes a page tab is deliberately left small: a finger-sized close button on a tab makes
+  losing a page by accident far too easy.
+
+### Other
+- The "IV · DV · CV" button in Science had no icon at all: it asked for an icon named `tag` that was not in
+  the library, so it drew nothing. Added.
+
+### New test: `tests/menus.js`
+Opens every bar at 3840x2160, 1920x1080 and 1366x768 and checks each control for four faults: cut off or
+unreachable, under 40 px, no name or title, or drawing nothing at all. It found 22 faults on 3.2.0 — two of
+which were the test being wrong (a colour swatch paints itself with a background rather than an icon, and
+the colour picker's hidden input sits inside a label that is the real target), and those exceptions are
+written into it. It now reports none at any of the three sizes. `node tests/runall.js` runs 13 suites.
+
 ## 3.2.0
 
 Opening a PDF or a Word document, done properly. The import path was read line by line and seven faults came
