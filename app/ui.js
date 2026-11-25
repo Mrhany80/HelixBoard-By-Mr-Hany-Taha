@@ -158,7 +158,16 @@ const TABS = [
     G('bgs', 'MOST POPULAR', { s: 'bg' }), G('bgs', 'LINED — CHOOSE THE SPACING', { s: 'bg' }), G('bgs', 'GRIDS & MATHS', { s: 'bg' }), G('bgs', 'DARK', { s: 'bg' }), G('bgs', 'COLOURS & PAPER', { s: 'bg' }), G('bgs', 'BIOLOGY', { l: 'BIOLOGY BACKGROUNDS', s: 'bg' }), G('bgs', 'SCIENCE', { l: 'SCIENCE BACKGROUNDS', s: 'bg' }), without(without(G('bgs', 'PAGE', { l: 'BACKGROUND OPTIONS', s: 'bg' }), ['anim2']), ['contrast2']),
     { l: 'START', s: 'page', items: [btn('introOn', 'sparkles', 'Intro at start', () => { const v = !set.get('introEvery', true); set.put('introEvery', v); toast(v ? 'The opening titles will play each time HelixBoard starts.' : 'HelixBoard will start straight on the board.'); }, () => set.get('introEvery', true)), btn('introPlay', 'play', 'Play intro', () => window.HBIntro && HBIntro.play(true)), btn('langAr', 'languages', 'العربية / English', () => window.HBLang && HBLang.toggle(), () => window.HBLang && HBLang.on), ...(window.helixDesktop ? [] : [btn('installApp', 'monitor-smartphone', 'Install as app', call('HBInstall', 'install'))]), btn('updates', 'refresh-cw', 'Check for updates', call('HBInstall', 'checkUpdates')), btn('acct', 'users', 'My account', call('HBA', 'menu'))] },
     { l: 'FILE', s: 'file', items: only('board', ['save', 'open', 'png', 'pdfx', 'vers', 'newb', 'about']) }] }];
-const OLD_TAB = { recog: 'draw', wheel: 'teach', timer: 'teach', class: 'teach', water: 'teach', bgs: 'page', board: 'page', bio: 'science', chem: 'science', phys: 'science', lab: 'science', maths: 'science', roots: 'science' };
+/* 3.3.0: eight ribbon tabs become five. Shapes and Text join Draw, Notes joins Insert, each as a sub-tab of the tab it joined,
+   so every tool keeps its place in the same sub-tab chip row Science, Teach and Page already use. */
+(function mergeTabs() {
+  const by = id => TABS.find(t => t.id === id); if (!by('draw') || !by('shapes') || !by('text') || !by('notes') || !by('insert')) return;
+  const join = (into, subs, parts) => { const t = by(into); t.subs = subs; t.groups.forEach(g => { g.s = g.s || subs[0][0]; });
+    parts.forEach(([id, key]) => { const src = by(id); src.groups.forEach(g => { g.s = key; t.groups.push(g); }); TABS.splice(TABS.indexOf(src), 1); }); t.defSub = subs[0][0]; };
+  join('draw', [['pens', 'Pens'], ['shapes', 'Shapes'], ['text', 'Text']], [['shapes', 'shapes'], ['text', 'text']]);
+  join('insert', [['media', 'Media'], ['notes', 'Notes']], [['notes', 'notes']]);
+})();
+const OLD_TAB = { shapes: 'draw', text: 'draw', notes: 'insert', study: 'teach', recog: 'draw', wheel: 'teach', timer: 'teach', class: 'teach', water: 'teach', bgs: 'page', board: 'page', bio: 'science', chem: 'science', phys: 'science', lab: 'science', maths: 'science', roots: 'science' };
 const ALL = {}; SRC.concat(TABS).forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id) ALL[it.id] = it; })));
 const COLORS_A = ['--A', '--T', '--G', '--C'];
 let curTab = set.get('tab', 'draw'); if (!TABS.find(t => t.id === curTab)) curTab = OLD_TAB[curTab] || 'draw';
@@ -188,7 +197,7 @@ function selectTab(id) { if (id === curTab) return; const prev = TABS.findIndex(
 const row = $('#toolrow');
 function buildRow() { try { return buildRowInner(); } catch (e) { console.error(e); if (curTab !== 'draw') { curTab = 'draw'; set.put('tab', 'draw'); try { return buildRowInner(); } catch (e2) { console.error(e2); } } }
 }
-['study', 'teach', 'page'].forEach(id => set.put('sub:' + id, 'all'));
+['study', 'teach', 'page'].forEach(id => set.put('sub:' + id, 'all')); TABS.forEach(t => { if (t.defSub) set.put('sub:' + t.id, t.defSub); });
 function buildRowInner() { const t = TABS.find(x => x.id === curTab); let h = ''; let groups = t.groups;
   if (t.subs) { const cur = set.get('sub:' + t.id, 'all'); h += '<div class="grp subs"><span class="glab">SHOW</span><div class="subchips">' + [['all', 'All']].concat(t.subs).map(([k, l]) => '<button class="subchip" data-sub="' + k + '" aria-pressed="' + (k === cur) + '">' + l + '</button>').join('') + '</div></div>'; if (cur !== 'all') groups = groups.filter(g => g.s === cur); }
   groups.forEach(g => { h += '<div class="grp"><span class="glab">' + g.l + '</span>'; g.items.forEach(it => h += itemHTML(it)); h += '</div>'; });
