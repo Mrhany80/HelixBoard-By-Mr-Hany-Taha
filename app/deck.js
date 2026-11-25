@@ -27,15 +27,15 @@ function create(name, slides, opts) { opts = opts || {}; const W = pageW(), w = 
   p.H = Math.max(2160, totalH(p)); B.pages.splice(B.cur + 1, 0, p); window.HBUI && HBUI.goPage(B.cur + 1); E.changed(); SND.page && SND.page(); setTimeout(() => goSlide(0, false), 60); return p; }
 
 /* ---------- view ---------- */
-let cur = 0, show = false, railW = 0;
+let cur = 0, show = false, railW = 0, lastFitS = 0;
 let full = false; const barMin = () => document.body.classList.contains('deckbar-min');
 /* How much room the bar really takes. It used to be guessed at 52 px; a bar that wraps onto a second row
    on a narrower window is taller than that, and the slide ended up underneath it. Measured instead. */
 function barH(fallback) { if (barMin()) return 40; const b = document.getElementById('deckBar');
   const h = b && !b.hidden ? Math.round(b.getBoundingClientRect().height) : 0; return Math.max(fallback, h ? h + 14 : fallback); }
-const area = () => show ? { x: 0, y: 0, w: E.SW, h: E.SH } : full ? { x: 8, y: barH(52), w: E.SW - 40, h: E.SH - barH(52) - 86 } : { x: railW + 10, y: barH(58), w: E.SW - railW - 50, h: E.SH - barH(58) - 96 };
-function fitTo(i) { const r = rects()[i]; if (!r) return null; const a = area(), pad = show ? 1 : 0.97; const s = Math.min(a.w * pad / r[2], a.h * pad / r[3]); return { s, x: a.x + (a.w - r[2] * s) / 2 - r[0] * s, y: a.y + (a.h - r[3] * s) / 2 - r[1] * s }; }
-function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; const back = i < prev; cur = i; P().deck.cur = i; let tr = null;
+const area = () => show ? { x: 0, y: 0, w: E.SW, h: E.SH } : full ? (barMin() ? { x: 0, y: 0, w: E.SW, h: E.SH } : { x: 8, y: barH(52), w: E.SW - 16, h: E.SH - barH(52) - 8 }) : { x: railW + 10, y: barH(58), w: E.SW - railW - 50, h: E.SH - barH(58) - 96 };
+function fitTo(i) { const r = rects()[i]; if (!r) return null; const a = area(), pad = show ? 1 : full ? 0.99 : 0.97; const s = Math.min(a.w * pad / r[2], a.h * pad / r[3]); return { s, x: a.x + (a.w - r[2] * s) / 2 - r[0] * s, y: a.y + (a.h - r[3] * s) / 2 - r[1] * s }; }
+function goSlide(i, anim, how) { if (!isDeck()) return; const n = P().deck.slides.length; i = clamp(i, 0, n - 1); const t = fitTo(i); if (!t) return; lastFitS = t.s; const prev = cur; if (i !== cur) { step = wantStep != null ? wantStep : 0; E.dirty.all(); } wantStep = null; const back = i < prev; cur = i; P().deck.cur = i; let tr = null;
   /* "As in PowerPoint": the transition stored with the slide being entered, with its own direction and speed */
   if (!how && show && P().deck.trans === 'ppt') { tr = P().deck.slides[i].tr || { k: 'none' }; how = tr.k; } how = how || (show ? P().deck.trans : 'push'); autoAdv(i);
   const V = E.V, from = { s: V.s, x: V.x, y: V.y };
@@ -187,8 +187,9 @@ const thLater = window.HB.later(() => { if (!isDeck() || show) return; if (thumb
 bus.on('img-loaded', () => { if (isDeck()) { clearTimeout(thT); thT = setTimeout(() => drawThumbs(true), 300); } });
 bus.on('page', () => { setTimeout(() => { rebuild(); if (isDeck()) goSlide(P().deck.cur || 0, false); }, 30); });
 /* full-screen writing: the slide fills the screen, every writing tool stays available (pen tray, eraser, text, select) */
-function enterFull() { if (!isDeck()) return; full = true; document.body.classList.add('deckfull'); const fs = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen().catch(() => {}) : Promise.resolve(); Promise.resolve(fs).then(() => setTimeout(() => { E.resize && E.resize(); rebuild(); goSlide(cur, false); E.dirty.all(); }, 180)); toast('Full screen: write, type and edit on the slides. Esc or “Exit full screen” to leave.'); SND.whoosh && SND.whoosh(); }
-function exitFull() { if (!full) return; full = false; document.body.classList.remove('deckfull'); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); setTimeout(() => { E.resize && E.resize(); rebuild(); goSlide(cur, false); E.dirty.all(); }, 180); }
+let barWas = null;
+function enterFull() { if (!isDeck()) return; full = true; document.body.classList.add('deckfull'); E.resize && E.resize(); if (!barMin()) { barWas = false; barToggle(true); set.put('deckBarMin', false); } document.body.classList.add('deckfull'); const fs = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen().catch(() => {}) : Promise.resolve(); Promise.resolve(fs).then(() => setTimeout(() => { E.resize && E.resize(); rebuild(); goSlide(cur, false); E.dirty.all(); }, 180)); toast('Full screen: write, type and edit on the slides. Esc or “Exit full screen” to leave.'); SND.whoosh && SND.whoosh(); }
+function exitFull() { if (!full) return; full = false; document.body.classList.remove('deckfull'); E.resize && E.resize(); if (barWas === false) { barWas = null; barToggle(false); set.put('deckBarMin', false); } document.body.classList.remove('deckfull'); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); setTimeout(() => { E.resize && E.resize(); rebuild(); goSlide(cur, false); E.dirty.all(); }, 180); }
 document.addEventListener('fullscreenchange', () => { if (full && !document.fullscreenElement) exitFull(); });
 /* the bar can wrap to a second row when the window narrows: refit the slide so it is never covered */
 try { new ResizeObserver(() => { if (isDeck() && !show) goSlide(cur, false); }).observe(bar); } catch (e) {}
@@ -196,6 +197,23 @@ bus.on('page', () => { if (full && !isDeck()) exitFull(); });
 /* the deck bar can shrink to a small tab */
 function barToggle(on) { document.body.classList.toggle('deckbar-min', on); set.put('deckBarMin', on); let pill = document.getElementById('deckPill'); if (!pill) { pill = document.createElement('button'); pill.id = 'deckPill'; pill.title = 'Show the slide bar'; pill.onclick = () => barToggle(false); ['pointerdown', 'dblclick'].forEach(ev => pill.addEventListener(ev, e => e.stopPropagation())); $('#stage').appendChild(pill); } updPill(); goSlide(cur, true); }
 function updPill() { const pill = document.getElementById('deckPill'); if (pill && isDeck()) pill.innerHTML = icon('chevrons-down') + '<span>Slide ' + (cur + 1) + ' / ' + P().deck.slides.length + '</span>'; }
+/* when the window or the full-screen state changes size, a page that was fitted stays fitted (a page the user zoomed is left alone) */
+try { let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(() => { if (!isDeck() || show || !lastFitS) return; if (Math.abs(E.V.s - lastFitS) / lastFitS < 0.01) { E.resize && E.resize(); goSlide(cur, false); } }, 120); }).observe(document.getElementById('stage')); } catch (e) {}
+
+/* ---------- zoom: buttons next to pinch, wheel and trackpad. "Fit" = the whole page on the screen, "Width" = page as wide as the screen ---------- */
+const zoomBase = () => fitTo(cur);
+function zoomFit() { goSlide(cur, true); }
+function zoomWidth() { const r = rects()[cur]; if (!r) return; const a = area(), s = a.w * (full ? 0.99 : 0.97) / r[2]; E.setView(s, a.x + (a.w - r[2] * s) / 2 - r[0] * s, a.y + 8 - r[1] * s); }
+function zoomBy(k) { const a = area(); E.zoomAt(k, a.x + a.w / 2, a.y + a.h / 2); }
+let zoomEl = null;
+function zoomMount() { if (zoomEl) return; const st = $('#stage'); if (!st) return; const st_ = document.createElement('style'); st_.textContent = '#deckZoom{position:absolute;right:16px;bottom:64px;z-index:12;display:none;gap:4px;align-items:center;padding:4px;border-radius:14px;background:rgba(20,16,30,.82);border:1px solid rgba(255,255,255,.18);color:#fff;font:600 14px system-ui,sans-serif;direction:ltr}body.deckon:not(.deckshow) #deckZoom{display:flex}#deckZoom button{min-width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:18px;cursor:pointer;touch-action:manipulation}#deckZoom button:hover,#deckZoom button:active{background:rgba(255,255,255,.18)}#deckZoom output{min-width:52px;text-align:center}'; document.head.appendChild(st_);
+  zoomEl = document.createElement('div'); zoomEl.id = 'deckZoom'; zoomEl.dir = 'ltr'; zoomEl.setAttribute('role', 'group'); zoomEl.setAttribute('aria-label', 'Zoom');
+  const b = (id, t, ti, fn) => { const x = document.createElement('button'); x.id = id; x.type = 'button'; x.textContent = t; x.title = ti; x.setAttribute('aria-label', ti); x.onclick = e => { e.stopPropagation(); fn(); }; ['pointerdown', 'dblclick', 'wheel'].forEach(ev => x.addEventListener(ev, e => e.stopPropagation())); return x; };
+  const o = document.createElement('output'); o.id = 'dzPct'; o.textContent = '100%';
+  zoomEl.append(b('dzOut', '\u2212', 'Zoom out', () => zoomBy(1 / 1.25)), o, b('dzIn', '+', 'Zoom in', () => zoomBy(1.25)), b('dzFit', 'Fit', 'Fit the whole page on the screen', zoomFit), b('dzW', 'Width', 'Make the page as wide as the screen', zoomWidth));
+  ['pointerdown', 'dblclick', 'wheel'].forEach(ev => zoomEl.addEventListener(ev, e => e.stopPropagation())); st.appendChild(zoomEl); }
+function zoomUpd() { if (!isDeck() || show) return; zoomMount(); const t = zoomBase(); const o = document.getElementById('dzPct'); if (o && t) o.textContent = Math.round(E.V.s / t.s * 100) + '%'; }
+bus.on('view', zoomUpd); bus.on('page', () => setTimeout(zoomUpd, 60));
 if (set.get('deckBarMin', false)) setTimeout(() => barToggle(true), 500);
 function togglePanel() { document.body.classList.toggle('deckrail-off'); set.put('deckRailOff', document.body.classList.contains('deckrail-off')); rebuild(); goSlide(cur, true); }
 if (set.get('deckRailOff', false)) document.body.classList.add('deckrail-off');
@@ -283,7 +301,7 @@ document.addEventListener('keydown', e => { const k = e.key;
   if (map[k]) { e.preventDefault(); map[k](); } }, true);
 
 setTimeout(() => { rebuild(); if (isDeck()) goSlide(P().deck.cur || 0, false); }, 400); bus.on('board-loaded', () => setTimeout(rebuild, 50));
-window.HBD = { enterFull, exitFull, get cur() { return cur; }, get full() { return full; }, create, goSlide, next, prev, startShow, endShow, rects, buckets, move, dup, del, hide, addBlank, clearInk, toggleInk, sorter, exportDeck, get cur() { return cur; }, get show() { return show; }, isDeck };
+window.HBD = { zoomBy, zoomFit, zoomWidth, enterFull, exitFull, get cur() { return cur; }, get full() { return full; }, create, goSlide, next, prev, startShow, endShow, rects, buckets, move, dup, del, hide, addBlank, clearInk, toggleInk, sorter, exportDeck, get cur() { return cur; }, get show() { return show; }, isDeck };
 })();
 
 /* diagnostics: remember long main-thread stalls; Ctrl+Shift+D copies a problem report to paste to support */

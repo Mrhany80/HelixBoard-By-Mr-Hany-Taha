@@ -87,9 +87,9 @@ stage.addEventListener('scroll', () => { if (stage.scrollLeft || stage.scrollTop
 cv.addEventListener('pointerdown', e => { e.preventDefault(); INK.down = true; INK.at = performance.now(); if (!editing) cv.focus({ preventScroll: true });
   /* smartboards often lose 'pointerup' (ghost or dropped touches); a new primary contact means nothing else is really down, so stale pointers can never block writing */
   if (e.isPrimary) { ptrs.clear(); if (act && (act.k === 'pinch' || act.k === 'pan')) act = null; }
-  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: e.pointerType }); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: e.pointerType, w: Math.max(e.width || 0, e.height || 0) }); try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   if (e.pointerType === 'touch' && !seenTouch) firstTouch();
-  if (T.board && e.pointerType === 'touch' && ptrs.size > 1) { ptrs.delete(e.pointerId); return; } /* smartboard mode: extra fingers, sleeves and palms are ignored */
+  if (T.board && e.pointerType === 'touch' && ptrs.size > 1 && !(page() && page().deck && ptrs.size === 2 && [...ptrs.values()].every(q => q.w <= 48))) { ptrs.delete(e.pointerId); return; } /* an opened PDF or deck may be pinched even in smartboard mode, but only by two small contacts (fingers, not palms or sleeves) */ /* smartboard mode: extra fingers, sleeves and palms are ignored */
   if (editing && !e.target.closest('#editor')) commitEdit();
   if (e.pointerType === 'pen') lastPenAt = Date.now();
   if (ptrs.size === 2 && [...ptrs.values()].every(p => p.t === 'touch')) { if (act && act.k === 'draw' && act.o.pts.length < 30) { act = null; SND.writeStop(); dirty.live = true; } startPinch(); return; }

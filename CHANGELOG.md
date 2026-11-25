@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.1.0
+
+Opened PDFs and decks: the page fills the screen, and you can zoom with your fingers.
+
+### Changed
+- Full screen on an opened PDF or deck now uses the whole screen. The slide bar folds into its small tab, and the page is fitted with only a hair of margin (it used to leave wide empty borders).
+
+### New
+- Zoom on an opened PDF or deck: pinch with two fingers, Ctrl + mouse wheel, or trackpad pinch. Zoom buttons (minus, percent, plus, Fit, Width) sit at the bottom right. Fit shows the whole page again, Width makes the page as wide as the screen.
+- Smartboard mode no longer blocks pinch on an opened PDF or deck. Two small contacts pinch; palms and sleeves are still ignored.
+
 ## 4.0.0
 
 A big tidy-up and a set of new classroom tools. Boards and saved settings from 3.x open as before.
