@@ -205,3 +205,10 @@ html body #vbar .sa svg,html body #hbar .sa svg{width:10px;height:10px}
   #vbar .sa,#hbar .sa{display:none!important}
   html body #vbar{width:14px} html body #hbar{height:14px}
 }
+
+/* 3.3.0 contextual bar next to the selection */
+#selbar{position:fixed;z-index:30;display:flex;gap:2px;align-items:center;padding:4px;border-radius:14px;background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.28)}
+#selbar[hidden]{display:none}
+#selbar .tb{width:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center}
+#selbar .tb[hidden]{display:none}
+#selbar .sbn{font:600 12px var(--head);color:var(--muted);padding:0 8px}

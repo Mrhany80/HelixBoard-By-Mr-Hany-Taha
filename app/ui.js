@@ -445,6 +445,19 @@ document.addEventListener('keydown', e => { const tg = e.target.tagName; if (tg 
   if (e.key === '?' ) cheat(); });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && presenting) present(false); });
 
+/* ---------- 3.3.0 contextual bar: duplicate / delete / order / group float next to whatever is selected ---------- */
+(function selBar() { const SB = document.createElement('div'); SB.id = 'selbar'; SB.hidden = true; SB.setAttribute('role', 'toolbar'); SB.setAttribute('aria-label', 'Selected items');
+  const IDS = ['dup', 'del', 'front', 'back', 'group', 'ungroup']; SB.innerHTML = IDS.map(id => '<button class="tb" data-sb="' + id + '" title="' + esc(ALL[id].label) + '" aria-label="' + esc(ALL[id].label) + '">' + icon(ALL[id].ic) + '</button>').join('') + '<span class="sbn"></span>';
+  document.body.appendChild(SB); ['pointerdown', 'pointerup', 'click', 'dblclick'].forEach(ev => SB.addEventListener(ev, e => e.stopPropagation()));
+  SB.querySelectorAll('[data-sb]').forEach(b => b.onclick = () => { const it = ALL[b.dataset.sb]; if (it) it.act(); refresh(); place(); });
+  function place() { const objs = I.selObjs(); if (!objs.length || presenting || T.tool === 'draw' && !objs.length) { SB.hidden = true; return; }
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; objs.forEach(o => { const b = E.bbox(o); if (!b) return; x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[0] + b[2]); y1 = Math.max(y1, b[1] + b[3]); }); if (x0 > 1e8) { SB.hidden = true; return; }
+    const st = (document.getElementById('stage') || document.body).getBoundingClientRect(), a = E.toS(x0, y0), c = E.toS(x1, y1); SB.hidden = false;
+    SB.querySelector('[data-sb="group"]').hidden = objs.length < 2; SB.querySelector('[data-sb="ungroup"]').hidden = !objs.some(o => o.g); SB.querySelector('.sbn').textContent = objs.length > 1 ? objs.length + ' selected' : '';
+    const w = SB.offsetWidth || 260, h = SB.offsetHeight || 48; let left = (a[0] + c[0]) / 2 + st.left - w / 2, top = a[1] + st.top - h - 10; if (top < st.top + 4) top = c[1] + st.top + 10;
+    SB.style.left = Math.max(st.left + 4, Math.min(st.right - w - 4, left)) + 'px'; SB.style.top = Math.max(st.top + 4, Math.min(st.bottom - h - 70, top)) + 'px'; }
+  const later = window.HB.later(place, 40); bus.on('selection', () => requestAnimationFrame(place)); bus.on('view', later); bus.on('changed', later); bus.on('moved', later); bus.on('page', later); window.HBUI_selbar = place; })();
+
 /* ---------- command palette (Ctrl+K) ---------- */
 const extraCmds = []; const cmd = c => extraCmds.push(c);
 function palette() { const P = $('#palette'), inp = $('#palIn'), list = $('#palList'); P.hidden = false; inp.value = ''; inp.focus(); let sel = 0;
