@@ -21,7 +21,7 @@ Competitor claims come only from the official pages listed, read 2026-11-25 (sea
 | Several question types in one quiz | Kahoot, Quizizz, Wordwall | Multiple choice and "Order:" (arrange in the right order). True/false can be written as two options. No type-the-answer, no multi-select | Add type-the-answer first, then multi-select |
 | Spaced repetition | Quizlet | Present: Leitner boxes, "Due today" mixes all decks, daily reminder. Parity | Keep |
 | Rate each card (know / unsure) | Quizlet | Exists (known and seen counts feed progress) | Keep |
-| Timer, points, leaderboard | Mentimeter, Kahoot | Team points and winners exist; per-question countdown not found in code | Add optional per-question timer |
+| Timer, points, leaderboard | Mentimeter, Kahoot | Present: per-question countdown (Off to 120 s, ticks in the last 5 s, auto-reveal), team points, winners, paper answer cards read by camera, results to Reports. Parity or ahead for a one-board classroom | Keep |
 | Random wheel, no repeats, saved class lists | Wordwall | Present: wheel removes winners, saved named lists, Arabic names, spin time | Parity, nothing to build |
 | Match-up, open-the-box style activities | Wordwall, Blooket | Not offered | Candidate after the items above |
 | Ink to text / math | OneNote | Ink to shapes exists; ink to text was removed in 3.0 (large model) | Keep removed unless a small offline method is found |
