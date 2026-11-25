@@ -38,4 +38,4 @@ Nothing was deleted. Each old tool keeps its id (saved docks still find it), sta
 | Settings | Smartboard, Touch test, OS ink, Pen delay, Ink speed; Intro at start, Play intro, language, Install, Updates, My account | settings do not belong in the lesson tools |
 | (hidden) | Bullet lines (Text tab) | same as Bullets in Notes |
 
-Not yet merged (next): shared colour picker (A8), one searchable backgrounds gallery (A10), single Import button (the Insert "Open PDF / Word / PPT" button already imports all three).
+Backgrounds: the seven lists (64 thumbnails, many repeated) are now one searchable "All backgrounds" gallery (40 unique) next to the "Most popular" quick row. Not yet merged: the shared colour picker (A8). The Insert "Open PDF / Word / PPT" button already imports all three, so no separate Import button is needed.

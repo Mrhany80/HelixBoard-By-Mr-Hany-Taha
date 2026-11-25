@@ -193,6 +193,15 @@ const MERGES = [
     TABS.forEach(t => { t.groups = t.groups.filter(g => g.items.length); });
   });
 })();
+/* 3.3.0 backgrounds: the seven background lists (64 thumbnails, many shown twice) become one searchable gallery; "Most popular" stays as the quick row */
+const BGSECT = [];
+(function foldBackgrounds() { const t = TABS.find(x => x.id === 'page'); if (!t) return; let first = null;
+  t.groups.forEach(g => { if (g.l === 'MOST POPULAR') return; const keep = []; g.items.forEach(it => { if (it.kind === 'bgs') { if (!first) first = g; BGSECT.push([g.l.replace(/^LINED.*/, 'Lined paper').replace(/^BIOLOGY BACKGROUNDS/, 'Biology').replace(/^SCIENCE BACKGROUNDS/, 'Science'), it.list]); } else keep.push(it); }); g.items = keep; });
+  if (first) first.items.unshift(btn('m_bg', 'image', 'All backgrounds', () => openBgGallery())); t.groups = t.groups.filter(g => g.items.length); })();
+function openBgGallery() { const seen = new Set(), sects = BGSECT.map(([n, l]) => [n.charAt(0) + n.slice(1).toLowerCase(), l.filter(k => E.THEMES[k] && !seen.has(k) && seen.add(k))]).filter(x => x[1].length);
+  const draw = q => sects.map(([n, l]) => { const ks = l.filter(k => !q || (E.THEMES[k].name + ' ' + n).toLowerCase().includes(q)); return ks.length ? '<h3 style="margin:10px 0 6px">' + esc(n) + '</h3><div class="bgrow" style="flex-wrap:wrap">' + ks.map(k => '<button class="bgt" data-bgg="' + k + '" title="' + esc(E.THEMES[k].name) + '" aria-pressed="' + (page().theme === k) + '"><img alt="" src="' + bgThumb(k) + '"><span>' + esc(E.THEMES[k].name) + '</span></button>').join('') + '</div>' : ''; }).join('') || '<p class="muted">No background matches.</p>';
+  modal.open('<h2>Backgrounds</h2><input id="bgq" class="sel" style="width:100%;margin:6px 0" type="search" placeholder="Search (grid, dark, cell, lined...)" aria-label="Search backgrounds"><div id="bgg">' + draw('') + '</div>', sh => { const g = sh.querySelector('#bgg'), bind = () => g.querySelectorAll('[data-bgg]').forEach(b => b.onclick = () => { setTheme(b.dataset.bgg); modal.close(); renderTabs(); SND.pop(); buildRow(); });
+    bind(); sh.querySelector('#bgq').oninput = e => { g.innerHTML = draw(e.target.value.toLowerCase().trim()); bind(); }; }); }
 function openMerged(m) { const ok = id => ALL[id] && ALL[id].act; const ids = m.secs.map(s => s[1].filter(ok));
   modal.open('<h2>' + esc(m.label) + '</h2>' + m.secs.map((s, i) => ids[i].length ? '<h3 style="margin:10px 0 6px">' + esc(s[0]) + '</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">' + ids[i].map(id => '<button class="btn" data-mi="' + id + '" style="min-height:48px;display:flex;gap:8px;align-items:center;justify-content:flex-start">' + icon(ALL[id].ic) + '<span>' + esc(ALL[id].label) + '</span></button>').join('') + '</div>' : '').join(''),
     sh => sh.querySelectorAll('[data-mi]').forEach(b => b.onclick = () => { modal.close(); try { ALL[b.dataset.mi].act(); } catch (e) { console.error(e); toast('That tool could not start.'); } refresh(); })); }

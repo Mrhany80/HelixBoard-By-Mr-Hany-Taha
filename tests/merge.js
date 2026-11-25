@@ -23,6 +23,14 @@ const ok = (n, c, i) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (i !== undef
       else await p.evaluate(() => HB.modal.close());
     }
   }
+  /* backgrounds gallery */
+  await p.evaluate(() => { document.querySelector('[data-t="page"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await p.waitForTimeout(150);
+  await p.evaluate(() => document.querySelector('#toolrow .subchip[data-sub="bg"]').click()); await p.waitForTimeout(150);
+  await p.evaluate(() => document.querySelector('#toolrow [data-id="m_bg"]').click()); await p.waitForTimeout(250);
+  const all = await p.evaluate(() => document.querySelectorAll('[data-bgg]').length); ok('backgrounds gallery lists every background once', all >= 40, all);
+  await p.fill('#bgq', 'graph'); const gr = await p.evaluate(() => document.querySelectorAll('[data-bgg]').length); ok('gallery search narrows the list', gr > 0 && gr < all, gr);
+  const k = await p.evaluate(() => { const b = document.querySelector('[data-bgg]'); const id = b.dataset.bgg; b.click(); return id; }); await p.waitForTimeout(250);
+  ok('choosing a background applies it', await p.evaluate(k => HB.ink ? true : document.querySelector('#modal').hidden, k));
   const gone = ['t_open', 't_5', 'w_open', 'minipick', 'sp_cards', 'lq_pres', 'n_cornell', 'nk_hi_pink', 'nk_st_tick', 'png', 'pdfx', 'touchtest', 'bul'];
   const left = await p.evaluate(g => { const on = new Set(); HBUI.TABS.forEach(t => t.groups.forEach(x => x.items.forEach(i => on.add(i.id)))); return g.filter(i => on.has(i)); }, gone);
   ok('old tools are off the ribbon', left.length === 0, left);
