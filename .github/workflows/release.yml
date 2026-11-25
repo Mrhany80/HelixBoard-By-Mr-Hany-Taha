@@ -17,7 +17,10 @@ concurrency:
   group: windows-release
   cancel-in-progress: false
 jobs:
+  tests:
+    uses: ./.github/workflows/ci.yml
   check:
+    needs: tests
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -34,7 +37,7 @@ jobs:
           N=$(gh release view "v$V" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length' 2>/dev/null || echo 0)
           if [ "$N" -ge 3 ]; then echo "build=false" >> "$GITHUB_OUTPUT"; echo "v$V is already released ($N files) — nothing to do"; else echo "build=true" >> "$GITHUB_OUTPUT"; echo "v$V has no release yet — building"; fi
   windows:
-    needs: check
+    needs: [tests, check]
     if: needs.check.outputs.build == 'true'
     runs-on: windows-latest
     env:
