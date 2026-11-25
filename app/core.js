@@ -15,7 +15,7 @@ const IDB = (() => { let dbp = null;
   const tx = async (store, mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction(store, mode), s = t.objectStore(store); const out = fn(s); t.oncomplete = () => res(out instanceof IDBRequest ? out.result : out); t.onerror = () => rej(t.error); }); };
   return {
     get: k => tx('kv', 'readonly', s => s.get(k)).catch(() => undefined),
-    put: (k, v) => tx('kv', 'readwrite', s => s.put(v, k)).catch(e => { console.warn('save failed', e); saveFailed(k, e); }),
+    put: (k, v) => tx('kv', 'readwrite', s => s.put(v, k)).then(() => true, e => { console.warn('save failed', e); saveFailed(k, e); return false; }),
     addVersion: async v => { try { await tx('versions', 'readwrite', s => s.add(v)); const all = await tx('versions', 'readonly', s => s.getAllKeys()); if (all.length > 20) await tx('versions', 'readwrite', s => { all.slice(0, all.length - 20).forEach(k => s.delete(k)); }); } catch (e) {} },
     versions: () => tx('versions', 'readonly', s => s.getAll()).catch(() => []),
     version: id => tx('versions', 'readonly', s => s.get(id)).catch(() => null) };

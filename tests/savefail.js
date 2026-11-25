@@ -12,6 +12,7 @@ const ok = (n, c, i) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (i !== undef
   ok('failed save shows a message', await p.evaluate(() => { const t = document.getElementById('toast'); return !t.hidden && /could not be saved|out of storage/.test(t.textContent); }));
   await p.evaluate(() => { document.getElementById('toast').hidden = true; HB.IDB.put('board', { bad: () => 1 }); }); await p.waitForTimeout(300);
   ok('message is limited to one per minute', await p.evaluate(() => document.getElementById('toast').hidden === true));
+  ok('put reports failure and success', await p.evaluate(async () => (await HB.IDB.put('board', { bad: () => 1 })) === false && (await HB.IDB.put('kvtest2', { a: 1 })) === true));
   ok('a normal save still works', await p.evaluate(async () => { await HB.IDB.put('kvtest', { a: 1 }); return (await HB.IDB.get('kvtest')).a === 1; }));
   console.log('ERRORS', JSON.stringify(errs)); await b.close(); process.exit(fails.length || errs.length ? 1 : 0);
 })();
