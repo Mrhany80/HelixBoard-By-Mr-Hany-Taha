@@ -2,7 +2,7 @@
    something selected and the text box left open — every advance must move the step, fast, without errors */
 const { chromium } = require('playwright'); const fs = require('fs'); const S = process.argv[2] || __dirname; const log = (...a) => console.log(...a);
 (async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1400, height: 850 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('file:///home/user/helixboard/dist/index.html?nointro'); await p.waitForTimeout(1500);
+  await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro')); await p.waitForTimeout(1500);
   const b64 = fs.readFileSync(S + '/anim.pptx').toString('base64'); await p.evaluate(b64 => { const u = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); HBIO.importPptx(new File([u], 'anim.pptx')); }, b64);
   await p.waitForSelector('#ppGo', { timeout: 20000 }); await p.click('#ppGo'); await p.waitForFunction(() => HBE.page().deck, null, { timeout: 120000 }); await p.waitForTimeout(800);
   /* 400 ink strokes and 20 text boxes over the slides, then leave a text box open and something selected */

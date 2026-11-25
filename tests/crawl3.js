@@ -1,6 +1,6 @@
 // every tab, every filter, every tool button — inside the Windows app (Electron), reporting any error
-const {_electron}=require('playwright');const S=process.argv[2];
-(async()=>{const app=await _electron.launch({executablePath:'/home/user/helixboard/desktop/node_modules/electron/dist/electron',args:['--no-sandbox','/home/user/helixboard/desktop']});
+const {_electron}=require('playwright');const OS=require('os'),PATH=require('path');const S=process.argv[2]||OS.tmpdir();
+(async()=>{const app=await _electron.launch({executablePath:process.env.HB_ELECTRON||require(PATH.resolve(__dirname, '..', 'desktop', 'node_modules', 'electron')),args:['--no-sandbox',require('path').resolve(__dirname, '..', 'desktop')]});
 const w=await app.firstWindow();await w.waitForLoadState();await w.evaluate(()=>{localStorage.clear();localStorage['hb:accSkip']='true';localStorage['hb:introEvery']='false'});await w.reload();
 let cur='boot';const errs=[];w.on('pageerror',e=>errs.push('['+cur+'] '+e.message+' @ '+(e.stack||'').split('\n')[1]));w.on('console',m=>{if(m.type()==='error'&&!/ERR_|Failed to load/.test(m.text()))errs.push('['+cur+'] console: '+m.text())});
 await w.waitForTimeout(1500);await w.waitForFunction(()=>{const i=document.getElementById('intro');return !i||i.hidden},null,{timeout:30000}).catch(()=>{});await w.waitForTimeout(800);const blk=await w.evaluate(()=>{const b=document.querySelector('#toolrow .tb[data-id="pen"]');const r=b.getBoundingClientRect();let e=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);const out=[];while(e&&out.length<5){out.push(e.id||e.className||e.tagName);e=e.parentElement}return out.join(' < ')});console.log('over pen:',blk);await w.evaluate(()=>{HB.modal.close();window.confirm=()=>false;window.alert=()=>{};window.prompt=()=>null;});
@@ -8,7 +8,7 @@ const fp=()=>w.evaluate(()=>{const P=HBE.page();return JSON.stringify([HBE.B.pag
 const SKIP=/^(newb|about|cl_link|lq_phone|lc_|acct|updates|introPlay|record|cl_rec|nk_scr|nk_ann|docO|doc|open|img|cam|bg_img|ocr|ocrI|pickImage|save|docS|pdfx|png|docI|docP|vers|present|replay|t_full|langAr|fs_|lset)/;
 const tabs=await w.$$eval('#sidetabs [data-st]',e=>e.map(x=>x.dataset.st));let n=0;
 for(const t of tabs){console.log('tab',t,'errors so far',errs.length,new Date().toISOString().slice(11,19));await w.click('[data-st="'+t+'"]');await w.waitForTimeout(250);
-  const subs=await w.$$eval('#toolrow .subchip',e=>e.map(x=>x.dataset.sub));for(const s of (subs.length?subs:['-'])){ if(s!=='-'){await w.click('.subchip[data-sub="'+s+'"]');await w.waitForTimeout(200);}
+  const subs=await w.$$eval('#toolrow .subchip[data-sub]',e=>e.map(x=>x.dataset.sub));for(const s of (subs.length?subs:['-'])){ if(s!=='-'){await w.click('.subchip[data-sub="'+s+'"]');await w.waitForTimeout(200);}
    const ids=await w.$$eval('#toolrow .tb[data-id]',e=>e.map(x=>x.dataset.id));
    for(const id of ids){ if(SKIP.test(id))continue; cur=t+'/'+id; n++;
      await w.evaluate(()=>{const t=document.getElementById('toast');if(t){t.textContent='';t.hidden=true;}});const f0=await fp();const t0=Date.now();try{await w.click('#toolrow .tb[data-id="'+id+'"]',{timeout:1500});}catch(e){errs.push('['+cur+'] could not click');} if(Date.now()-t0>1200)console.log('slow',cur,Date.now()-t0);
@@ -20,4 +20,4 @@ for(const t of tabs){console.log('tab',t,'errors so far',errs.length,new Date().
 // the top bar buttons
 for(const id of ['aUndo','aRedo','aUi','aLang','aLang']){cur='top/'+id;const b=await w.$('#'+id);if(b){try{await b.click({timeout:1000});}catch(e){}await w.waitForTimeout(200);await w.keyboard.press('Escape');}}
 console.log('clicked',n,'tools in',tabs.length,'tabs');console.log('NO VISIBLE EFFECT',NOEFF.length,NOEFF.join(' '));console.log('ERRORS',errs.length);const U={};errs.forEach(e=>{const k=e.replace(/^\[[^\]]*\] /,'');(U[k]=U[k]||[]).push(e.match(/^\[([^\]]*)\]/)[1])});Object.entries(U).forEach(([k,v])=>console.log(' ',v.length+'x',k.slice(0,200),'<=',[...new Set(v)].slice(0,6).join(',')));
-await w.screenshot({path:S+'/crawl2.png'});await app.close();})().catch(e=>{console.log('FAIL',e.message);process.exit(1)});
+await w.screenshot({path:PATH.join(S,'crawl2.png')});await app.close();if(errs.length||n<150){console.log('FAIL',errs.length?errs.length+' errors':'only '+n+' tools clicked');process.exit(1);}console.log('PASS');})().catch(e=>{console.log('FAIL',String(e.message).slice(0,600));process.exit(1)});

@@ -1,0 +1,1 @@
+Import fixtures (generated with python-pptx, LibreOffice and PyMuPDF): a 40-slide deck with Arabic and English text, pictures, a chart, tables and notes (`stress.pptx`), its PDF (`stress.pdf`), a password-protected copy (`enc.pdf`, password `x`), and broken files (empty, truncated, not a zip).

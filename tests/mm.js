@@ -1,6 +1,6 @@
 const {chromium}=require('playwright');const S=process.argv[2];const log=(...a)=>console.log(...a);
 (async()=>{const b=await chromium.launch();const c=await b.newContext({viewport:{width:1600,height:900}});await c.addInitScript(()=>{localStorage['hb:accSkip']='true'});const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('dialog',d=>d.accept('produces'));
-await p.goto('file:///home/user/helixboard/dist/index.html?nointro');await p.waitForTimeout(1500);
+await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro'));await p.waitForTimeout(1500);
 await p.evaluate(()=>HBMM.open());await p.waitForTimeout(300);await p.click('#sheet [data-t="Cellular respiration"]');await p.waitForTimeout(600);
 const cnt=()=>p.evaluate(()=>({nodes:HBE.page().objs.filter(o=>o.nd).length,branches:HBE.page().objs.filter(o=>o.t==='conn'&&o.tree).length,links:HBE.page().objs.filter(o=>o.t==='conn'&&o.mm&&!o.tree).length,hidden:HBE.page().objs.filter(o=>o.nd&&o.off).length}));
 log('template:',JSON.stringify(await cnt()),'bar:',!!(await p.$('#mmBar')));

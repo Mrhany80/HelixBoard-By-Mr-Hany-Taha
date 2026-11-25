@@ -1,5 +1,7 @@
 # HelixBoard By Mr. Hany Taha — the Science Slate
 
+> **Version 4.0 changes** are described in `docs/v3.3.0-audit.md` and `docs/menu-changes.md`. Parts of the text below still describe 3.2.1.
+>
 > **Version 3.0 "Lean".** Writing speed first: a finished stroke is painted at once and saving waits for a pause. Live class on phones,
 > reports, tests and exams, video lessons, paper cards, recording and the water reminder were removed (368 → 304 tools).
 > See `docs/3.0-removed-tools.md`. The full 2.8 version is on the branch `archive/full-2.8`. Sections below that mention a removed
@@ -92,12 +94,12 @@ No npm, no bundler. Everything is concatenated into one HTML file:
 
 ## Tabs
 
-Ten tabs: **Draw** (pens, erase, select, colour, ink magic) · **Shapes** · **Text** (styles, fonts, photo → text) ·
-**Notes** (rich note-taking kit + note templates and thinking maps) · **Insert** (images, documents, PowerPoint, stamps, screen) ·
-**Science** (Biology, Chemistry, Physics, Lab, Maths, Roots — filter chips at the top) ·
-**Teach** (lesson, timers, wheel and pickers, quiz on the board, assessment, focus tools, water — filter chips) ·
-**Study** (Live class on phones — and student self-study tools; filter chips) · **Collaborate** (ten group-work structures with phase timers, groups and roles, the live sticky wall) · **Page** (page, backgrounds, files, intro setting — filter chips).
-Tab definitions live in `ui.js`: `SRC` holds every tool group, `TABS` assembles the ten tabs from them.
+Five ribbon tabs (3.3; older saved tab names still open the right tab):
+**Draw** (sub-tabs Pens, Shapes, Text) · **Insert** (sub-tabs Media, Notes: images, PDF / Word / PowerPoint, stamps, screen, note kit, templates) ·
+**Science** (Biology, Chemistry, Physics, Lab, Maths, Roots) · **Teach** (Lesson, Time, Pick, Assess, Focus) ·
+**Page** (Page, Backgrounds, Files, settings). "Simple mode" (on by default) hides rarely used groups behind a "More tools" chip; Ctrl+K searches every tool.
+Near-identical buttons are merged into one button that opens a panel (Timer, Pick a student, Flashcards, Quiz, Templates, Highlighter, Marks, Export, Settings, All backgrounds); the old tool ids still work. A small bar appears next to a selection (duplicate, delete, order, group).
+Tab definitions live in `ui.js`: `SRC` holds every tool group, `TABS` assembles the tabs from them, `MERGES` lists the merged buttons.
 
 ### Learning tools (2.8)
 
@@ -160,7 +162,7 @@ empty disappears; adding an idea and typing in it is one Undo step (`E.histLen`/
 
 ## Tests
 
-`python3 build.py && cd tests && node runall.js` runs 13 suites: `ink` (20 checks on the ink path and saving), `sweep` (every tool
+`python3 build.py && cd tests && node runall.js` runs the browser suites (`savefail`, `imports`, `menus`, `menus2`, `merge`, `selbar` were added in 3.3; `.github/workflows/ci.yml` runs them on every pull request): `ink` (20 checks on the ink path and saving), `sweep` (every tool
 button tapped with touch at 3840x2160 and 1366x768), `crawl3` (the same inside the Windows app shell), `mm`, `mm3`, `mm4` (concept maps),
 `anim`, `tr2`, `ppt` (PowerPoint), `kb` (keyboard), `plus` (the 2.8 learning tools), `doc` (PDF/Word import: codec,
 resolution, Arabic reading order, Mark and return) and `menus` (every control in every bar: reachable, named, 40 px,

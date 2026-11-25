@@ -1,6 +1,6 @@
 const {chromium}=require('playwright');const S=process.argv[2];
 (async()=>{const b=await chromium.launch();const c=await b.newContext({viewport:{width:1366,height:768},hasTouch:true});await c.addInitScript(()=>{localStorage['hb:accSkip']='true'});const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
-await p.goto('file:///home/user/helixboard/dist/index.html?nointro');await p.waitForTimeout(1500);await p.evaluate(()=>HBUI.addPage());
+await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro'));await p.waitForTimeout(1500);await p.evaluate(()=>HBUI.addPage());
 const tree=()=>p.evaluate(()=>{const all=HBE.page().objs.filter(o=>o.nd);const r=all.find(o=>o.root);const t=n=>(n.s||'∅')+(all.some(k=>k.par===n.id)?'['+all.filter(k=>k.par===n.id).sort((a,b)=>a.ord-b.ord).map(t).join(',')+']':'');return r?t(r):'none'});
 const overl=()=>p.evaluate(()=>{const a=HBE.page().objs.filter(o=>o.nd&&!o.off);let n=0;for(let i=0;i<a.length;i++)for(let j=i+1;j<a.length;j++){const A=a[i],B=a[j];if(A.x<B.x+B.w&&A.x+A.w>B.x&&A.y<B.y+B.h&&A.y+A.h>B.y)n++;}return n});
 const at=s=>p.evaluate(s=>{const o=HBE.page().objs.find(o=>o.nd&&o.s===s);const r=document.getElementById('cvLive').getBoundingClientRect();const [x,y]=HBE.toS(o.x+o.w/2,o.y+o.h/2);return [r.left+x,r.top+y]},s);

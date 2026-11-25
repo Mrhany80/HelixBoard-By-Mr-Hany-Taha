@@ -7,8 +7,9 @@ const S = process.argv[2] || __dirname, URL = 'file://' + path.resolve(S, '..', 
 const SKIP = /^(newb|about|acct|updates|introPlay|nk_scr|nk_ann|docO|doc|open|img|cam|bg_img|pickImage|save|docS|pdfx|png|docI|docP|vers|present|t_full|langAr|fs_|lset|ss_imp|installApp)/;
 (async () => {
   const b = await chromium.launch(); const all = []; let total = 0;
-  for (const vp of [{ width: 3840, height: 2160 }, { width: 1366, height: 768 }]) {
-    const c = await b.newContext({ viewport: vp, hasTouch: true }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; localStorage['hb:seenVer'] = '"99"'; localStorage['hb:seenIntro'] = 'true'; localStorage['hb:dueSeen'] = '"x"'; });
+  const ONLY_VP = process.env.HB_SWEEP_VP, ONLY_TABS = process.env.HB_SWEEP_TABS ? process.env.HB_SWEEP_TABS.split(',') : null;   /* a full sweep is long: HB_SWEEP_VP=0|1 and HB_SWEEP_TABS=draw,insert run a part of it */
+  for (const [vi, vp] of [{ width: 3840, height: 2160 }, { width: 1366, height: 768 }].entries()) { if (ONLY_VP != null && +ONLY_VP !== vi) continue;
+    const c = await b.newContext({ viewport: vp, hasTouch: true }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; localStorage['hb:seenVer'] = '"99"'; localStorage['hb:seenIntro'] = 'true'; localStorage['hb:simple'] = 'false'; localStorage['hb:dueSeen'] = '"x"'; });
     await c.route(/^https?:/, r => r.abort()); const p = await c.newPage(); let cur = 'boot'; const errs = [], size = vp.width + 'x' + vp.height;
     p.on('pageerror', e => errs.push('[' + cur + '] ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1])); p.on('console', m => { if (m.type() === 'error' && !/ERR_|Failed to load|net::/.test(m.text())) errs.push('[' + cur + '] console: ' + m.text()); });
     await p.goto(URL); await p.waitForFunction(() => window.HBE && window.HBUI); await p.waitForTimeout(1500);
@@ -16,8 +17,8 @@ const SKIP = /^(newb|about|acct|updates|introPlay|nk_scr|nk_ann|docO|doc|open|im
     await p.evaluate(() => { HB.modal.close(); window.confirm = () => false; window.alert = () => {}; window.prompt = () => null; });
     await p.waitForTimeout(600); const md = await p.evaluate(() => { const m = document.getElementById('modal'); return m && !m.hidden ? m.innerText.slice(0, 200) : ''; }); if (md) { console.log('a dialog is open at start: ' + md.replace(/\n/g, ' | ')); await p.evaluate(() => HB.modal.close()); }
     const tabs = await p.$$eval('#sidetabs [data-st]', e => e.map(x => x.dataset.st)); let n = 0; const small = [];
-    for (const t of tabs) { await p.tap('[data-st="' + t + '"]'); await p.waitForTimeout(200);
-      const subs = await p.$$eval('#toolrow .subchip', e => e.map(x => x.dataset.sub));
+    for (const t of tabs) { if (ONLY_TABS && !ONLY_TABS.includes(t)) continue; await p.tap('[data-st="' + t + '"]'); await p.waitForTimeout(200);
+      const subs = await p.$$eval('#toolrow .subchip[data-sub]', e => e.map(x => x.dataset.sub));
       for (const s of (subs.length ? subs : ['-'])) { if (s !== '-') { await p.tap('.subchip[data-sub="' + s + '"]'); await p.waitForTimeout(150); }
         const btns = await p.$$eval('#toolrow .tb[data-id]', e => e.map(x => { const r = x.getBoundingClientRect(); return { id: x.dataset.id, w: Math.round(r.width), h: Math.round(r.height) }; }));
         for (const { id, w, h } of btns) { if (SKIP.test(id)) continue; cur = size + ' ' + t + '/' + id; n++; if (Math.min(w, h) < 40 && !small.includes(id)) small.push(id + ' ' + w + 'x' + h);

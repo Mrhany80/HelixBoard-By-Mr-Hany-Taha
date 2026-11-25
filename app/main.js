@@ -28,13 +28,14 @@ if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d)
   D.onOpenFile(({ name, data }) => { const f = new File([data], name), ext = (name.split('.').pop() || '').toLowerCase();
     if (ext === 'helix') window.HBIO.readHelix(f); else if (ext === 'hbset') window.HBL.importFiles([f]); else window.HBIO.openDoc(f); }); if (D.onInsertImage) D.onInsertImage(url => { window.HBI.insertImage(url); toast('Screen picture added to the board.'); }); D.ready(); }
 /* after an update: a short "What's new" card, once (not on a first install) */
-{ const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
+{ const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver && !/[?&]nointro/.test(location.search)) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
   const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
     const tab = t => () => window.HBUI && HBUI.selectTab(t);
-    const items = [['pencil', 'Writing keeps up with the pen', 'A finished stroke is painted at once instead of redrawing the whole page, and saving waits until you pause. A full board writes like an empty one.', tab('draw')],
-      ['layout-grid', 'A lighter board: 304 tools instead of 368', 'Live class on phones, reports, tests and exams, video lessons, paper cards, lesson recording and the water reminder are gone. Your saved boards open as before.', null],
-      ['graduation-cap', 'Flashcards, groups and Fair talk are in Teach', 'Teach → Assess has the flashcards; Teach → Pick has Make groups and Fair talk.', tab('teach')],
-      ['save', 'Nothing is lost on closing', 'The board is saved the moment you leave or close the app.', null]];
+    const items = [['layout-grid', 'Five tabs and a Simple mode', 'Draw, Insert, Science, Teach and Page. Related tools are merged into one panel each, and Simple mode hides the extras. Old boards and saved docks open as before.', null],
+      ['search', 'Find and comment', 'Ctrl+F finds typed text and sticky notes on every page. Select any item and tap the comment button to leave a note on it.', null],
+      ['graduation-cap', 'More quiz types', 'Pick-all-that-apply and type-the-answer questions, with Arabic matching, in Teach → Assess.', tab('teach')],
+      ['file-text', 'PDF and PowerPoint open more reliably', 'Clear messages for damaged files, a password box for locked PDFs, and charts now show their real colours.', tab('insert')],
+      ['smartphone', 'Works better on phones and big screens', 'Finger-size buttons, slim scroll bars, and a bar next to your selection with copy, delete, order and group.', null]];
     modal.open('<h2>' + icon('sparkles') + ' What’s new in HelixBoard ' + ver + '</h2><div style="display:grid;gap:8px">' + items.map((it, i) => '<button class="btn" data-wn="' + i + '" style="height:auto;justify-content:flex-start;text-align:left;padding:10px 12px;gap:12px">' + icon(it[0]) + '<span><b>' + it[1] + '</b><br><span class="small muted">' + it[2] + '</span></span></button>').join('') + '</div><div class="foot"><button class="btn primary" data-close>Start teaching</button></div>', sh => {
       sh.querySelectorAll('[data-wn]').forEach(b => b.onclick = () => { const f = items[+b.dataset.wn][3]; modal.close(); if (f) setTimeout(f, 60); }); }); };
   setTimeout(show, 1500); } } }

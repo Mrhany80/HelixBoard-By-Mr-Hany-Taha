@@ -2,16 +2,17 @@
    node plus.js [tests-folder]   — prints one line per check, then "ERRORS n". */
 const { chromium } = require('playwright'); const path = require('path');
 const S = process.argv[2] || __dirname, URL = 'file://' + path.resolve(S, '..', 'dist', 'index.html') + '?nointro=1&accskip=1';
+const VER = require('../desktop/package.json').version;
 const fails = []; const ok = (name, cond, info) => { console.log((cond ? 'ok   ' : 'FAIL ') + name + (info !== undefined ? '  ' + JSON.stringify(info) : '')); if (!cond) fails.push(name); };
 const PNG = (col) => `(() => { const c = document.createElement('canvas'); c.width = 320; c.height = 200; const g = c.getContext('2d'); g.fillStyle = '${col}'; g.fillRect(0, 0, 320, 200); g.fillStyle = '#fff'; g.fillRect(40, 40, 80, 80); return c.toDataURL(); })()`;
 (async () => {
   const b = await chromium.launch();
-  const open = async (vp, extra) => { const c = await b.newContext(Object.assign({ viewport: vp }, extra || {})); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; localStorage['hb:seenVer'] = '"3.0.0"'; localStorage['hb:seenIntro'] = 'true'; localStorage['hb:dueSeen'] = '"x"'; });
+  const open = async (vp, extra) => { const c = await b.newContext(Object.assign({ viewport: vp }, extra || {})); await c.addInitScript(v => { localStorage['hb:accSkip'] = 'true'; localStorage['hb:seenVer'] = '"' + v + '"'; localStorage['hb:seenIntro'] = 'true'; localStorage['hb:dueSeen'] = '"x"'; }, VER);
     /* no network at all: everything below has to work behind a school firewall */
     await c.route(/^https?:/, r => r.abort()); const p = await c.newPage(); p.errs = []; p.on('pageerror', e => p.errs.push(e.message)); await p.goto(URL); await p.waitForTimeout(1600); return p; };
   const p = await open({ width: 1600, height: 900 });
   ok('app starts, plus.js loaded', await p.evaluate(() => !!window.HBP && !(window.__hbErr || []).length));
-  ok('every new button is in a tab', await p.evaluate(() => ['p_ghost', 'p_measure', 'p_cloze', 'p_nquiz', 'p_compare', 'p_labs', 'p_lab_enz', 'p_lab_osm', 'p_lab_pp', 'sp_due', 'p_fair', 'p_recap'].every(id => HBUI.ALL[id] && HBUI.TABS.some(t => t.groups.some(g => g.items.some(i => i.id === id))))));
+  ok('every new button is in a tab', await p.evaluate(() => ['p_ghost', 'p_measure', 'p_cloze', 'p_nquiz', 'p_compare', 'p_labs', 'p_lab_enz', 'p_lab_osm', 'p_lab_pp', 'sp_due', 'p_fair', 'p_recap'].every(id => HBUI.ALL[id] && (HBUI.TABS.some(t => t.groups.some(g => g.items.some(i => i.id === id))) || HBUI.FOLDED.some(f => f.it.id === id)))));
   ok('no two tools share a label', await p.evaluate(() => { const seen = {}, dup = []; HBUI.TABS.forEach(t => t.groups.forEach(g => g.items.forEach(i => { if (!i.id || !i.label) return; if (seen[i.label] && seen[i.label] !== i.id) dup.push(i.label); seen[i.label] = i.id; }))); return dup; }).then(d => d.length === 0));
 
   /* ---- 1 ghost trace ---- */
@@ -119,7 +120,7 @@ const PNG = (col) => `(() => { const c = document.createElement('canvas'); c.wid
   /* ---- tablet and phone layout ---- */
   for (const [nm, vp] of [['tablet 768', { width: 768, height: 1024 }], ['phone 390', { width: 390, height: 844 }]]) { const q = await open(vp, { hasTouch: true, isMobile: true });
     const m = await q.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); const t = r('toolrow'), d = r('dock'); return { iw: innerWidth, sw: document.documentElement.scrollWidth, tool: Math.round(t.width), toolH: Math.round(t.height), dockL: Math.round(d.left), dockR: Math.round(d.right), acts: Math.round(document.querySelector('#top .acts').getBoundingClientRect().right) }; });
-    ok(nm + ': the page is as wide as the screen', m.iw === vp.width && m.sw <= vp.width, m); ok(nm + ': the tool row spans the screen and scrolls sideways', m.tool === vp.width && m.toolH < 110, m); ok(nm + ': the dock and the top buttons stay on screen', m.dockL >= 0 && m.dockR <= vp.width && m.acts <= vp.width, m);
+    ok(nm + ': the page is as wide as the screen', m.iw === vp.width && m.sw <= vp.width, m); ok(nm + ': the tool row spans the screen (sub-tab chips on their own line, finger size)', m.tool === vp.width && m.toolH < 130, m); ok(nm + ': the dock and the top buttons stay on screen', m.dockL >= 0 && m.dockR <= vp.width && m.acts <= vp.width, m);
     await q.screenshot({ path: S + '/plus_' + vp.width + '.png' }); ok(nm + ': no script errors', q.errs.length === 0, q.errs); await q.context().close(); }
   await p.screenshot({ path: S + '/plus_desktop.png' });
   console.log('ERRORS ' + fails.length + (fails.length ? ' — ' + fails.join(' | ') : '')); await b.close(); process.exit(fails.length ? 1 : 0);

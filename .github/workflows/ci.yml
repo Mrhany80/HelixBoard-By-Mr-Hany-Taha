@@ -1,0 +1,41 @@
+# Builds the web app and runs the browser test suites.
+# Runs on every pull request, and the release and web-app workflows call it first, so a broken build is never published.
+# The Electron suite (crawl3), the 4K sweep and the ink benchmark are not run here: they need a desktop, a GPU or a quiet machine.
+name: Tests
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build the web app
+        run: python3 build.py
+      - name: Install Playwright and Chromium
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm install playwright
+          npx playwright install --with-deps chromium
+      - name: Run the suites
+        working-directory: tests
+        env:
+          NODE_PATH: /tmp/pw/node_modules
+        run: node runall.js savefail imports menus menus2 doc kb mm mm3 mm4 anim tr2 ppt plus ink
+      - name: Sweep every tool at 1366x768 (one tab at a time)
+        working-directory: tests
+        env:
+          NODE_PATH: /tmp/pw/node_modules
+          HB_SWEEP_VP: '1'
+          HB_USER_DATA: ${{ runner.temp }}/hb-sweep
+        run: |
+          for t in draw insert science teach page; do HB_SWEEP_TABS=$t node sweep.js; done

@@ -174,3 +174,41 @@ html{overflow:hidden}
   #toolrow input[type=range]{height:40px!important}
   #pagetabs .ptab{min-height:40px!important} #ptAdd{min-width:40px!important;min-height:40px!important}
 }
+
+/* 3.3.0 scroll bars: slim, quiet pills instead of thick glowing slabs; the thumb only takes the accent colour while it is used */
+html body #vbar,html body #hbar{padding:2px;gap:2px;border:0;border-radius:10px;box-shadow:none;background:color-mix(in srgb,var(--panel) 70%,transparent);backdrop-filter:none}
+html body #vbar{width:16px;right:6px}
+html body #hbar{height:16px;bottom:6px}
+html body #vbar .trk,html body #hbar .trk{background:transparent;border-radius:6px}
+html body #vbar .trk i,html body #hbar .trk i{background:color-mix(in srgb,var(--muted) 70%,transparent);box-shadow:none;border-radius:6px;filter:none}
+html body #vbar .trk i{left:3px;right:3px} html body #hbar .trk i{top:3px;bottom:3px}
+html body #vbar .trk i::after,html body #hbar .trk i::after{display:none}
+html body #vbar .trk:hover i,html body #hbar .trk:hover i,html body #vbar .trk.drag i,html body #hbar .trk.drag i{background:var(--accent);box-shadow:none;filter:none}
+html body #vbar .sa,html body #hbar .sa{width:12px;height:12px;border-radius:4px}
+html body #vbar .sa svg,html body #hbar .sa svg{width:10px;height:10px}
+@media (pointer:coarse){ html body #vbar{width:20px} html body #hbar{height:20px} html body #vbar .sa,html body #hbar .sa{width:16px;height:16px} }
+/* the browser's own scroll bars (lists, panels) match */
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 55%,transparent);border-radius:8px;border:2px solid transparent;background-clip:padding-box}::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+/* 3.3.0 phones (up to 600 px wide): the sub-tab chips get their own line above the tools, so the tools are not pushed off the screen,
+   and every chip and tool button is finger sized. Wider screens are not affected. */
+@media (max-width:600px){
+  body.side #toolrow{display:grid!important;grid-template-rows:auto auto;grid-auto-flow:column;align-items:center!important;row-gap:4px!important;padding:8px 8px 4px!important}
+  body.side #toolrow .grp.subs{grid-row:1;grid-column:1;position:sticky!important;left:0;z-index:3;width:calc(100vw - 16px);background:var(--bg);border:0!important;padding:0 0 2px!important;overflow-x:auto;scrollbar-width:none}
+  body.side #toolrow .grp.subs .glab{display:none!important}
+  body.side #toolrow .grp.subs .subchips{flex-wrap:nowrap;gap:6px}
+  body.side #toolrow .grp:not(.subs){grid-row:2}
+  body.side #toolrow .subchip{min-height:40px;white-space:nowrap}
+  body.side #toolrow .tb{width:64px!important;min-width:64px!important;min-height:52px}
+  #pagetabs .px{min-width:40px;min-height:40px;display:inline-grid;place-items:center}
+  #drawerBtn,#drawerX{min-width:44px;min-height:44px}
+  #drawer button{min-height:44px;min-width:86px}
+  #vbar .sa,#hbar .sa{display:none!important}
+  html body #vbar{width:14px} html body #hbar{height:14px}
+}
+
+/* 3.3.0 contextual bar next to the selection */
+#selbar{position:fixed;z-index:30;display:flex;gap:2px;align-items:center;padding:4px;border-radius:14px;background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.28)}
+#selbar[hidden]{display:none}
+#selbar .tb{width:44px;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center}
+#selbar .tb[hidden]{display:none}
+#selbar .sbn{font:600 12px var(--head);color:var(--muted);padding:0 8px}

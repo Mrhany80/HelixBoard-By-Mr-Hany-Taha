@@ -9,7 +9,7 @@ cd tests && node runall.js            # all suites, then a pass count
 node runall.js ink ppt kb             # some suites
 ```
 
-The Electron suite (`crawl3`) runs under `xvfb-run` and expects the repository at `/home/user/helixboard` (a link to the checkout works).
+The Electron suite (`crawl3`) runs under `xvfb-run` and resolves the repository from its own location.
 
 v3.0.0 suites: `ink` (fast stroke commit equals a full redraw for every pen, layers, undo, saving after a pause and on closing,
 a 2.8 board with unknown objects), `sweep` (every tool button, touch, two screen sizes). `inkbench.js` is the writing-speed benchmark
