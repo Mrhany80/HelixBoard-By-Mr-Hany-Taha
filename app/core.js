@@ -15,13 +15,18 @@ const IDB = (() => { let dbp = null;
   const tx = async (store, mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction(store, mode), s = t.objectStore(store); const out = fn(s); t.oncomplete = () => res(out instanceof IDBRequest ? out.result : out); t.onerror = () => rej(t.error); }); };
   return {
     get: k => tx('kv', 'readonly', s => s.get(k)).catch(() => undefined),
-    put: (k, v) => tx('kv', 'readwrite', s => s.put(v, k)).catch(e => { console.warn('save failed', e); }),
+    put: (k, v) => tx('kv', 'readwrite', s => s.put(v, k)).catch(e => { console.warn('save failed', e); saveFailed(k, e); }),
     addVersion: async v => { try { await tx('versions', 'readwrite', s => s.add(v)); const all = await tx('versions', 'readonly', s => s.getAllKeys()); if (all.length > 20) await tx('versions', 'readwrite', s => { all.slice(0, all.length - 20).forEach(k => s.delete(k)); }); } catch (e) {} },
     versions: () => tx('versions', 'readonly', s => s.getAll()).catch(() => []),
     version: id => tx('versions', 'readonly', s => s.get(id)).catch(() => null) };
 })();
 
 /* ---------- tiny event bus ---------- */
+/* a failed autosave must not be silent: tell the teacher once a minute, and say what to do */
+let lastSaveWarn = 0;
+function saveFailed(k, e) { const now = Date.now(); if (now - lastSaveWarn < 60000) return; lastSaveWarn = now;
+  const full = e && (e.name === 'QuotaExceededError' || /quota/i.test(String(e.message || e)));
+  try { toast((full ? 'This device is out of storage, so the board could not be saved. ' : 'The board could not be saved automatically. ') + 'Open the File tab and use Save to keep a copy now.', 8000); } catch (er) { console.error(er); } window.__hbSaveErr = (window.__hbSaveErr || 0) + 1; }
 const bus = { m: {}, on(e, f) { (this.m[e] = this.m[e] || []).push(f); }, emit(e, d) { (this.m[e] || []).forEach(f => { try { f(d); } catch (er) { console.error(er); } }); } };
 
 /* ---------- toast, modal, floating panels ---------- */
