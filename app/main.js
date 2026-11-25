@@ -28,7 +28,7 @@ if (window.helixDesktop) { const D = window.helixDesktop; window.prompt = (m, d)
   D.onOpenFile(({ name, data }) => { const f = new File([data], name), ext = (name.split('.').pop() || '').toLowerCase();
     if (ext === 'helix') window.HBIO.readHelix(f); else if (ext === 'hbset') window.HBL.importFiles([f]); else window.HBIO.openDoc(f); }); if (D.onInsertImage) D.onInsertImage(url => { window.HBI.insertImage(url); toast('Screen picture added to the board.'); }); D.ready(); }
 /* after an update: a short "What's new" card, once (not on a first install) */
-{ const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
+{ const ver = window.HBA && HBA.version, seen = set.get('seenVer', ''); if (ver && seen !== ver && !/[?&]nointro/.test(location.search)) { if (!set.get('seenIntro', false) && !seen) set.put('seenVer', ver); else {
   const show = () => { if (document.getElementById('intro') && !document.getElementById('intro').hidden) return setTimeout(show, 800); set.put('seenVer', ver); const { modal, icon } = window.HB;
     const tab = t => () => window.HBUI && HBUI.selectTab(t);
     const items = [['pencil', 'Writing keeps up with the pen', 'A finished stroke is painted at once instead of redrawing the whole page, and saving waits until you pause. A full board writes like an empty one.', tab('draw')],
