@@ -1,5 +1,5 @@
 const { chromium } = require('playwright'); const S = process.argv[2] || __dirname; (async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
-await p.goto('file:///home/user/helixboard/dist/index.html?nointro=1&accskip=1'); await p.waitForTimeout(1500);
+await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro=1&accskip=1')); await p.waitForTimeout(1500);
 await p.evaluate(() => HBK.toggle(true)); await p.waitForTimeout(400);
 const tap = async k => { const el = (await p.$$('#kbd .key')).find(async () => 0); const all = await p.$$('#kbd .key'); for (const x of all) if ((await x.getAttribute('data-k')) === k || (await x.getAttribute('data-i')) === k) { await x.click(); return; } throw new Error('no key ' + k); };
 await tap('{sh}'); for (const k of ['h', 'e', 'l', 'l', 'o']) await tap(k); await tap(' '); for (const k of ['c', 'o', '2', 'x']) await tap(k); await tap('{bs}');

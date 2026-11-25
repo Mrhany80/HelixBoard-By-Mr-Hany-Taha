@@ -1,6 +1,6 @@
 const { chromium } = require('playwright'); const fs = require('fs'); (async () => { const b = await chromium.launch();
 for (const variant of ['import only', 'show + esc', 'show + freeze + esc']) { const c = await b.newContext({ viewport: { width: 1400, height: 850 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage();
- await p.goto('file:///home/user/helixboard/dist/index.html?nointro'); await p.waitForTimeout(1200);
+ await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro')); await p.waitForTimeout(1200);
  const b64 = fs.readFileSync(__dirname + '/anim.pptx').toString('base64'); await p.evaluate(b64 => HBIO.importPptx(new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'a.pptx')), b64);
  await p.waitForSelector('#ppGo'); await p.click('#ppGo'); await p.waitForFunction(() => HBE.page().deck, null, { timeout: 120000 }); await p.waitForTimeout(500);
  if (variant !== 'import only') { await p.keyboard.press('F5'); await p.waitForTimeout(1000); if (variant.includes('freeze')) { const cdp = await c.newCDPSession(p); await cdp.send('Page.setWebLifecycleState', { state: 'frozen' }); await p.waitForTimeout(2000); await cdp.send('Page.setWebLifecycleState', { state: 'active' }); } await p.keyboard.press('Escape'); await p.waitForTimeout(300); await p.keyboard.press('Escape'); await p.waitForTimeout(300); }

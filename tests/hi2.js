@@ -1,5 +1,5 @@
 const { chromium } = require('playwright'); const fs = require('fs'); (async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1400, height: 850 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage();
- await p.goto('file:///home/user/helixboard/dist/index.html?nointro'); await p.waitForTimeout(1200);
+ await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro')); await p.waitForTimeout(1200);
  const px = () => p.evaluate(() => { const cv = document.getElementById('cvMain') || document.querySelector('#stage canvas'); const g = cv.getContext('2d'), r = cv.getBoundingClientRect(), k = cv.width / r.width; const d = g.getImageData(Math.round((900 - r.left) * k), Math.round((566 - r.top) * k), 1, 1).data; return [cv.id, ...d].join(','); });
  const draw = async () => { await p.evaluate(() => HBI.setTool('draw', 'hi')); await p.mouse.move(800, 560); await p.mouse.down(); for (let i = 0; i < 15; i++) await p.mouse.move(800 + i * 12, 560 + i * 1); await p.mouse.up(); await p.waitForTimeout(500); };
  await draw(); console.log('plain board pixel under the stroke:', await px()); await p.screenshot({ path: 'hi_plain.png', clip: { x: 700, y: 480, width: 400, height: 160 } });

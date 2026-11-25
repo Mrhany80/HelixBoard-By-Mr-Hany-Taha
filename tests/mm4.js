@@ -1,7 +1,7 @@
 /* Concept map: professional names, and a branch dragged onto another idea re-attaches there (one Undo step) */
 const { chromium } = require('playwright'); const S = process.argv[2] || __dirname; const log = (...a) => console.log(...a);
 (async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 1600, height: 900 } }); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; }); const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('file:///home/user/helixboard/dist/index.html?nointro'); await p.waitForTimeout(1500);
+  await p.goto('file://' + require('path').resolve(__dirname, '..', 'dist/index.html?nointro')); await p.waitForTimeout(1500);
   await p.evaluate(() => HBMM.open()); await p.waitForTimeout(300); await p.click('#sheet [data-t="Cellular respiration"]'); await p.waitForTimeout(700);
   const node = s => p.evaluate(s => { const n = HBE.page().objs.find(o => o.nd && o.s === s); return n && { id: n.id, par: n.par, x: n.x, y: n.y, w: n.w, h: n.h }; }, s);
   const scr = async n => p.evaluate(n => { const st = document.getElementById('stage').getBoundingClientRect(), V = HBE.V; return [st.left + (n.x + n.w / 2) * V.s + V.x, st.top + (n.y + n.h / 2) * V.s + V.y]; }, n);
