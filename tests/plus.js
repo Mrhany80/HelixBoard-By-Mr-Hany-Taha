@@ -2,11 +2,12 @@
    node plus.js [tests-folder]   — prints one line per check, then "ERRORS n". */
 const { chromium } = require('playwright'); const path = require('path');
 const S = process.argv[2] || __dirname, URL = 'file://' + path.resolve(S, '..', 'dist', 'index.html') + '?nointro=1&accskip=1';
+const VER = require('../desktop/package.json').version;
 const fails = []; const ok = (name, cond, info) => { console.log((cond ? 'ok   ' : 'FAIL ') + name + (info !== undefined ? '  ' + JSON.stringify(info) : '')); if (!cond) fails.push(name); };
 const PNG = (col) => `(() => { const c = document.createElement('canvas'); c.width = 320; c.height = 200; const g = c.getContext('2d'); g.fillStyle = '${col}'; g.fillRect(0, 0, 320, 200); g.fillStyle = '#fff'; g.fillRect(40, 40, 80, 80); return c.toDataURL(); })()`;
 (async () => {
   const b = await chromium.launch();
-  const open = async (vp, extra) => { const c = await b.newContext(Object.assign({ viewport: vp }, extra || {})); await c.addInitScript(() => { localStorage['hb:accSkip'] = 'true'; localStorage['hb:seenVer'] = '"3.0.0"'; localStorage['hb:seenIntro'] = 'true'; localStorage['hb:dueSeen'] = '"x"'; });
+  const open = async (vp, extra) => { const c = await b.newContext(Object.assign({ viewport: vp }, extra || {})); await c.addInitScript(v => { localStorage['hb:accSkip'] = 'true'; localStorage['hb:seenVer'] = '"' + v + '"'; localStorage['hb:seenIntro'] = 'true'; localStorage['hb:dueSeen'] = '"x"'; }, VER);
     /* no network at all: everything below has to work behind a school firewall */
     await c.route(/^https?:/, r => r.abort()); const p = await c.newPage(); p.errs = []; p.on('pageerror', e => p.errs.push(e.message)); await p.goto(URL); await p.waitForTimeout(1600); return p; };
   const p = await open({ width: 1600, height: 900 });
