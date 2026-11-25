@@ -1,0 +1,65 @@
+# Windows app check. Starts the real desktop app (Electron) on Windows and taps every tool.
+# Safe by design: read-only permissions, no release, no tag, no upload to Releases, no secrets.
+# It runs on pull requests and by hand. It tests the exact commit under review (shown in the log).
+# A failed tool, a page error, or too few tools tapped makes this check fail.
+name: Windows app check
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  app:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Which commit is being tested
+        shell: bash
+        run: |
+          echo "Testing commit: $(git rev-parse HEAD)"
+          grep '"version"' desktop/package.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build the app page
+        shell: bash
+        run: |
+          python build.py
+          mkdir -p desktop/app
+          cp dist/index.html desktop/app/index.html
+      - name: Install Electron
+        shell: bash
+        working-directory: desktop
+        run: npm ci
+      - name: Install Playwright (test driver only)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y >/dev/null && npm install playwright
+      - name: Start the app and tap every tool
+        shell: bash
+        env:
+          NODE_PATH: ${{ runner.temp }}/pw/node_modules
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          node tests/crawl3.js "$RUNNER_TEMP/shots" 2>&1 | tee "$RUNNER_TEMP/crawl.log"
+          test "${PIPESTATUS[0]}" -eq 0
+      - name: Keep the log and screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app-check
+          path: |
+            ${{ runner.temp }}/crawl.log
+            ${{ runner.temp }}/shots/crawl2.png
+          if-no-files-found: ignore
