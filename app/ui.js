@@ -198,8 +198,17 @@ const row = $('#toolrow');
 function buildRow() { try { return buildRowInner(); } catch (e) { console.error(e); if (curTab !== 'draw') { curTab = 'draw'; set.put('tab', 'draw'); try { return buildRowInner(); } catch (e2) { console.error(e2); } } }
 }
 ['study', 'teach', 'page'].forEach(id => set.put('sub:' + id, 'all')); TABS.forEach(t => { if (t.defSub) set.put('sub:' + t.id, t.defSub); });
-function buildRowInner() { const t = TABS.find(x => x.id === curTab); let h = ''; let groups = t.groups;
-  if (t.subs) { const cur = set.get('sub:' + t.id, 'all'); h += '<div class="grp subs"><span class="glab">SHOW</span><div class="subchips">' + [['all', 'All']].concat(t.subs).map(([k, l]) => '<button class="subchip" data-sub="' + k + '" aria-pressed="' + (k === cur) + '">' + l + '</button>').join('') + '</div></div>'; if (cur !== 'all') groups = groups.filter(g => g.s === cur); }
+/* 3.3.0 Simple mode: each tab shows the groups a lesson needs every day; the rest sit behind "More tools" and the Ctrl+K search (nothing is removed).
+   Keys are tab | sub-tab | group label. */
+const ADV = new Set(['draw|pens|OPTIONS', 'draw|pens|INK MAGIC', 'draw|pens|PRACTISE DRAWING', 'draw|shapes|MEASURE', 'draw|shapes|ARRANGE', 'draw|text|RECALL',
+  'insert|media|SCREEN', 'insert|media|COMPARE', 'insert|media|ATLAS APPS', 'insert|notes|THINKING MAPS', 'insert|notes|MARK', 'insert|notes|REVIEW', 'insert|notes|SCIENCE TEMPLATES', 'insert|notes|MORE',
+  'teach|time|ROUTINES', 'teach|pick|NAMES', 'teach|pick|WHEEL OPTIONS', 'teach|check|EVERY VOICE', 'teach|check|QUESTIONING', 'teach|focus|SIGNAL', 'teach|focus|MOTIVATE',
+  'page|page|LOOK', 'page|page|INPUT', 'page|page|SHOW', 'page|page|START', 'page|bg|BACKGROUND OPTIONS']);
+const isAdv = (t, g) => ADV.has(t.id + '|' + (g.s || '') + '|' + g.l);
+const simpleOn = () => set.get('simple', true) !== false;
+function buildRowInner() { const t = TABS.find(x => x.id === curTab); let h = ''; let groups = t.groups; const hasAdv = groups.some(g => isAdv(t, g)), simple = simpleOn() && hasAdv;
+  if (t.subs) { const cur = set.get('sub:' + t.id, 'all'); h += '<div class="grp subs"><span class="glab">SHOW</span><div class="subchips">' + [['all', 'All']].concat(t.subs).map(([k, l]) => '<button class="subchip" data-sub="' + k + '" aria-pressed="' + (k === cur) + '">' + l + '</button>').join('') + (hasAdv ? '<button class="subchip more" data-more="1" aria-pressed="' + !simple + '" title="Show or hide the less used tools. Everything is also found with Ctrl+K.">' + (simple ? 'More tools' : 'Fewer tools') + '</button>' : '') + '</div></div>'; if (cur !== 'all') groups = groups.filter(g => g.s === cur); }
+  if (simple) groups = groups.filter(g => !isAdv(t, g));
   groups.forEach(g => { h += '<div class="grp"><span class="glab">' + g.l + '</span>'; g.items.forEach(it => h += itemHTML(it)); h += '</div>'; });
   row.innerHTML = h; bindRow(); if (window.gsap && !REDUCE) gsap.from('#toolrow .grp', { y: -10, opacity: 0, duration: 0.28, stagger: 0.03, ease: 'power2.out' }); refresh(); }
 function itemHTML(it) { if (!it.kind) return '<button class="tb" data-id="' + it.id + '" draggable="true" title="' + esc(it.label) + '">' + icon(it.ic) + '<span>' + esc(it.label) + '</span></button>';
@@ -216,7 +225,7 @@ function itemHTML(it) { if (!it.kind) return '<button class="tb" data-id="' + it
     case 'theme': return '<select class="sel" data-k="theme" aria-label="Background theme">' + Object.entries(E.THEMES).map(([k, th]) => '<option value="' + k + '"' + (k === page().theme ? ' selected' : '') + '>' + th.name + '</option>').join('') + '</select>';
     case 'width': return '<select class="sel" data-k="width" aria-label="Page width"><option value="1280">Standard 1280</option><option value="1920">Wide 1920</option><option value="2560">Ultra-wide 2560</option><option value="custom">Custom…</option></select>'; }
   return ''; }
-function bindRow() { bindFS(); bindBgs(); $$('#toolrow [data-sub]').forEach(b => b.onclick = () => { set.put('sub:' + curTab, b.dataset.sub); SND.pop && SND.pop(); buildRow(); row.scrollTop = 0; });
+function bindRow() { bindFS(); bindBgs(); $$('#toolrow [data-more]').forEach(b => b.onclick = () => { set.put('simple', !simpleOn()); SND.pop && SND.pop(); buildRow(); row.scrollTop = 0; }); $$('#toolrow [data-sub]').forEach(b => b.onclick = () => { set.put('sub:' + curTab, b.dataset.sub); SND.pop && SND.pop(); buildRow(); row.scrollTop = 0; });
   $$('#toolrow [data-id]').forEach(b => { b.onclick = () => { const it = ALL[b.dataset.id]; it.act(); refresh(); }; b.ondragstart = e => e.dataTransfer.setData('text/hb-tool', b.dataset.id); });
   $$('#toolrow [data-c]').forEach(b => b.onclick = () => { I.setColor(b.dataset.c); refresh(); });
   const pk = $('#toolrow [data-k="picker"]'); if (pk) { pk.value = /^#[0-9a-f]{6}$/i.test(T.color) ? T.color : '#1e1419'; pk.oninput = e => { I.setColor(e.target.value); }; }

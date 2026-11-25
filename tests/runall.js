@@ -2,7 +2,7 @@
 const { spawnSync } = require('child_process'), fs = require('fs'), os = require('os'), path = require('path');
 const S = __dirname;
 const ELECTRON = ['crawl3'];
-const BROWSER = ['savefail', 'ink', 'doc', 'menus', 'sweep', 'mm', 'mm3', 'mm4', 'anim', 'tr2', 'ppt', 'kb', 'plus'];
+const BROWSER = ['savefail', 'menus2', 'ink', 'doc', 'menus', 'sweep', 'mm', 'mm3', 'mm4', 'anim', 'tr2', 'ppt', 'kb', 'plus'];
 const pick = process.argv.slice(2), all = ELECTRON.concat(BROWSER).filter(n => !pick.length || pick.includes(n));
 const rows = [];
 for (const n of all) { const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'hbprof-')), t0 = Date.now();
