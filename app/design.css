@@ -174,3 +174,15 @@ html{overflow:hidden}
   #toolrow input[type=range]{height:40px!important}
   #pagetabs .ptab{min-height:40px!important} #ptAdd{min-width:40px!important;min-height:40px!important}
 }
+
+/* 3.3.0 phones (up to 600 px wide): the sub-tab chips get their own line above the tools, so the tools are not pushed off the screen,
+   and every chip and tool button is finger sized. Wider screens are not affected. */
+@media (max-width:600px){
+  body.side #toolrow{display:grid!important;grid-template-rows:auto auto;grid-auto-flow:column;align-items:center!important;row-gap:4px!important;padding:8px 8px 4px!important}
+  body.side #toolrow .grp.subs{grid-row:1;grid-column:1;position:sticky!important;left:0;z-index:3;width:calc(100vw - 16px);background:var(--bg);border:0!important;padding:0 0 2px!important;overflow-x:auto;scrollbar-width:none}
+  body.side #toolrow .grp.subs .glab{display:none!important}
+  body.side #toolrow .grp.subs .subchips{flex-wrap:nowrap;gap:6px}
+  body.side #toolrow .grp:not(.subs){grid-row:2}
+  body.side #toolrow .subchip{min-height:40px;white-space:nowrap}
+  body.side #toolrow .tb{width:64px!important;min-width:64px!important;min-height:52px}
+}
