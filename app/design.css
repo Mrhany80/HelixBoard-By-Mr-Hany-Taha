@@ -185,4 +185,8 @@ html{overflow:hidden}
   body.side #toolrow .grp:not(.subs){grid-row:2}
   body.side #toolrow .subchip{min-height:40px;white-space:nowrap}
   body.side #toolrow .tb{width:64px!important;min-width:64px!important;min-height:52px}
+  #pagetabs .px{min-width:40px;min-height:40px;display:inline-grid;place-items:center}
+  #drawerBtn,#drawerX{min-width:44px;min-height:44px}
+  #drawer button{min-height:44px;min-width:86px}
+  #vbar .sa,#hbar .sa{min-width:40px;min-height:40px}
 }
