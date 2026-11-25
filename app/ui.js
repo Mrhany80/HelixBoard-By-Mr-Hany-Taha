@@ -167,8 +167,37 @@ const TABS = [
   join('draw', [['pens', 'Pens'], ['shapes', 'Shapes'], ['text', 'Text']], [['shapes', 'shapes'], ['text', 'text']]);
   join('insert', [['media', 'Media'], ['notes', 'Notes']], [['notes', 'notes']]);
 })();
+/* 3.3.0 merged tools: groups of near-identical buttons become one button that opens a small panel with the old choices.
+   Each old tool keeps its id (saved docks and boards still find it, Ctrl+K still searches it); it is only taken off the ribbon. */
+const FOLDED = [];
+const MERGES = [
+  { id: 'm_timer', ic: 'timer', label: 'Timer', secs: [['Countdown', ['t_open', 't_5', 't_10', 't_full', 't_mini', 't_think']]] },
+  { id: 'm_pick', ic: 'users', label: 'Pick a student', secs: [['Pick', ['w_open', 'w_spin', 'minipick', 'la_cold', 'p_fair']], ['Class list', ['w_edit', 'w_new', 'w_num', 'w_grp', 'w_q']], ['Wheel', ['w_rm', 'w_reset']]] },
+  { id: 'm_cards', ic: 'layers', label: 'Flashcards', secs: [['Study', ['sp_due', 'sp_cards', 'sp_roots']], ['Sets', ['ss_imp', 'lr_edit']], ['Make', ['nk_cards', 'lr_cards']]] },
+  { id: 'm_quiz', ic: 'list-checks', label: 'Quiz', secs: [['Quiz', ['lq_pres', 'lq_edit', 'p_nquiz']]] },
+  { id: 'm_tmpl', ic: 'layout-grid', label: 'Templates', secs: [['Notes', ['@NOTE TEMPLATES']], ['Science', ['@SCIENCE TEMPLATES']], ['More', ['n_all', 'tmpl']]] },
+  { id: 'm_hi', ic: 'highlighter', label: 'Highlighter', secs: [['Colour', ['nk_hi_yellow', 'nk_hi_green', 'nk_hi_pink', 'nk_hi_blue']]] },
+  { id: 'm_marks', ic: 'check', label: 'Marks', secs: [['Marks', ['nk_st_tick', 'nk_st_cross', 'nk_st_star', 'nk_st_ask', 'nk_st_good']]] },
+  { id: 'm_export', ic: 'download', label: 'Export', secs: [['Save a copy as', ['png', 'pdfx']]] },
+  { id: 'm_settings', ic: 'settings', label: 'Settings', secs: [['Smartboard and pen', ['boardmode', 'touchtest', 'inktrail', 'inkmeter', 'inksm']], ['Start-up and app', ['introOn', 'introPlay', 'langAr', 'installApp', 'updates', 'acct']]] },
+  { id: null, drop: ['bul'] }
+];
+(function foldMerges() {
+  const inTabs = pred => { const r = []; TABS.forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id && pred(it, g)) r.push([t, g, it]); }))); return r; };
+  MERGES.forEach(m => {
+    m.secs = (m.secs || []).map(([ti, ids]) => [ti, ids.flatMap(x => x[0] === '@' ? inTabs((it, g) => g.l === x.slice(1)).map(r => r[2].id) : [x])]);
+    const ids = m.drop || m.secs.flatMap(s => s[1]); const found = inTabs(it => ids.includes(it.id)); if (!found.length) return;
+    const [t0, g0, it0] = found[0], at = g0.items.indexOf(it0);
+    found.forEach(([t, g, it]) => { g.items.splice(g.items.indexOf(it), 1); FOLDED.push({ it, via: m.label }); });
+    if (m.id) g0.items.splice(Math.min(at, g0.items.length), 0, btn(m.id, m.ic, m.label, () => openMerged(m)));
+    TABS.forEach(t => { t.groups = t.groups.filter(g => g.items.length); });
+  });
+})();
+function openMerged(m) { const ok = id => ALL[id] && ALL[id].act; const ids = m.secs.map(s => s[1].filter(ok));
+  modal.open('<h2>' + esc(m.label) + '</h2>' + m.secs.map((s, i) => ids[i].length ? '<h3 style="margin:10px 0 6px">' + esc(s[0]) + '</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">' + ids[i].map(id => '<button class="btn" data-mi="' + id + '" style="min-height:48px;display:flex;gap:8px;align-items:center;justify-content:flex-start">' + icon(ALL[id].ic) + '<span>' + esc(ALL[id].label) + '</span></button>').join('') + '</div>' : '').join(''),
+    sh => sh.querySelectorAll('[data-mi]').forEach(b => b.onclick = () => { modal.close(); try { ALL[b.dataset.mi].act(); } catch (e) { console.error(e); toast('That tool could not start.'); } refresh(); })); }
 const OLD_TAB = { shapes: 'draw', text: 'draw', notes: 'insert', study: 'teach', recog: 'draw', wheel: 'teach', timer: 'teach', class: 'teach', water: 'teach', bgs: 'page', board: 'page', bio: 'science', chem: 'science', phys: 'science', lab: 'science', maths: 'science', roots: 'science' };
-const ALL = {}; SRC.concat(TABS).forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id) ALL[it.id] = it; })));
+const ALL = {}; SRC.concat(TABS).forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id) ALL[it.id] = it; }))); FOLDED.forEach(f => { if (!ALL[f.it.id]) ALL[f.it.id] = f.it; });
 const COLORS_A = ['--A', '--T', '--G', '--C'];
 let curTab = set.get('tab', 'draw'); if (!TABS.find(t => t.id === curTab)) curTab = OLD_TAB[curTab] || 'draw';
 
@@ -410,7 +439,7 @@ document.addEventListener('fullscreenchange', () => { if (!document.fullscreenEl
 /* ---------- command palette (Ctrl+K) ---------- */
 const extraCmds = []; const cmd = c => extraCmds.push(c);
 function palette() { const P = $('#palette'), inp = $('#palIn'), list = $('#palList'); P.hidden = false; inp.value = ''; inp.focus(); let sel = 0;
-  const all = () => { const out = []; TABS.forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id && it.act) out.push({ n: it.label, k: t.name + ' · ' + g.l.toLowerCase(), ic: it.ic, run: it.act }); }))); extraCmds.forEach(c => out.push(c)); return out; };
+  const all = () => { const out = []; TABS.forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id && it.act) out.push({ n: it.label, k: t.name + ' · ' + g.l.toLowerCase(), ic: it.ic, run: it.act }); }))); FOLDED.forEach(f => { if (f.it.act) out.push({ n: f.it.label, k: f.via, ic: f.it.ic, run: f.it.act }); }); extraCmds.forEach(c => out.push(c)); return out; };
   const render = () => { const q = inp.value.toLowerCase().trim(); const items = all().filter(c => !q || (c.n + ' ' + c.k + ' ' + (c.kw || '')).toLowerCase().includes(q)).slice(0, 40); sel = clamp(sel, 0, items.length - 1); list.innerHTML = items.map((c, i) => '<div role="option" data-i="' + i + '" aria-selected="' + (i === sel) + '">' + icon(c.ic || 'search') + '<span>' + esc(c.n) + '</span><small>' + esc(c.k) + '</small></div>').join('') || '<div class="muted">No match</div>'; list._items = items; $$('#palList [data-i]').forEach(d => d.onclick = () => run(+d.dataset.i)); };
   const run = i => { const c = list._items[i]; P.hidden = true; if (c) { c.run(); refresh(); } };
   inp.oninput = () => { sel = 0; render(); }; inp.onkeydown = e => { if (e.key === 'ArrowDown') { sel++; render(); e.preventDefault(); } else if (e.key === 'ArrowUp') { sel--; render(); e.preventDefault(); } else if (e.key === 'Enter') run(sel); else if (e.key === 'Escape') P.hidden = true; e.stopPropagation(); };
