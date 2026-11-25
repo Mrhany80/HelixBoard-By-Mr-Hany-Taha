@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.0.0
+
+A big tidy-up and a set of new classroom tools. Boards and saved settings from 3.x open as before.
+
+### New
+- Find on the board (Ctrl+F or Ctrl+K): searches typed text and sticky notes on every page, then jumps to the match.
+- Comments on any item: a small bubble marks it, it is saved in the board file and never printed or exported.
+- Quiz questions: pick-all-that-apply and type-the-answer (Arabic spelling variants are accepted), in practice and class mode.
+- A bar next to the selection with duplicate, delete, comment, front, back, group and ungroup.
+- One "All backgrounds" gallery, and merged panels for timers, pickers, cards, quizzes, templates, highlights, marks, export and settings.
+- Simple mode, a `?nointro` URL option, and slimmer scroll bars.
+
+### Fixed
+- A locked item could never be selected again. The Properties panel now offers Unlock.
+- Keys typed into a field on the quiz stage were swallowed.
+- Charts in PowerPoint files now show their real series colours and a blank default title.
+- Damaged PDF, Word and PowerPoint files give a plain message, and locked PDFs ask for the password.
+- Phones: finger-size controls and no sideways scrolling on the tool row.
+- Save failures are now reported instead of silent.
+
+### Under the hood
+- Automated checks run on every pull request, including a Windows check that starts the desktop app.
+
 ## 3.2.1
 
 Menus and toolbars. Reported: the slide bar over an opened document cannot be minimised. The button was there

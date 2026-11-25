@@ -1,6 +1,6 @@
 # HelixBoard By Mr. Hany Taha — the Science Slate
 
-> **Unreleased 3.3 work (branch `audit/pro-overhaul`)** is described in `docs/v3.3.0-audit.md` and `docs/menu-changes.md`. The text below describes 3.2.1.
+> **Version 4.0 changes** are described in `docs/v3.3.0-audit.md` and `docs/menu-changes.md`. Parts of the text below still describe 3.2.1.
 >
 > **Version 3.0 "Lean".** Writing speed first: a finished stroke is painted at once and saving waits for a pause. Live class on phones,
 > reports, tests and exams, video lessons, paper cards, recording and the water reminder were removed (368 → 304 tools).
