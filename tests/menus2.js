@@ -23,7 +23,7 @@ const ok = (n, c, i) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (i !== undef
   ok('simple mode hides some tools on the whole', hidden > 20, { hidden, of: all });
   ok('every tool with an action is reachable by the Ctrl+K list', await p.evaluate(() => { let miss = []; HBUI.TABS.forEach(t => t.groups.forEach(g => g.items.forEach(it => { if (it.id && !it.act && !it.kind) miss.push(it.id); }))); return miss.length === 0 ? true : miss.slice(0, 5); }));
   ok('no two tools share a label', await p.evaluate(() => { const seen = {}, dup = []; HBUI.TABS.forEach(t => t.groups.forEach(g => g.items.forEach(i => { if (!i.id || !i.label) return; if (seen[i.label]) dup.push(i.label); seen[i.label] = 1; }))); return dup.length === 0 || dup; }));
-  await p.evaluate(() => { localStorage['hb:tab'] = '"notes"'; }); await p.reload(); await p.waitForTimeout(1500);
+  await p.evaluate(() => { localStorage['hb:tab'] = '"notes"'; }); await p.reload(); await p.waitForSelector('#helix .tab.on', { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(800);
   const on = await p.evaluate(() => { const g = document.querySelector('#helix .tab.on'); return g ? g.dataset.t : null; });
   ok('a saved "notes" tab opens Insert', on === 'insert', on);
   console.log('ERRORS', JSON.stringify(errs)); await b.close(); process.exit(fails.length || errs.length ? 1 : 0);
