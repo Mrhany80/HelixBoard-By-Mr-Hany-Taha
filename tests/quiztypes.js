@@ -61,7 +61,7 @@ Answer: A, C`;
   ok('score screen shows 100%', (await p.textContent('#stStage')).includes('100%'));
   /* wrong answers are explained */
   await p.evaluate(() => HBL.closeStage()); await p.evaluate(() => HBL.practise('QT')); await p.waitForSelector('#stStage .st-q');
-  const first = await p.$('#prT'); if (first) { await p.fill('#prT', 'zzz'); await p.press('#prT', 'Enter'); } else { await (await p.$$('#stStage .st-opt'))[3].click(); await p.click('#prC'); }
+  const first = await p.$('#prT'); if (first) { await p.fill('#prT', 'zzz'); await p.press('#prT', 'Enter'); } else { await p.locator('#stStage .st-opt').first().click(); await p.click('#prC');  }
   await p.waitForSelector('#prX'); ok('a wrong answer shows the right one', /Not quite/.test(await p.textContent('#stStage .st-ex')));
   await p.evaluate(() => HBL.closeStage());
   /* present mode */
