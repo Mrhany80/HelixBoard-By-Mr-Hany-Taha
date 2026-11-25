@@ -15,14 +15,16 @@ Competitor claims come only from the official pages listed, read 2026-11-25 (sea
 | Notability | Write or type, record audio with notes, annotate PDFs, turn notes into flashcards and quizzes; customisable floating tool bar | https://notability.com/faq , https://blog.notability.com/post/how-to-get-started-with-notability |
 | Apple Freeform | Boundless board with photos, drawings, links and files; share and work together | https://support.apple.com/guide/freeform/get-started-frfm85d6f7b58/mac |
 
-## Gap table (plan only; nothing built yet for 4b)
-| Feature | Leaders | HelixBoard today | Plan |
+## Gap table (checked against the code, 2026-11-25)
+| Feature | Leaders | HelixBoard today (read in app/studio.js, app/wheel.js) | Plan |
 |---|---|---|---|
-| Several question types in one quiz | Kahoot, Quizizz, Wordwall | Live quiz and quiz sets exist; which types they support: not checked | List the types, add missing (true/false, type-answer, ordering, matching) |
-| Spaced repetition and "rate each card" | Quizlet | "Due today" exists, so some scheduling is there; scheduler quality: not checked | Document the scheduler; add know / unsure / no buttons if missing |
-| Timer, points and leaderboard in a quiz | Mentimeter, Kahoot | Team points and winners exist; per-question timer: not checked | Check, then add |
-| Many activity formats (match up, open the box, wheel) | Wordwall, Blooket | Wheel and picker exist; the others do not | Offer match-up and open-the-box first (smallest) |
-| Ink to text / math | OneNote | Ink to shapes exists; ink to text was removed in 3.0 (64 MB model) | Keep removed unless a small offline method is found |
-| Lasso, search across handwriting | GoodNotes | Lasso exists; search across notes: not checked | Check typed-text search first |
-| Notes to flashcards and quizzes | Notability | Both exist ("Make flashcards", "Notes to quiz") | Keep; one-tap access from the selection |
-| Audio with notes | Notability | Not offered (removed in 3.0 for ink speed) | Leave out unless it shows no ink cost |
+| Several question types in one quiz | Kahoot, Quizizz, Wordwall | Multiple choice and "Order:" (arrange in the right order). True/false can be written as two options. No type-the-answer, no multi-select | Add type-the-answer first, then multi-select |
+| Spaced repetition | Quizlet | Present: Leitner boxes, "Due today" mixes all decks, daily reminder. Parity | Keep |
+| Rate each card (know / unsure) | Quizlet | Exists (known and seen counts feed progress) | Keep |
+| Timer, points, leaderboard | Mentimeter, Kahoot | Team points and winners exist; per-question countdown not found in code | Add optional per-question timer |
+| Random wheel, no repeats, saved class lists | Wordwall | Present: wheel removes winners, saved named lists, Arabic names, spin time | Parity, nothing to build |
+| Match-up, open-the-box style activities | Wordwall, Blooket | Not offered | Candidate after the items above |
+| Ink to text / math | OneNote | Ink to shapes exists; ink to text was removed in 3.0 (large model) | Keep removed unless a small offline method is found |
+| Notes to flashcards and quizzes | Notability | Both exist ("Make flashcards", "Notes to quiz") | Keep |
+| Search across notes | GoodNotes | Not found in app/notes.js | Add typed-text search in the notes list |
+| Audio with notes | Notability | Not offered (removed for ink speed) | Leave out |
